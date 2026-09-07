@@ -1,0 +1,356 @@
+@import "tailwindcss";
+
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap");
+
+/* ── Nokia Pure Headline Bold font for Amharic text ── */
+@font-face {
+  font-family: 'Nokia Pure Headline';
+  src: url('/nokia-pure-headline-bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+}
+
+/* ── Soft Mint & Ice design tokens ── */
+:root {
+  --bg-page:        #C5CECC;   /* E6ECEB darkened 15% */
+  --bg-card:        #EEF1F0;   /* matches bg tone, slightly lighter so cards float */
+  --bg-card-hover:  #CBD2D0;
+  --bg-sidebar:     #1e3a37;   /* 0c1e1c lightened 20% */
+  --bg-topbar:      rgba(212,218,217,0.97);
+  --border-color:   rgba(0,0,0,0.07);
+  --border-card:    rgba(0,80,60,0.09);
+  --text-primary:   #1A2E2B;
+  --text-secondary: #1A3530;
+  --text-muted:     #2A5C54;
+  --accent-teal:    #0F766E;
+  --accent-teal2:   #14B8A6;
+  --accent-teal-lt: #CCFBF1;
+  --accent-orange:  #EA580C;
+  --accent-blue:    #2563EB;
+  --accent-emerald: #059669;
+  --shadow-card:    0 2px 12px rgba(0,60,45,0.09), 0 1px 3px rgba(0,0,0,0.05);
+  --shadow-hover:   0 8px 28px rgba(0,60,45,0.14), 0 2px 6px rgba(0,0,0,0.07);
+}
+
+/* ── Keyframes ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes continuousSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes logoSpin {
+  0%   { transform: rotate(0deg) scale(0.8); opacity: 0; }
+  60%  { transform: rotate(380deg) scale(1.05); opacity: 1; }
+  80%  { transform: rotate(350deg) scale(0.97); }
+  100% { transform: rotate(360deg) scale(1); opacity: 1; }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Base ── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { font-size: 110%; }   /* +10% global font scale */
+
+body {
+  margin: 0;
+  font-family: "Poppins", system-ui, sans-serif;
+  font-size: 1rem;
+  color: var(--text-primary);
+  background: var(--bg-page);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Poppins", system-ui, sans-serif;
+  color: var(--text-primary);
+}
+
+/* ── Scrollbars ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,80,60,0.15); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,80,60,0.25); }
+
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none { scrollbar-width: none; }
+
+/* ── Leave calendar ── */
+.leave-bg { animation: rise-in 420ms ease-out; }
+.leave-calendar-popper { z-index: 9999; }
+.leave-calendar { min-width: 320px; }
+.leave-calendar .react-datepicker__month-container { min-width: 320px; }
+.leave-calendar-popper .react-datepicker__month-select,
+.leave-calendar-popper .react-datepicker__year-select {
+  background: #0c1e1c;
+  color: #E6ECEB;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 6px;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+.leave-calendar .react-datepicker__month-dropdown-container,
+.leave-calendar .react-datepicker__year-dropdown-container {
+  color: #E6ECEB;
+}
+.leave-calendar .react-datepicker__month-dropdown,
+.leave-calendar .react-datepicker__year-dropdown {
+  background: #0c1e1c;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  color: #E6ECEB;
+}
+.leave-calendar .react-datepicker__month-option,
+.leave-calendar .react-datepicker__year-option {
+  color: #E6ECEB;
+  padding: 4px 12px;
+}
+.leave-calendar .react-datepicker__month-option:hover,
+.leave-calendar .react-datepicker__year-option:hover {
+  background: rgba(15,118,110,0.3);
+}
+.leave-calendar .react-datepicker__month-option--selected,
+.leave-calendar .react-datepicker__year-option--selected_year {
+  color: #14B8A6;
+  font-weight: 700;
+}
+.leave-calendar {
+  border: 1px solid rgba(0,80,60,0.1);
+  border-radius: 14px;
+  box-shadow: 0 14px 40px rgba(0,60,45,0.15);
+  overflow: hidden;
+  background: #F4F8F7;
+}
+.leave-calendar .react-datepicker__header {
+  background: linear-gradient(130deg, #0c1e1c, #0f3530);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding-top: 10px;
+}
+.leave-calendar .react-datepicker__current-month,
+.leave-calendar .react-datepicker__navigation-icon::before { color: #E6ECEB; }
+.leave-calendar .react-datepicker__day-names { background: rgba(0,80,60,0.05); }
+.leave-calendar .react-datepicker__day-name { color: #0F766E; font-weight: 600; }
+.leave-calendar .react-datepicker__day { border-radius: 8px; color: #1A2E2B; }
+.leave-calendar .react-datepicker__day:hover { background: rgba(15,118,110,0.1); }
+.leave-calendar .react-datepicker__day--selected,
+.leave-calendar .react-datepicker__day--keyboard-selected { background: #0F766E; color: #fff; }
+.leave-calendar .react-datepicker__day--today { box-shadow: inset 0 0 0 1.5px #0F766E; font-weight: 700; }
+.leave-calendar .react-datepicker__month-container { background: #F4F8F7; }
+
+/* ══════════════════════════════════════════════════════════
+   RESPONSIVE DESIGN — HRMS
+   Breakpoints:
+     Mobile : < 768px
+     Tablet : 768px – 1023px
+     Desktop: ≥ 1024px
+══════════════════════════════════════════════════════════ */
+
+/* ── Prevent horizontal overflow globally ── */
+html, body { overflow-x: hidden; }
+* { max-width: 100%; box-sizing: border-box; }
+
+/* ── Responsive table wrapper ── */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Grid helpers ── */
+.grid-responsive-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+.grid-responsive-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.grid-responsive-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+
+/* ── Card helpers ── */
+.card-base {
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border-card);
+  box-shadow: var(--shadow-card);
+  padding: 1.25rem;
+}
+
+/* ── Form helpers ── */
+.form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+.form-full  { grid-column: 1 / -1; }
+
+/* ── Touch targets ── */
+button, a, [role="button"] { min-height: 44px; }
+
+/* ════════════════════════════
+   TABLET  768px – 1023px
+════════════════════════════ */
+@media (max-width: 1023px) {
+  html { font-size: 105%; }
+
+  /* Grids */
+  .grid-responsive-4 { grid-template-columns: repeat(2, 1fr); }
+  .grid-responsive-3 { grid-template-columns: repeat(2, 1fr); }
+
+  /* Forms */
+  .form-row-3 { grid-template-columns: 1fr 1fr; }
+
+  /* Dashboard metric cards */
+  .dash-metrics { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Stat cards row */
+  .stat-row { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Tables — allow horizontal scroll */
+  table { min-width: 600px; }
+
+  /* Main content padding */
+  main { padding: 20px !important; }
+
+  /* Modals */
+  [class*="modal"], [style*="maxWidth: 600"], [style*="maxWidth: 700"],
+  [style*="maxWidth: 800"], [style*="maxWidth: 900"] {
+    max-width: calc(100vw - 32px) !important;
+    margin: 16px !important;
+  }
+
+  /* Notification panel */
+  [style*="width: 400"] { width: min(400px, calc(100vw - 24px)) !important; }
+
+  /* Employee registration steps */
+  .reg-steps { flex-wrap: wrap; gap: 8px; }
+  .reg-steps > * { flex: 1 1 120px; }
+
+  /* Dashboard charts */
+  .chart-container { min-width: 0; overflow: hidden; }
+}
+
+/* ════════════════════════════
+   MOBILE  < 768px
+════════════════════════════ */
+@media (max-width: 767px) {
+  html { font-size: 100%; }
+
+  /* Grids → single column */
+  .grid-responsive-4,
+  .grid-responsive-3,
+  .grid-responsive-2 { grid-template-columns: 1fr !important; }
+
+  /* Dashboard metrics → 2 cols on phone */
+  .dash-metrics { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Forms → single column */
+  .form-row-2,
+  .form-row-3 { grid-template-columns: 1fr !important; }
+
+  /* All inline-style grid overrides for pages using style= */
+  [style*="gridTemplateColumns: '1fr 1fr'"],
+  [style*="gridTemplateColumns: \"1fr 1fr\""],
+  [style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+  [style*="gridTemplateColumns: 'repeat(3"],
+  [style*="gridTemplateColumns: \"repeat(3"],
+  [style*="gridTemplateColumns: 'repeat(4"],
+  [style*="gridTemplateColumns: \"repeat(4"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Main content */
+  main { padding: 16px !important; }
+
+  /* Page headers */
+  [style*="padding: '20px 26px'"],
+  [style*="padding: \"20px 26px\""],
+  [style*="padding: '22px 28px'"],
+  [style*="padding: '24px 28px'"] {
+    padding: 14px 16px !important;
+  }
+
+  /* Tables */
+  .table-responsive { overflow-x: auto; }
+  table { min-width: 480px; font-size: 0.78rem; }
+  th, td { padding: 8px 10px !important; }
+
+  /* Modals */
+  [style*="maxWidth"],
+  [style*="max-width"] {
+    max-width: calc(100vw - 24px) !important;
+  }
+
+  /* Cards */
+  .card-base { padding: 1rem; border-radius: 10px; }
+
+  /* Typography */
+  h1 { font-size: 1.25rem !important; }
+  h2 { font-size: 1.1rem !important; }
+  h3 { font-size: 1rem !important; }
+
+  /* Buttons */
+  button { min-height: 44px; }
+
+  /* Stat rows → stack */
+  .stat-row { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Filter bars → stack vertically */
+  [style*="display: 'grid'"][style*="repeat(5"],
+  [style*="display: 'grid'"][style*="repeat(4"],
+  [style*="display: 'grid'"][style*="repeat(3"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Avatar dropdown → full width */
+  [style*="width: 240"] { width: calc(100vw - 24px) !important; right: 12px !important; }
+
+  /* Notification panel */
+  [style*="width: 400"] { width: calc(100vw - 16px) !important; right: 8px !important; left: 8px !important; }
+
+  /* Header stat flex rows */
+  [style*="flexWrap: 'wrap'"] { flex-wrap: wrap !important; }
+
+  /* Chip / badge overflow */
+  [style*="whiteSpace: 'nowrap'"] { white-space: normal !important; }
+
+  /* Action button rows in tables */
+  [style*="display: 'flex'"][style*="gap: 8"] { flex-wrap: wrap; }
+
+  /* Pagination */
+  .pagination { flex-wrap: wrap; gap: 4px; }
+}
+
+/* ════════════════════════════
+   SMALL MOBILE  < 480px
+════════════════════════════ */
+@media (max-width: 479px) {
+  html { font-size: 95%; }
+
+  /* Dashboard metrics → single column on very small */
+  .dash-metrics { grid-template-columns: 1fr !important; }
+
+  /* Stat rows → single column */
+  .stat-row { grid-template-columns: 1fr !important; }
+
+  main { padding: 12px !important; }
+
+  /* Table font shrink */
+  table { font-size: 0.73rem; }
+  th, td { padding: 6px 8px !important; }
+
+  /* Topbar — shrink font */
+  header h1 { font-size: 1rem !important; }
+}
+
+/* ════════════════════════════
+   PRINT
+════════════════════════════ */
+@media print {
+  aside, header, footer { display: none !important; }
+  main { margin: 0 !important; padding: 0 !important; }
+}

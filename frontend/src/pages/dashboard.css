@@ -1,0 +1,109 @@
+@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;600;700;800;900&display=swap");
+
+:root {
+  --leave-grid-line: rgba(15, 23, 42, 0.05);
+  --leave-bg-solid: #f8fbfa;
+}
+
+body {
+  margin: 0;
+  font-family: "DM Sans", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #102A43;
+  background: #F2FBFA;
+}
+
+h1, h2, h3, h4 {
+  font-family: "DM Serif Display", "Outfit", Georgia, serif;
+}
+
+/* Scrollbar hide utility */
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Dashboard fade-up animation */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Sidebar scrollbar */
+nav.overflow-y-auto::-webkit-scrollbar { width: 3px; }
+nav.overflow-y-auto::-webkit-scrollbar-track { background: transparent; }
+nav.overflow-y-auto::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 99px; }
+
+.leave-bg {
+  animation: rise-in 420ms ease-out;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.leave-calendar-popper {
+  z-index: 60;
+}
+
+.leave-calendar {
+  border: 1px solid #d5e1dc;
+  border-radius: 14px;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.18);
+  font-family: "Source Sans 3", sans-serif;
+  overflow: hidden;
+}
+
+.leave-calendar .react-datepicker__header {
+  background: linear-gradient(130deg, #0b5d4a, #0f7a61);
+  border-bottom: none;
+  padding-top: 10px;
+}
+
+.leave-calendar .react-datepicker__current-month,
+.leave-calendar .react-datepicker-time__header,
+.leave-calendar .react-datepicker-year-header,
+.leave-calendar .react-datepicker__navigation-icon::before {
+  color: #f6fffb;
+}
+
+.leave-calendar .react-datepicker__day-names {
+  background: #e6f3ee;
+}
+
+.leave-calendar .react-datepicker__day-name {
+  color: #0f4b3b;
+  font-weight: 700;
+}
+
+.leave-calendar .react-datepicker__month-dropdown,
+.leave-calendar .react-datepicker__year-dropdown {
+  border: 1px solid #d5e1dc;
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+}
+
+.leave-calendar .react-datepicker__day {
+  border-radius: 8px;
+  color: #1f2937;
+}
+
+.leave-calendar .react-datepicker__day:hover {
+  background: #d8efe7;
+}
+
+.leave-calendar .react-datepicker__day--keyboard-selected,
+.leave-calendar .react-datepicker__day--selected {
+  background: #0b5d4a;
+  color: #fff;
+}
+
+.leave-calendar .react-datepicker__day--today {
+  box-shadow: inset 0 0 0 1px #0b5d4a;
+  font-weight: 700;
+}

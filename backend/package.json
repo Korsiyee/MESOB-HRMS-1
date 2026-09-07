@@ -1,0 +1,57 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "test": "jest --verbose",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "db:setup-wizard": "node scripts/setup-wizard.js",
+    "db:init": "node scripts/dbInit.js",
+    "db:clean": "node scripts/dbClean.js",
+    "db:migrate": "node scripts/migrate.js",
+    "db:verify": "node scripts/dbVerify.js",
+    "db:reset": "npm run db:clean && npm run db:init",
+    "db:trim": "node scripts/trimEmployees.js",
+    "db:seed-attendance": "node scripts/seedAttendance.js",
+    "db:setup": "npm run db:init && npm run db:trim && npm run db:seed-attendance",
+    "holidays:init": "node scripts/initHolidays.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.6",
+    "date-holidays": "^2.0.0",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.0",
+    "kenat": "^3.2.0",
+    "minio": "^8.0.6",
+    "multer": "^2.1.1",
+    "mysql2": "^3.19.0",
+    "node-cron": "^4.2.1",
+    "pdf-lib": "^1.17.1",
+    "puppeteer": "^25.1.0",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.14"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coveragePathIgnorePatterns": [
+      "/node_modules/"
+    ],
+    "testMatch": [
+      "**/__tests__/**/*.test.js"
+    ]
+  }
+}
