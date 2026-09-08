@@ -164,13 +164,11 @@ async function authenticateJwt(req, res, next) {
       department_uuid: departmentUuid || null,
       username: user.username,
       email: employeeData?.email || null,
-      role: user.role,
+      role_id: user.role_id, // NEW: Use role_id instead of role ENUM
+      role: user.role, // DEPRECATED: Keep for backward compat during migration, will be removed
       full_name: fullName,
       profile_photo_url: profilePhotoUrl,
       mesob_id: employeeData?.mesob_id || null,
-      // NEW: Extract occupations and scopes from JWT payload
-      occupations: payload.occupations || [],
-      scopes: payload.scopes || []
     };
     return next();
   } catch (error) {

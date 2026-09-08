@@ -5,7 +5,7 @@ const { requireEnv, getEnv } = require("../config/env");
 const { executeQuery } = require("../utils/dbQuery");
 const { getSignedUrl } = require("./employeeStorageService");
 const db = require("../config/db");
-const permissionService = require("./permissionService");
+const authorizationService = require("./authorizationService"); // NEW: Use authorization service
 
 const JWT_SECRET = requireEnv("JWT_SECRET");
 const JWT_REFRESH_SECRET = requireEnv("JWT_REFRESH_SECRET");
@@ -92,48 +92,27 @@ async function verifyPassword(password, passwordHash) {
 }
 
 async function createAccessToken(user) {
-  // Calculate effective occupations (role + direct + delegations)
-  const occupations = await permissionService.calculateEffectiveOccupations(
-    user.uuid,
-    user.role,
-    user.employee_uuid
-  );
-  
-  // Get user scopes
-  const scopes = await permissionService.getUserScopes(user.uuid);
-  
+  // JWT contains minimal identity data - permissions come from authorization service
   const payload = {
     uuid: user.uuid,
     employee_uuid: user.employee_uuid,
-    role: user.role,
+    role_id: user.role_id, // NEW: Use role_id instead of role string
     department_uuid: user.department_uuid || null,
     token_version: user.token_version || 0,
-    permissions_version: user.permissions_version || 1, // NEW: Fine-grained permission tracking
-    occupations, // NEW: Include effective occupations
-    scopes       // NEW: Include user scopes
+    permissions_version: user.permissions_version || 1,
   };
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
 
 async function createRefreshToken(user) {
-  // Refresh token includes occupations/scopes for seamless token refresh
-  const occupations = await permissionService.calculateEffectiveOccupations(
-    user.uuid,
-    user.role,
-    user.employee_uuid
-  );
-  
-  const scopes = await permissionService.getUserScopes(user.uuid);
-  
+  // Refresh token also contains minimal identity data
   const payload = {
     uuid: user.uuid,
     employee_uuid: user.employee_uuid,
-    role: user.role,
+    role_id: user.role_id, // NEW: Use role_id instead of role string
     department_uuid: user.department_uuid || null,
     token_version: user.token_version || 0,
-    permissions_version: user.permissions_version || 1, // NEW: Fine-grained permission tracking
-    occupations, // NEW: Include effective occupations
-    scopes,      // NEW: Include user scopes
+    permissions_version: user.permissions_version || 1,
     tokenId: randomUUID(),
   };
   return jwt.sign(payload, JWT_REFRESH_SECRET, {
@@ -374,27 +353,22 @@ async function getUserWithOccupations(userUuid) {
     }
   }
 
-  // Fetch occupations
+  // Fetch occupations (DEPRECATED - using old tables for now)
   let occupations = [];
-  if (user.employee_uuid) {
-    try {
-      const [rows] = await executeQuery(
-        `SELECT 
-          eo.uuid AS assignment_uuid,
-          eo.assigned_at,
-          o.uuid AS occupation_uuid,
-          o.name AS occupation_name,
-          o.description AS occupation_description
-        FROM EmployeeOccupations eo
-        JOIN Occupations o ON o.uuid = eo.occupation_uuid
-        WHERE eo.employee_uuid = ?
-        ORDER BY eo.assigned_at DESC`,
-        [user.employee_uuid]
-      );
-      occupations = rows || [];
-    } catch (err) {
-      console.error("Error fetching occupations:", err);
-    }
+  // NEW: Get permissions from new authorization service
+  let permissions = [];
+  try {
+    permissions = await authorizationService.getUserPermissions(userUuid);
+  } catch (err) {
+    console.error("Error fetching permissions:", err);
+  }
+  
+  // Get role info
+  let roleInfo = null;
+  try {
+    roleInfo = await authorizationService.getUserRole(userUuid);
+  } catch (err) {
+    console.error("Error fetching role:", err);
   }
 
   // Build full name from employee data
@@ -410,12 +384,15 @@ async function getUserWithOccupations(userUuid) {
     department_uuid: user.department_uuid || null,
     username: user.username,
     email: employeeData?.email || null,
-    role: user.role,
+    role_id: user.role_id,
+    role: roleInfo ? roleInfo.code : user.role, // Return role code (backward compat)
+    role_name: roleInfo ? roleInfo.name : null, // Human-readable role name
     is_active: Boolean(user.is_active),
     full_name: fullName,
     profile_photo_url: profilePhotoUrl,
     mesob_id: employeeData?.mesob_id || null,
-    occupations: occupations, // Include occupations in response
+    permissions, // NEW: Array of permission codes
+    occupations: occupations, // DEPRECATED: Empty for backward compat
   };
 }
 
