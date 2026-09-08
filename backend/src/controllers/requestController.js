@@ -95,7 +95,6 @@ const createRequest = async (req, res) => {
   try {
     // Use employee_uuid from authenticated user
     const employee_uuid = req.user.employee_uuid;
-    const requester_role = req.user.role;
     
     if (!employee_uuid) {
       return sendError(res, {
@@ -931,11 +930,12 @@ const getEmployeeRequests = async (req, res) => {
       });
     }
 
-    // Authorization: Users can only view their own requests unless they're HR/Admin
-    const isAdminRole = ["HR_OFFICER", "HR_ADMIN", "SUPER_ADMIN"].includes(req.user.role);
+    // Authorization: Users can access their own requests OR have permission
+    const authorizationService = require("../services/authorizationService");
+    const canViewAll = await authorizationService.hasPermission(req.user.uuid, 'leave.view_all');
     const isOwnRequest = req.user.employee_uuid && req.user.employee_uuid === uuid;
 
-    if (!isOwnRequest && !isAdminRole) {
+    if (!isOwnRequest && !canViewAll) {
       return sendError(res, {
         status: 403,
         message: "You can only view your own leave requests.",

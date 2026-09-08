@@ -21,10 +21,12 @@ exports.getBalance = async (req, res) => {
     }
 
     // Authorization: Users can only view their own balance unless they're HR/Admin
-    if (
-      req.user.employee_uuid !== employeeUuid &&
-      !["HR_OFFICER", "HR_ADMIN", "SUPER_ADMIN", "DEPARTMENT_HEAD"].includes(req.user.role)
-    ) {
+    // Authorization: Check if user can view this employee's balance
+    const authorizationService = require("../services/authorizationService");
+    const canViewBalances = await authorizationService.hasPermission(req.user.uuid, 'leave.view_balances');
+    const isOwnBalance = req.user.employee_uuid === employeeUuid;
+    
+    if (!isOwnBalance && !canViewBalances) {
       return sendError(res, {
         status: 403,
         message: "You can only view your own leave balance.",

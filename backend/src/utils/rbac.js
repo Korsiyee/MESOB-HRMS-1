@@ -1,20 +1,22 @@
+/**
+ * RBAC Utility Functions
+ * 
+ * Database-driven authorization helpers that replace hardcoded role checks.
+ * Uses authorizationService for all permission checks.
+ */
+
 const { ApiError } = require("./errors");
+const authorizationService = require("../services/authorizationService");
 
-const ROLE_HR_ADMIN = "HR_ADMIN";
-const ROLE_SUPER_ADMIN = "SUPER_ADMIN";
-const ROLE_HR_OFFICER = "HR_OFFICER";
-const ROLE_DEPARTMENT_HEAD = "DEPARTMENT_HEAD";
-const ROLE_EMPLOYEE = "EMPLOYEE";
-
-function isHrAdmin(role) {
-  return role === ROLE_HR_ADMIN || role === ROLE_SUPER_ADMIN;
-}
-
-function isHrOfficer(role) {
-  return isHrAdmin(role) || role === ROLE_HR_OFFICER;
-}
-
-function assertEmployeeReadAccess(user, employee) {
+/**
+ * Assert user has permission to read employee data
+ * Checks: employees.view permission OR self-access
+ * 
+ * @param {Object} user - req.user object
+ * @param {Object} employee - Employee record
+ * @throws {ApiError} If access denied
+ */
+async function assertEmployeeReadAccess(user, employee) {
   if (!user) {
     throw new ApiError("Not authenticated.", 401, "UNAUTHORIZED");
   }
@@ -23,60 +25,111 @@ function assertEmployeeReadAccess(user, employee) {
     throw new ApiError("Employee not found.", 404, "NOT_FOUND");
   }
 
-  if (isHrOfficer(user.role) || isHrAdmin(user.role)) {
-    return;
+  // Check if accessing own employee record
+  if (user.employee_uuid === employee.uuid) {
+    return; // Self-access allowed
   }
 
-  if (user.role === ROLE_DEPARTMENT_HEAD) {
-    if (!user.department_uuid) {
-      throw new ApiError("Department context is missing.", 403, "FORBIDDEN");
-    }
-    if (employee.department_uuid !== user.department_uuid) {
-      throw new ApiError("Forbidden.", 403, "FORBIDDEN");
-    }
-    return;
+  // Check if user has employees.view permission
+  const canView = await authorizationService.hasPermission(user.uuid, 'employees.view');
+  
+  if (!canView) {
+    throw new ApiError("Insufficient permissions to view this employee.", 403, "FORBIDDEN");
   }
-
-  if (user.role === ROLE_EMPLOYEE) {
-    if (user.employee_uuid !== employee.uuid) {
-      throw new ApiError("Forbidden.", 403, "FORBIDDEN");
-    }
-    return;
+  
+  // If permission requires scope, check scope boundaries
+  const scope = await authorizationService.getUserScope(user.uuid);
+  
+  if (scope.type === 'DEPARTMENT' && employee.department_uuid !== scope.value) {
+    throw new ApiError("Employee is outside your department scope.", 403, "FORBIDDEN");
   }
-
-  throw new ApiError("Forbidden.", 403, "FORBIDDEN");
+  
+  if (scope.type === 'SELF') {
+    // Should have been caught by self-access check above, but double-check
+    throw new ApiError("Your scope is limited to self-access only.", 403, "FORBIDDEN");
+  }
 }
 
-function assertEmployeeListAccess(user) {
+/**
+ * Assert user has permission to list employees
+ * Returns scope filter for query construction
+ * 
+ * @param {Object} user - req.user object
+ * @returns {Object} Scope filter: { scope, departmentUuid?, branchUuid? }
+ * @throws {ApiError} If access denied
+ */
+async function assertEmployeeListAccess(user) {
   if (!user) {
     throw new ApiError("Not authenticated.", 401, "UNAUTHORIZED");
   }
 
-  // HR Admins and Officers have full access
-  if (isHrOfficer(user.role) || isHrAdmin(user.role)) {
-    return { scope: "all" };
+  // Check if user has employees.view permission
+  const canView = await authorizationService.hasPermission(user.uuid, 'employees.view');
+  
+  if (!canView) {
+    throw new ApiError("Insufficient permissions to list employees.", 403, "FORBIDDEN");
   }
 
-  // Department Heads have department-scoped access
-  if (user.role === ROLE_DEPARTMENT_HEAD) {
-    if (!user.department_uuid) {
-      throw new ApiError("Department context is missing.", 403, "FORBIDDEN");
-    }
-    return { scope: "department", departmentUuid: user.department_uuid };
+  // Get user's data scope
+  const scope = await authorizationService.getUserScope(user.uuid);
+  
+  switch (scope.type) {
+    case 'ALL':
+    case 'COMPANY':
+      return { scope: "all" };
+      
+    case 'DEPARTMENT':
+      if (!scope.value) {
+        throw new ApiError("Department scope is missing.", 403, "FORBIDDEN");
+      }
+      return { scope: "department", departmentUuid: scope.value };
+      
+    case 'BRANCH':
+      if (!scope.value) {
+        throw new ApiError("Branch scope is missing.", 403, "FORBIDDEN");
+      }
+      return { scope: "branch", branchUuid: scope.value };
+      
+    case 'SELF':
+      // SELF scope means user can only see themselves
+      if (!user.employee_uuid) {
+        throw new ApiError("No employee record linked to user.", 403, "FORBIDDEN");
+      }
+      return { scope: "self", employeeUuid: user.employee_uuid };
+      
+    default:
+      throw new ApiError("Invalid scope type.", 500, "INTERNAL_ERROR");
   }
+}
 
-  // Employees with occupation-based access (handled by occupation middleware)
-  // The occupation middleware already verified access, so allow them through
-  if (user.role === ROLE_EMPLOYEE) {
-    return { scope: "all" }; // Occupation middleware already restricted access
-  }
+/**
+ * Check if user has a specific permission (async)
+ * Convenience wrapper around authorizationService
+ * 
+ * @param {Object} user - req.user object
+ * @param {string} permissionCode - Permission code to check
+ * @returns {Promise<boolean>}
+ */
+async function hasPermission(user, permissionCode) {
+  if (!user) return false;
+  return authorizationService.hasPermission(user.uuid, permissionCode);
+}
 
-  throw new ApiError("Forbidden.", 403, "FORBIDDEN");
+/**
+ * Check if user has any of the specified permissions
+ * 
+ * @param {Object} user - req.user object
+ * @param {string[]} permissionCodes - Array of permission codes
+ * @returns {Promise<boolean>}
+ */
+async function hasAnyPermission(user, permissionCodes) {
+  if (!user) return false;
+  return authorizationService.hasAnyPermission(user.uuid, permissionCodes);
 }
 
 module.exports = {
-  isHrAdmin,
-  isHrOfficer,
   assertEmployeeReadAccess,
   assertEmployeeListAccess,
+  hasPermission,
+  hasAnyPermission,
 };
