@@ -6,30 +6,20 @@ const {
   updatePolicy,
   deletePolicy,
 } = require("../controllers/policyController");
-const { requirePermission } = require("../middleware/requirePermission");
+const { authorize } = require("../middleware/authorize");
 const { authenticateJwt } = require("../middleware/authMiddleware");
 
 const router = express.Router();
-
-// Leave Policies occupation allows managing leave policies
-const canManagePolicies = requirePermission({ 
-  occupations: 'Leave Policies' 
-});
 
 // View policies (all authenticated users)
 router.get("/", authenticateJwt, listPolicies);
 router.get("/:leaveType", authenticateJwt, getPolicy);
 
-// Create policy (requires Leave Policies occupation)
-router.post("/", canManagePolicies, createPolicy);
+// Manage policies (requires Policies permission)
+router.post("/", authorize("Policies.Create"), createPolicy);
+router.patch("/:leaveType", authorize("Policies.Update"), updatePolicy);
 
-// Update policy (requires Leave Policies occupation)
-router.patch("/:leaveType", canManagePolicies, updatePolicy);
-
-// Delete policy (SUPER_ADMIN only - super critical operation)
-router.delete("/:leaveType", 
-  requirePermission({ roles: ['SUPER_ADMIN'] }),
-  deletePolicy
-);
+// Delete policy (critical operation - requires delete permission)
+router.delete("/:leaveType", authorize("Policies.Delete"), deletePolicy);
 
 module.exports = router;

@@ -6,37 +6,31 @@ const {
   getEntityTypes,
   exportLogs,
 } = require("../controllers/logController");
-const { requirePermission } = require("../middleware/requirePermission");
-const { requireScope } = require("../middleware/requireScope");
+const { authorize, requireScopeFilter } = require("../middleware/authorize");
 
 const router = express.Router();
 
-// Audit Logs occupation allows viewing audit logs
-const canViewAuditLogs = requirePermission({ 
-  occupations: 'Audit Logs' 
-});
-
-// List logs with filtering and pagination (with scope)
+// List logs with filtering and pagination (with scope filtering for Dept Heads)
 router.get("/", 
-  canViewAuditLogs, 
-  requireScope('audit'),
+  authorize("AuditLogs.View"),
+  requireScopeFilter('audit'),
   listLogs
 );
 
 // Get available action types
-router.get("/actions", canViewAuditLogs, getActions);
+router.get("/actions", authorize("AuditLogs.View"), getActions);
 
 // Get available entity types
-router.get("/entity-types", canViewAuditLogs, getEntityTypes);
+router.get("/entity-types", authorize("AuditLogs.View"), getEntityTypes);
 
-// Export logs to CSV (with scope)
+// Export logs to CSV (with scope filtering)
 router.get("/export", 
-  canViewAuditLogs, 
-  requireScope('audit'),
+  authorize("AuditLogs.Export"),
+  requireScopeFilter('audit'),
   exportLogs
 );
 
 // Get single log entry (must be last to avoid route conflicts)
-router.get("/:uuid", canViewAuditLogs, getLog);
+router.get("/:uuid", authorize("AuditLogs.View"), getLog);
 
 module.exports = router;

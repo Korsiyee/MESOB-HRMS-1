@@ -6,31 +6,31 @@ const {
   updateDepartment,
   deleteDepartment,
 } = require("../controllers/departmentController");
-const { requirePermission } = require("../middleware/requirePermission");
+const { authorize } = require("../middleware/authorize");
 
 const router = express.Router();
 
-// Authorization helpers using new RBAC middleware
-const canManageDepartments = requirePermission({ 
-  occupations: 'Departments - Manage' 
-});
+// View: Anyone who can view departments, employees, or attendance
+router.get("/", 
+  authorize([
+    "Departments.View",
+    "Employees.View", 
+    "Attendance.View"
+  ]), 
+  listDepartments
+);
+router.get("/:uuid", 
+  authorize([
+    "Departments.View",
+    "Employees.View",
+    "Attendance.View"
+  ]), 
+  getDepartment
+);
 
-const canViewDepartments = requirePermission({ 
-  occupations: [
-    'Departments - Overview',
-    'Departments - Manage',
-    'Employees - Registration',
-    'Employees - Overview',
-    'Attendance - Overview',
-    'Attendance - Manage'
-  ],
-  logic: 'OR'
-});
-
-router.get("/", canViewDepartments, listDepartments);
-router.post("/", canManageDepartments, createDepartment);
-router.get("/:uuid", canViewDepartments, getDepartment);
-router.patch("/:uuid", canManageDepartments, updateDepartment);
-router.delete("/:uuid", canManageDepartments, deleteDepartment);
+// Manage: Requires department management permission
+router.post("/", authorize("Departments.Create"), createDepartment);
+router.patch("/:uuid", authorize("Departments.Update"), updateDepartment);
+router.delete("/:uuid", authorize("Departments.Delete"), deleteDepartment);
 
 module.exports = router;

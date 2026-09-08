@@ -2,57 +2,28 @@ const express = require("express");
 const router = express.Router();
 const enhancedLetterController = require("../controllers/enhancedLetterController");
 const { authenticateJwt } = require("../middleware/authMiddleware");
-const { requirePermission } = require("../middleware/requirePermission");
-
-// Letters occupation allows managing letter templates
-const canManageLetterTemplates = requirePermission({ 
-  occupations: 'Letters' 
-});
+const { authorize } = require("../middleware/authorize");
 
 /* ─── Template Management ─────────────────────────────── */
 
 // Create template (body only, uses master layout)
-router.post(
-  "/templates",
-  canManageLetterTemplates,
-  enhancedLetterController.createEnhancedLetterTemplate
-);
+router.post("/templates", authorize("Letters.Create"), enhancedLetterController.createEnhancedLetterTemplate);
 
 // Update template
-router.put(
-  "/templates/:uuid",
-  canManageLetterTemplates,
-  enhancedLetterController.updateEnhancedLetterTemplate
-);
+router.put("/templates/:uuid", authorize("Letters.Update"), enhancedLetterController.updateEnhancedLetterTemplate);
 
 // Get templates by category (all authenticated users)
-router.get(
-  "/templates/category/:category",
-  authenticateJwt,
-  enhancedLetterController.getTemplatesByCategory
-);
+router.get("/templates/category/:category", authenticateJwt, enhancedLetterController.getTemplatesByCategory);
 
-// Get template version history (requires Letters occupation)
-router.get(
-  "/templates/:uuid/versions",
-  canManageLetterTemplates,
-  enhancedLetterController.getTemplateVersionHistory
-);
+// Get template version history
+router.get("/templates/:uuid/versions", authorize("Letters.View"), enhancedLetterController.getTemplateVersionHistory);
 
 /* ─── Letter Generation ─────────────────────────────── */
 
-// Generate and download letter as PDF (requires Letters occupation)
-router.post(
-  "/generate",
-  canManageLetterTemplates,
-  enhancedLetterController.generateEnhancedLetter
-);
+// Generate and download letter as PDF
+router.post("/generate", authorize("Letters.Create"), enhancedLetterController.generateEnhancedLetter);
 
 // Preview letter without saving (all authenticated users)
-router.post(
-  "/preview",
-  authenticateJwt,
-  enhancedLetterController.previewEnhancedLetter
-);
+router.post("/preview", authenticateJwt, enhancedLetterController.previewEnhancedLetter);
 
 module.exports = router;

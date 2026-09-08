@@ -18,8 +18,7 @@ const {
   cancelLetterRequest,
   getPlaceholders,
 } = require("../controllers/letterController");
-const { requirePermission, requirePermissionOrSelfAccess } = require("../middleware/requirePermission");
-const { requireScope } = require("../middleware/requireScope");
+const { authorize, requireScopeFilter } = require("../middleware/authorize");
 const { authenticateJwt } = require("../middleware/authMiddleware");
 const {
   uploadSingle,
@@ -28,33 +27,31 @@ const {
 
 const router = express.Router();
 
-// Letters occupation allows managing letters
-const canManageLetters = requirePermission({ 
-  occupations: 'Letters' 
-});
+// Helper middleware for self-access OR permission
+const allowSelfOrPermission = (permission) => {
+  return (req, res, next) => {
+    const isSelf = req.params.uuid === req.user.employee_uuid;
+    if (isSelf) return next();
+    return authorize(permission)(req, res, next);
+  };
+};
 
 // Utility endpoints (all authenticated users)
 router.get("/placeholders", authenticateJwt, getPlaceholders);
 
-// Templates — read is open to all authenticated users; write requires Letters occupation
+// Templates — read is open to all authenticated users; write requires permission
 router.get("/templates", authenticateJwt, listLetterTemplates);
-router.post("/templates", canManageLetters, uploadSingle, handleUploadError, createLetterTemplate);
-router.patch("/templates/:uuid", canManageLetters, updateLetterTemplate);
-router.delete("/templates/:uuid", canManageLetters, deleteLetterTemplate);
+router.post("/templates", authorize("Letters.Create"), uploadSingle, handleUploadError, createLetterTemplate);
+router.patch("/templates/:uuid", authorize("Letters.Update"), updateLetterTemplate);
+router.delete("/templates/:uuid", authorize("Letters.Delete"), deleteLetterTemplate);
 
 // PDF template preview and download (all authenticated users)
 router.get("/templates/:uuid/preview", authenticateJwt, getTemplatePDFPreview);
 router.get("/templates/:uuid/download", authenticateJwt, downloadTemplatePDF);
 
 // Letter generation & retrieval
-router.post("/generate", canManageLetters, generateLetter);
-router.get("/employee/:uuid", 
-  requirePermissionOrSelfAccess({
-    occupations: 'Letters',
-    isSelfAccess: (req) => req.params.uuid === req.user.employee_uuid
-  }),
-  listIssuedLetters
-);
+router.post("/generate", authorize("Letters.Create"), generateLetter);
+router.get("/employee/:uuid", allowSelfOrPermission("Letters.View"), listIssuedLetters);
 router.get("/:uuid/content", authenticateJwt, downloadLetterContent);
 
 // Letter requests - employee workflow
@@ -62,18 +59,18 @@ router.post("/request", authenticateJwt, requestLetter);
 router.get("/requests/my", authenticateJwt, getMyLetterRequests);
 router.delete("/requests/:uuid", authenticateJwt, cancelLetterRequest);
 
-// Letter requests - HR workflow - requires Letters occupation
+// Letter requests - HR workflow - with scope filtering
 router.get("/requests/pending", 
-  canManageLetters, 
-  requireScope('letter'),
+  authorize("Letters.Approve"),
+  requireScopeFilter('letter'),
   getPendingLetterRequests
 );
 router.get("/requests/all", 
-  canManageLetters, 
-  requireScope('letter'),
+  authorize("Letters.View"),
+  requireScopeFilter('letter'),
   getAllLetterRequests
 );
-router.post("/requests/:uuid/approve", canManageLetters, approveLetterRequest);
-router.post("/requests/:uuid/reject", canManageLetters, rejectLetterRequest);
+router.post("/requests/:uuid/approve", authorize("Letters.Approve"), approveLetterRequest);
+router.post("/requests/:uuid/reject", authorize("Letters.Approve"), rejectLetterRequest);
 
 module.exports = router;

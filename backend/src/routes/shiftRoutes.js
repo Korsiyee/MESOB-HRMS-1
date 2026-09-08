@@ -10,28 +10,21 @@ const {
   detectGaps,
   getEmployeeHistory,
 } = require("../controllers/shiftController");
-const { requirePermission } = require("../middleware/requirePermission");
+const { authorize } = require("../middleware/authorize");
 
 const router = express.Router();
 
-// Authorization helpers using new RBAC middleware
-const canViewShifts = requirePermission({ 
-  occupations: ['Shifts - Overview', 'Shifts - Add'],
-  logic: 'OR'
-});
+// View endpoints
+router.get("/", authorize("Shifts.View"), listShifts);
+router.get("/gaps", authorize("Shifts.View"), detectGaps);
+router.get("/:uuid", authorize("Shifts.View"), getShift);
+router.get("/:uuid/employees", authorize("Shifts.View"), getShiftEmployees);
+router.get("/employee/:employee_uuid/history", authorize("Shifts.View"), getEmployeeHistory);
 
-const canManageShifts = requirePermission({ 
-  occupations: 'Shifts - Add' 
-});
-
-router.get("/", canViewShifts, listShifts);
-router.post("/", canManageShifts, createShift);
-router.get("/gaps", canViewShifts, detectGaps);
-router.get("/:uuid", canViewShifts, getShift);
-router.patch("/:uuid", canManageShifts, updateShift);
-router.delete("/:uuid", canManageShifts, deleteShift);
-router.post("/:uuid/assign", canManageShifts, assignShift);
-router.get("/:uuid/employees", canViewShifts, getShiftEmployees);
-router.get("/employee/:employee_uuid/history", canViewShifts, getEmployeeHistory);
+// Manage endpoints
+router.post("/", authorize("Shifts.Create"), createShift);
+router.patch("/:uuid", authorize("Shifts.Update"), updateShift);
+router.delete("/:uuid", authorize("Shifts.Delete"), deleteShift);
+router.post("/:uuid/assign", authorize("Shifts.Assign"), assignShift);
 
 module.exports = router;

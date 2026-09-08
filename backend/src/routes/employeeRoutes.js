@@ -21,109 +21,68 @@ const {
   uploadEmployeePhoto: uploadPhoto,
   uploadEmployeeDocuments,
 } = require("../middleware/employeeUploadMiddleware");
-const { requirePermission, requirePermissionOrSelfAccess } = require("../middleware/requirePermission");
-const { requireScope } = require("../middleware/requireScope");
+const { authorize, requireScopeFilter } = require("../middleware/authorize");
 const { authenticateJwt } = require("../middleware/authMiddleware");
+
+// Helper middleware for self-access OR permission
+const allowSelfOrPermission = (permission) => {
+  return (req, res, next) => {
+    const isSelf = req.params.uuid === req.user.employee_uuid;
+    if (isSelf) return next();
+    return authorize(permission)(req, res, next);
+  };
+};
 
 const router = express.Router();
 
-// Authorization helpers using new RBAC middleware
-const canRegisterEmployee = requirePermission({ 
-  occupations: 'Employees - Registration' 
-});
+// Draft endpoints
+router.post("/draft", authorize("Employees.Create"), saveDraft);
+router.get("/draft/:uuid", authorize("Employees.Create"), getDraft);
 
-const canViewEmployees = requirePermission({ 
-  occupations: [
-    'Employees - Overview',
-    'Employees - Registration',
-    'Attendance - Overview',
-    'Attendance - Manage',
-    'Shifts - Overview',
-    'Shifts - Add'
-  ],
-  logic: 'OR'
-});
+// Employee creation
+router.post("/", authorize("Employees.Create"), createEmployee);
 
-const canViewEmployeeAttendance = requirePermission({ 
-  occupations: 'Attendance - Overview' 
-});
-
-const canViewDashboard = requirePermission({ 
-  occupations: 'Dashboard' 
-});
-
-// Draft endpoints (no scope needed - drafts are pre-creation)
-router.post("/draft", canRegisterEmployee, saveDraft);
-router.get("/draft/:uuid", canRegisterEmployee, getDraft);
-
-// Employee creation (no scope needed - creates new employee)
-router.post("/", canRegisterEmployee, createEmployee);
-
-// List all employees (with scope filtering)
+// List all employees (with scope filtering for Dept Heads)
 router.get("/", 
-  canViewEmployees, 
-  requireScope('employee'),
+  authorize(["Employees.View", "Attendance.View", "Shifts.View"]),
+  requireScopeFilter('employee'),
   listEmployees
 );
 
 // Search employees for attendance (with scope filtering)
 router.get("/search/attendance", 
-  canViewEmployeeAttendance, 
-  requireScope('employee'),
+  authorize("Attendance.View"),
+  requireScopeFilter('employee'),
   searchEmployeesForAttendance
 );
 
-// Department head specific endpoints (with scope filtering)
-router.get("/dept-head/stats", canViewDashboard, getDeptHeadStats);
+// Department head specific endpoints
+router.get("/dept-head/stats", authorize("Dashboard.View"), getDeptHeadStats);
 router.get("/dept-head/employees", 
-  requirePermission({ occupations: 'Employees - Overview' }),
-  requireScope('employee'),
+  authorize("Employees.View"),
+  requireScopeFilter('employee'),
   getDeptEmployees
 );
 
 // Employee dashboard (self-access OR permission)
-router.get("/:uuid/dashboard", 
-  requirePermissionOrSelfAccess({
-    occupations: 'Employees - Overview',
-    isSelfAccess: (req) => req.params.uuid === req.user.employee_uuid
-  }),
-  getEmployeeDashboard
-);
+router.get("/:uuid/dashboard", allowSelfOrPermission("Employees.View"), getEmployeeDashboard);
 
-// Get single employee (self-access OR permission with scope)
-router.get("/:uuid", 
-  requirePermissionOrSelfAccess({
-    occupations: 'Employees - Overview',
-    isSelfAccess: (req) => req.params.uuid === req.user.employee_uuid
-  }),
-  getEmployee
-);
+// Get single employee (self-access OR permission)
+router.get("/:uuid", allowSelfOrPermission("Employees.View"), getEmployee);
 
-// Update employee (no scope - specific UUID)
-router.patch("/:uuid", canRegisterEmployee, updateEmployee);
-router.patch("/:uuid/status", canRegisterEmployee, updateEmployeeStatus);
+// Update employee
+router.patch("/:uuid", authorize("Employees.Update"), updateEmployee);
+router.patch("/:uuid/status", authorize("Employees.Update"), updateEmployeeStatus);
 
-// Photo upload (no scope - specific UUID)
-router.post("/:uuid/photo", canRegisterEmployee, uploadPhoto, uploadEmployeePhoto);
+// Photo upload
+router.post("/:uuid/photo", authorize("Employees.Update"), uploadPhoto, uploadEmployeePhoto);
 
 // Documents (self-access OR permission)
-router.get("/:uuid/documents", 
-  requirePermissionOrSelfAccess({
-    occupations: 'Employees - Overview',
-    isSelfAccess: (req) => req.params.uuid === req.user.employee_uuid
-  }),
-  listEmployeeDocuments
-);
-router.post("/:uuid/documents", canRegisterEmployee, uploadEmployeeDocuments, addEmployeeDocument);
-router.delete("/:uuid/documents/:docUuid", canRegisterEmployee, removeEmployeeDocument);
+router.get("/:uuid/documents", allowSelfOrPermission("Employees.View"), listEmployeeDocuments);
+router.post("/:uuid/documents", authorize("Employees.Update"), uploadEmployeeDocuments, addEmployeeDocument);
+router.delete("/:uuid/documents/:docUuid", authorize("Employees.Update"), removeEmployeeDocument);
 
 // Shift (self-access OR permission)
-router.get("/:uuid/shift", 
-  requirePermissionOrSelfAccess({
-    occupations: 'Shifts - Overview',
-    isSelfAccess: (req) => req.params.uuid === req.user.employee_uuid
-  }),
-  getEmployeeShift
-);
+router.get("/:uuid/shift", allowSelfOrPermission("Shifts.View"), getEmployeeShift);
 
 module.exports = router;

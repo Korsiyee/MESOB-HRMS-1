@@ -8,35 +8,35 @@ const {
   assignShiftToPosition,
   removeShiftFromPosition,
 } = require("../controllers/positionController");
-const { requirePermission } = require("../middleware/requirePermission");
+const { authorize } = require("../middleware/authorize");
 
 const router = express.Router();
 
-// Authorization helpers using new RBAC middleware
-const canManagePositions = requirePermission({ 
-  occupations: 'Positions - Manage' 
-});
+// View: Anyone who can view positions, employees, attendance, or shifts
+router.get("/", 
+  authorize([
+    "Positions.View",
+    "Employees.View",
+    "Attendance.View",
+    "Shifts.View"
+  ]), 
+  listPositions
+);
+router.get("/:uuid", 
+  authorize([
+    "Positions.View",
+    "Employees.View",
+    "Attendance.View",
+    "Shifts.View"
+  ]), 
+  getPosition
+);
 
-const canViewPositions = requirePermission({ 
-  occupations: [
-    'Positions - Overview',
-    'Positions - Manage',
-    'Employees - Registration',
-    'Employees - Overview',
-    'Attendance - Overview',
-    'Attendance - Manage',
-    'Shifts - Overview',
-    'Shifts - Add'
-  ],
-  logic: 'OR'
-});
-
-router.get("/", canViewPositions, listPositions);
-router.post("/", canManagePositions, createPosition);
-router.get("/:uuid", canViewPositions, getPosition);
-router.patch("/:uuid", canManagePositions, updatePosition);
-router.delete("/:uuid", canManagePositions, deletePosition);
-router.post("/:uuid/assign-shift", canManagePositions, assignShiftToPosition);
-router.delete("/:uuid/shift", canManagePositions, removeShiftFromPosition);
+// Manage: Requires position management permissions
+router.post("/", authorize("Positions.Create"), createPosition);
+router.patch("/:uuid", authorize("Positions.Update"), updatePosition);
+router.delete("/:uuid", authorize("Positions.Delete"), deletePosition);
+router.post("/:uuid/assign-shift", authorize("Positions.Update"), assignShiftToPosition);
+router.delete("/:uuid/shift", authorize("Positions.Update"), removeShiftFromPosition);
 
 module.exports = router;

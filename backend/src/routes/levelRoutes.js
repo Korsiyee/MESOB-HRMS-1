@@ -8,44 +8,19 @@ const {
   createLevelVersion,
   getLevelVersion,
 } = require("../controllers/levelController");
-const { requirePermission } = require("../middleware/requirePermission");
+const { authorize } = require("../middleware/authorize");
 
 const router = express.Router();
 
-// Authorization helpers using RBAC middleware
-const canManageLevels = requirePermission({
-  occupations: "Levels - Manage",
-});
+// View: Anyone who can view levels or employees
+router.get("/", authorize(["Levels.View", "Employees.View"]), listLevels);
+router.get("/:uuid", authorize(["Levels.View", "Employees.View"]), getLevel);
+router.get("/:uuid/version", authorize(["Levels.View", "Employees.View"]), getLevelVersion);
 
-const canViewLevels = requirePermission({
-  occupations: [
-    "Levels - Overview",
-    "Levels - Manage",
-    "Employees - Registration",
-    "Employees - Overview",
-  ],
-  logic: "OR",
-});
-
-// List all levels
-router.get("/", canViewLevels, listLevels);
-
-// Create a new level
-router.post("/", canManageLevels, createLevel);
-
-// Get a single level by UUID
-router.get("/:uuid", canViewLevels, getLevel);
-
-// Update a level (basic info only)
-router.patch("/:uuid", canManageLevels, updateLevel);
-
-// Delete a level
-router.delete("/:uuid", canManageLevels, deleteLevel);
-
-// Create a new version for a level (salary revision)
-router.post("/:uuid/versions", canManageLevels, createLevelVersion);
-
-// Get current level version for a specific date
-router.get("/:uuid/version", canViewLevels, getLevelVersion);
+// Manage: Requires level management permissions
+router.post("/", authorize("Levels.Create"), createLevel);
+router.patch("/:uuid", authorize("Levels.Update"), updateLevel);
+router.delete("/:uuid", authorize("Levels.Delete"), deleteLevel);
+router.post("/:uuid/versions", authorize("Levels.Update"), createLevelVersion);
 
 module.exports = router;

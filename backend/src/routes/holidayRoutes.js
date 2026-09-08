@@ -1,19 +1,14 @@
 const express = require("express");
 const HolidayService = require("../services/holidayService");
-const { requirePermission } = require("../middleware/requirePermission");
+const { authorize } = require("../middleware/authorize");
 const { authenticateJwt } = require("../middleware/authMiddleware");
 const { safeLogEvent } = require("../services/auditLogService");
 const { sendSuccess, sendError } = require("../utils/response");
 
 const router = express.Router();
 
-// Holidays occupation allows managing holidays
-const canManageHolidays = requirePermission({ 
-  occupations: 'Holidays' 
-});
-
-// POST /api/holidays/initialize - Initialize holidays for a range of years (requires Holidays occupation)
-router.post("/initialize", canManageHolidays, async (req, res) => {
+// POST /api/holidays/initialize - Initialize holidays for a range of years
+router.post("/initialize", authorize("Holidays.Create"), async (req, res) => {
   try {
     const { startYear, endYear, overwriteManual } = req.body;
 
@@ -137,8 +132,8 @@ router.get("/check/:date", authenticateJwt, async (req, res) => {
   }
 });
 
-// POST /api/holidays - Add a new holiday (requires Holidays occupation)
-router.post("/", canManageHolidays, async (req, res) => {
+// POST /api/holidays - Add a new holiday
+router.post("/", authorize("Holidays.Create"), async (req, res) => {
   try {
     const { date, name, type, ethiopian_date } = req.body;
 
@@ -185,8 +180,8 @@ router.post("/", canManageHolidays, async (req, res) => {
   }
 });
 
-// PATCH /api/holidays/:date/status - Update holiday status (requires Holidays occupation)
-router.patch("/:date/status", canManageHolidays, async (req, res) => {
+// PATCH /api/holidays/:date/status - Update holiday status
+router.patch("/:date/status", authorize("Holidays.Update"), async (req, res) => {
   try {
     const { date } = req.params;
     const { isActive } = req.body;
@@ -225,8 +220,8 @@ router.patch("/:date/status", canManageHolidays, async (req, res) => {
   }
 });
 
-// PATCH /api/holidays/item/:uuid - Update a holiday record by UUID (requires Holidays occupation)
-router.patch("/item/:uuid", canManageHolidays, async (req, res) => {
+// PATCH /api/holidays/item/:uuid - Update a holiday record by UUID
+router.patch("/item/:uuid", authorize("Holidays.Update"), async (req, res) => {
   try {
     const { uuid } = req.params;
     const holiday = await HolidayService.updateHolidayByUuid(
@@ -258,8 +253,8 @@ router.patch("/item/:uuid", canManageHolidays, async (req, res) => {
   }
 });
 
-// DELETE /api/holidays/item/:uuid - Permanently delete holiday by UUID (requires Holidays occupation)
-router.delete("/item/:uuid", canManageHolidays, async (req, res) => {
+// DELETE /api/holidays/item/:uuid - Permanently delete holiday by UUID
+router.delete("/item/:uuid", authorize("Holidays.Delete"), async (req, res) => {
   try {
     const { uuid } = req.params;
     const result = await HolidayService.deleteHolidayByUuid(uuid);
@@ -308,8 +303,8 @@ router.get("/statistics", authenticateJwt, async (req, res) => {
   }
 });
 
-// POST /api/holidays/sync/:ethiopianYear - Sync holidays for Ethiopian year (requires Holidays occupation)
-router.post("/sync/:ethiopianYear", canManageHolidays, async (req, res) => {
+// POST /api/holidays/sync/:ethiopianYear - Sync holidays for Ethiopian year
+router.post("/sync/:ethiopianYear", authorize("Holidays.Create"), async (req, res) => {
   try {
     const { ethiopianYear } = req.params;
     const { overwriteManual } = req.body || {};
