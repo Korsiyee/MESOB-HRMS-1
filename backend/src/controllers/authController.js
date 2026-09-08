@@ -181,9 +181,27 @@ exports.forceLogout = asyncHandler(async (req, res) => {
 });
 
 exports.register = asyncHandler(async (req, res) => {
-  const result = await AuthService.register(req.body || {});
+  // SECURITY: Pass actor's role_id for hierarchy validation
+  const actorRoleId = req.user?.role_id || null;
+  const result = await AuthService.register(req.body || {}, actorRoleId);
+  
+  // Log account creation
+  await safeLogEvent({
+    actorUuid: req.user?.uuid || null,
+    action: AUDIT_ACTIONS.ACCOUNT_CREATED,
+    entityType: AUDIT_ENTITY_TYPES.USER,
+    entityUuid: result.user.uuid,
+    diff: { 
+      username: result.user.username,
+      role_id: result.user.role_id,
+      employee_uuid: result.employee.uuid 
+    },
+    ipAddress: getClientIp(req),
+  });
+  
   return sendSuccess(res, {
     status: 201,
+    message: "Account created successfully.",
     data: result,
   });
 });

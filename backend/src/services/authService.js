@@ -396,7 +396,7 @@ async function getUserWithOccupations(userUuid) {
   };
 }
 
-async function register(registrationData) {
+async function register(registrationData, actorRoleId = null) {
   const {
     username,
     password,
@@ -405,7 +405,8 @@ async function register(registrationData) {
     last_name,
     hire_date,
     prior_gov_service,
-    role,
+    role, // DEPRECATED: Use role_id
+    role_id, // NEW: Direct role_id assignment
     title,
     gender,
     date_of_birth,
@@ -433,6 +434,38 @@ async function register(registrationData) {
     error.status = 409;
     throw error;
   }
+  
+  // Determine target role_id
+  let targetRoleId = role_id;
+  
+  // Backward compatibility: If role_id not provided but role string is, look up role_id
+  if (!targetRoleId && role) {
+    const roleRecord = await authorizationService.getRoleByCode(role);
+    if (!roleRecord) {
+      const error = new Error(`Invalid role: ${role}`);
+      error.status = 400;
+      throw error;
+    }
+    targetRoleId = roleRecord.id;
+  }
+  
+  // Default to Employee role if not specified
+  if (!targetRoleId) {
+    const employeeRole = await authorizationService.getRoleByCode('EMPLOYEE');
+    targetRoleId = employeeRole.id;
+  }
+  
+  // SECURITY: Validate role hierarchy if actor is specified
+  if (actorRoleId) {
+    const canAssign = await authorizationService.canModifyRole(actorRoleId, targetRoleId);
+    if (!canAssign) {
+      const error = new Error(
+        "Cannot assign a role equal to or higher than your own privilege level."
+      );
+      error.status = 403;
+      throw error;
+    }
+  }
 
   // Create employee
   const EmployeeService = require("./employeeService");
@@ -458,26 +491,11 @@ async function register(registrationData) {
   // Create user account
   const userUuid = randomUUID();
   const passwordHash = await generatePasswordHash(password);
-  const userRole = role || "EMPLOYEE";
-
-  if (
-    ![
-      "EMPLOYEE",
-      "DEPARTMENT_HEAD",
-      "HR_OFFICER",
-      "HR_ADMIN",
-      "SUPER_ADMIN",
-    ].includes(userRole)
-  ) {
-    const error = new Error("Invalid role specified.");
-    error.status = 400;
-    throw error;
-  }
 
   await executeQuery(
-    `INSERT INTO Users (uuid, employee_uuid, username, password_hash, role, is_active)
+    `INSERT INTO Users (uuid, employee_uuid, username, password_hash, role_id, is_active)
      VALUES (?, ?, ?, ?, ?, 1)`,
-    [userUuid, employee.uuid, username, passwordHash, userRole],
+    [userUuid, employee.uuid, username, passwordHash, targetRoleId],
   );
 
   // Fetch the created user
@@ -487,6 +505,9 @@ async function register(registrationData) {
   const accessToken = await createAccessToken(user);
   const refreshTokenValue = await createRefreshToken(user);
   await updateUserRefreshToken(userUuid, refreshTokenValue);
+  
+  // Get role info for response
+  const roleInfo = await authorizationService.getRoleById(targetRoleId);
 
   return {
     accessToken,
@@ -496,7 +517,9 @@ async function register(registrationData) {
       employee_uuid: user.employee_uuid,
       department_uuid: user.department_uuid || null,
       username: user.username,
-      role: user.role,
+      role_id: targetRoleId,
+      role: roleInfo ? roleInfo.code : null,
+      role_name: roleInfo ? roleInfo.name : null,
       is_active: Boolean(user.is_active),
     },
     employee: {

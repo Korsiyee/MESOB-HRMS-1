@@ -9,13 +9,19 @@ const {
   forceLogout,
 } = require("../controllers/authController");
 const { authenticateJwt } = require("../middleware/authMiddleware");
-const { requireRole } = require("../middleware/requireRole");
+const { authorize } = require("../middleware/authorize"); // NEW: Use authorize instead of requireRole
 const validateRequest = require("../middleware/validateRequest");
 const { authRateLimiter, refreshTokenRateLimiter } = require("../middleware/rateLimiters");
 
 const router = express.Router();
 
-router.post("/register", authRateLimiter, register);
+// FIXED: Registration now requires authentication and accounts.create permission
+router.post("/register", 
+  authRateLimiter, 
+  authenticateJwt,
+  authorize({ permissions: 'accounts.create' }),
+  register
+);
 router.post(
   "/login",
   authRateLimiter,
@@ -45,7 +51,7 @@ router.post(
   "/force-logout/:userUuid",
   authRateLimiter,
   authenticateJwt,
-  requireRole(["HR_ADMIN", "SUPER_ADMIN"]),
+  authorize({ permissions: 'accounts.manage' }), // FIXED: Use database-driven permission
   forceLogout,
 );
 
