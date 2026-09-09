@@ -437,26 +437,11 @@ exports.changeAccountRole = async (req, res) => {
     });
   }
 };
-        status: 404,
-        message: "Account not found.",
-        error: "ACCOUNT_NOT_FOUND",
-      });
-    }
 
-    const oldRole = existing[0].role;
-
-    // Update role
-    await pool.execute("UPDATE Users SET role = ? WHERE uuid = ?", [role, uuid]);
-
-    // Fetch updated account
-    const [updated] = await pool.execute(
-      `SELECT u.uuid, u.employee_uuid, u.username, u.role, u.is_active, u.must_change_password,
-              u.updated_at, e.first_name, e.last_name
-       FROM Users u
-       LEFT JOIN Employees e ON e.uuid = u.employee_uuid
-       WHERE u.uuid = ?`,
-      [uuid]
-    );
+/**
+ * Toggle account active status
+ * PATCH /api/accounts/:uuid/status
+ */
 
     // Audit log
     await safeLogEvent({
