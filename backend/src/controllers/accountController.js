@@ -442,36 +442,6 @@ exports.changeAccountRole = async (req, res) => {
  * Toggle account active status
  * PATCH /api/accounts/:uuid/status
  */
-
-    // Audit log
-    await safeLogEvent({
-      actorUuid: req.user?.uuid,
-      action: "CHANGE_USER_ROLE",
-      entityType: "USER",
-      entityUuid: uuid,
-      diff: { old_role: oldRole, new_role: role },
-      ipAddress: req.ip,
-    });
-
-    return sendSuccess(res, {
-      status: 200,
-      message: "User role updated successfully.",
-      data: updated[0],
-    });
-  } catch (error) {
-    console.error("changeAccountRole error:", error);
-    return sendError(res, {
-      status: 500,
-      message: "Failed to update user role.",
-      error: "CHANGE_ROLE_ERROR",
-    });
-  }
-};
-
-/**
- * Change user account active status (activate/deactivate)
- * PATCH /api/accounts/:uuid/status
- */
 exports.changeAccountStatus = async (req, res) => {
   try {
     const { uuid } = req.params;
@@ -518,7 +488,7 @@ exports.changeAccountStatus = async (req, res) => {
 
     // Fetch updated account
     const [updated] = await pool.execute(
-      `SELECT u.uuid, u.employee_uuid, u.username, u.role, u.is_active, u.must_change_password,
+      `SELECT u.uuid, u.employee_uuid, u.username, u.role_id, u.is_active, u.must_change_password,
               u.updated_at, e.first_name, e.last_name
        FROM Users u
        LEFT JOIN Employees e ON e.uuid = u.employee_uuid
