@@ -163,19 +163,10 @@ exports.createAccount = async (req, res) => {
     // Audit log
     await safeLogEvent({
       actorUuid: req.user?.uuid,
-      action: AUDIT_ACTIONS.ACCOUNT_CREATED,
-      entityType: AUDIT_ENTITY_TYPES.ACCOUNT,
-      entityUuid: userUuid,
-      diff: { 
-        username, 
-        role: roleInfo?.code || null,
-        employee_uuid 
-      },
-    });
       action: "CREATE_USER_ACCOUNT",
       entityType: "USER",
       entityUuid: userUuid,
-      diff: { username, role, employee_uuid },
+      diff: { username, role_id: role, employee_uuid },
       ipAddress: req.ip,
     });
 

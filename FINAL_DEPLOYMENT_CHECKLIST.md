@@ -14,32 +14,39 @@ git log --oneline | head -10
 git diff HEAD~5 --stat
 ```
 
-### 2. Run Database Migration
+### 2. Run Database Migration (Node.js - No MySQL CLI Required)
 ```bash
 cd backend
-mysql -u root -p hrms_db < ../database/migrations/100_rbac_refactor.sql
+node scripts/runRBACMigration.js
 ```
 
 **Expected Output:**
-- New tables created: Roles, Permissions, RolePermissions
-- Users.role_id column added
-- 5 roles seeded
-- 66 permissions seeded
+- Creates new tables: Roles, Permissions, RolePermissions
+- Adds Users.role_id, permissions_version, last_activity columns
+- Seeds 5 roles with hierarchy
+- Seeds 66 permissions
+- Creates role-permission mappings
 
 ### 3. Verify Migration
 ```bash
-mysql -u root -p hrms_db < ../database/verify_migration_100.sql
+node scripts/verifyRBACMigration.js
 ```
 
 **Should Show:**
 ```
-✓ Roles table exists with 5 roles
-✓ Permissions table exists with 66 permissions
-✓ RolePermissions table exists
-✓ Users.role_id column exists
+✓ Found 5 roles (SUPER_ADMIN, ADMIN, HR_MANAGER, DEPT_HEAD, EMPLOYEE)
+✓ Found 66 permissions across multiple resources
+✓ Role-permission mappings created
+✓ Users table updated with new columns
 ```
 
-### 4. Install Dependencies (if needed)
+### 4. Check Migration Status
+If you want to see detailed migration results:
+```bash
+node scripts/verifyRBACMigration.js
+```
+
+### 5. Restart Backend
 ```bash
 cd backend
 npm install
@@ -47,6 +54,10 @@ npm install
 
 ### 5. Restart Backend
 ```bash
+# Stop any running instance
+pkill -f "node.*server.js" || true
+
+# Start backend
 npm start
 ```
 
