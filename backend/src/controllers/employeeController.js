@@ -3,10 +3,7 @@ const asyncHandler = require("../middleware/asyncHandler");
 const { sendSuccess } = require("../utils/response");
 const { ApiError } = require("../utils/errors");
 const { parsePagination } = require("../utils/pagination");
-const {
-  assertEmployeeReadAccess,
-  assertEmployeeListAccess,
-} = require("../utils/rbac");
+// OLD RBAC imports removed - now using Permit middleware
 const { safeLogEvent } = require("../services/auditLogService");
 const { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } = require("../config/constants");
 const { getClientIp } = require("../utils/request");
@@ -85,7 +82,11 @@ exports.createEmployee = asyncHandler(async (req, res) => {
 });
 
 exports.listEmployees = asyncHandler(async (req, res) => {
-  const scope = assertEmployeeListAccess(req.user);
+  // Get user's scope from authorization service
+  const { getUserScope } = require("../services/authorizationService");
+  const { buildScopeFilter } = require("../middleware/permitMiddleware");
+  const scope = await getUserScope(req.user.uuid);
+  
   const pagination = parsePaginationFromQuery(req.query || {});
 
   const filters = {
@@ -97,9 +98,15 @@ exports.listEmployees = asyncHandler(async (req, res) => {
     offset: pagination.offset,
   };
 
-  if (scope.scope === "department") {
-    filters.departmentUuid = scope.departmentUuid;
+  // Apply scope-based filtering
+  if (scope === "DEPARTMENT") {
+    // Department scope: only employees in user's department
+    filters.departmentUuid = req.user.department_uuid;
+  } else if (scope === "OWN") {
+    // OWN scope: only user's own employee record
+    filters.employeeUuid = req.user.employee_uuid;
   }
+  // ALL scope: no additional filters
 
   const result = await EmployeeService.listEmployees(filters);
   return sendSuccess(res, {
@@ -122,7 +129,8 @@ exports.getEmployee = asyncHandler(async (req, res) => {
     includeSignedUrls: includeSigned,
   });
 
-  assertEmployeeReadAccess(req.user, employee);
+  // Access control is handled by the route middleware (allowSelfOr)
+  // No additional checks needed here
 
   return sendSuccess(res, { status: 200, data: employee });
 });

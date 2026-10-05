@@ -11,6 +11,7 @@ import PrettyDatePicker from "../components/PrettyDatePicker";
 import { useResponsive } from "../hooks/useResponsive";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 
+import { Can } from "../components/Can";
 /* ── Palette ── */
 const C = {
   page: "#C5CECC",
@@ -309,6 +310,7 @@ const EmployeeFormModal = ({ employee, onClose, onSaved, departments, positions,
 const ActionButtons = ({ employee, onView, onEdit, onStatusChange }) => {
   return (
     <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+      {/* View button - always visible for those who can view the list */}
       <button
         onClick={onView}
         title="View Details"
@@ -329,52 +331,60 @@ const ActionButtons = ({ employee, onView, onEdit, onStatusChange }) => {
       >
         <Eye size={14} />
       </button>
-      <button
-        onClick={onEdit}
-        title="Edit Employee"
-        style={{
-          display: "flex", alignItems: "center", justifyContent: "center",
-          width: 32, height: 32, borderRadius: 6,
-          background: "rgba(59,130,246,0.08)", border: "none",
-          cursor: "pointer", color: "#2563eb", transition: "all 0.15s",
-        }}
-        onMouseEnter={e => { 
-          e.currentTarget.style.background = "rgba(59,130,246,0.15)";
-          e.currentTarget.style.transform = "scale(1.05)";
-        }}
-        onMouseLeave={e => { 
-          e.currentTarget.style.background = "rgba(59,130,246,0.08)";
-          e.currentTarget.style.transform = "scale(1)";
-        }}
-      >
-        <Pencil size={14} />
-      </button>
-      <button
-        onClick={onStatusChange}
-        title={employee.status === "ACTIVE" ? "Deactivate Employee" : "Activate Employee"}
-        style={{
-          display: "flex", alignItems: "center", justifyContent: "center",
-          width: 32, height: 32, borderRadius: 6,
-          background: employee.status === "ACTIVE" ? "rgba(220,38,38,0.08)" : "rgba(34,197,94,0.08)",
-          border: "none", cursor: "pointer",
-          color: employee.status === "ACTIVE" ? "#dc2626" : "#16a34a",
-          transition: "all 0.15s",
-        }}
-        onMouseEnter={e => {
-          e.currentTarget.style.background = employee.status === "ACTIVE" 
-            ? "rgba(220,38,38,0.15)" 
-            : "rgba(34,197,94,0.15)";
-          e.currentTarget.style.transform = "scale(1.05)";
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.background = employee.status === "ACTIVE" 
-            ? "rgba(220,38,38,0.08)" 
-            : "rgba(34,197,94,0.08)";
-          e.currentTarget.style.transform = "scale(1)";
-        }}
-      >
-        {employee.status === "ACTIVE" ? <UserX size={14} /> : <UserCheck size={14} />}
-      </button>
+      
+      {/* Edit button - only visible with update permission */}
+      <Can action="update" resource="employees">
+        <button
+          onClick={onEdit}
+          title="Edit Employee"
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 32, height: 32, borderRadius: 6,
+            background: "rgba(59,130,246,0.08)", border: "none",
+            cursor: "pointer", color: "#2563eb", transition: "all 0.15s",
+          }}
+          onMouseEnter={e => { 
+            e.currentTarget.style.background = "rgba(59,130,246,0.15)";
+            e.currentTarget.style.transform = "scale(1.05)";
+          }}
+          onMouseLeave={e => { 
+            e.currentTarget.style.background = "rgba(59,130,246,0.08)";
+            e.currentTarget.style.transform = "scale(1)";
+          }}
+        >
+          <Pencil size={14} />
+        </button>
+      </Can>
+      
+      {/* Status change button - only visible with update permission */}
+      <Can action="update" resource="employees">
+        <button
+          onClick={onStatusChange}
+          title={employee.status === "ACTIVE" ? "Deactivate Employee" : "Activate Employee"}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 32, height: 32, borderRadius: 6,
+            background: employee.status === "ACTIVE" ? "rgba(220,38,38,0.08)" : "rgba(34,197,94,0.08)",
+            border: "none", cursor: "pointer",
+            color: employee.status === "ACTIVE" ? "#dc2626" : "#16a34a",
+            transition: "all 0.15s",
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = employee.status === "ACTIVE" 
+              ? "rgba(220,38,38,0.15)" 
+              : "rgba(34,197,94,0.15)";
+            e.currentTarget.style.transform = "scale(1.05)";
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = employee.status === "ACTIVE" 
+              ? "rgba(220,38,38,0.08)" 
+              : "rgba(34,197,94,0.08)";
+            e.currentTarget.style.transform = "scale(1)";
+          }}
+        >
+          {employee.status === "ACTIVE" ? <UserX size={14} /> : <UserCheck size={14} />}
+        </button>
+      </Can>
     </div>
   );
 };
@@ -932,48 +942,52 @@ const EmployeesPage = () => {
               </p>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button
-                onClick={handleExportCSV}
-                disabled={total === 0}
-                style={{
-                  background: "#fff",
-                  color: C.primary,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 8,
-                  padding: "8px 14px",
-                  fontSize: "0.76rem",
-                  fontWeight: 600,
-                  cursor: total === 0 ? "not-allowed" : "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontFamily: "Poppins, sans-serif",
-                  opacity: total === 0 ? 0.5 : 1,
-                }}
-              >
-                <Download size={14} /> CSV
-              </button>
-              <button
-                onClick={handleExportPDF}
-                disabled={total === 0}
-                style={{
-                  background: "#fff",
-                  color: C.primary,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 8,
-                  padding: "8px 14px",
-                  fontSize: "0.76rem",
-                  fontWeight: 600,
-                  cursor: total === 0 ? "not-allowed" : "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontFamily: "Poppins, sans-serif",
-                  opacity: total === 0 ? 0.5 : 1,
-                }}
-              >
-                <FileText size={14} /> PDF
-              </button>
+              <Can action="export" resource="employees">
+                <button
+                  onClick={handleExportCSV}
+                  disabled={total === 0}
+                  style={{
+                    background: "#fff",
+                    color: C.primary,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 8,
+                    padding: "8px 14px",
+                    fontSize: "0.76rem",
+                    fontWeight: 600,
+                    cursor: total === 0 ? "not-allowed" : "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontFamily: "Poppins, sans-serif",
+                    opacity: total === 0 ? 0.5 : 1,
+                  }}
+                >
+                  <Download size={14} /> CSV
+                </button>
+              </Can>
+              <Can action="export" resource="employees">
+                <button
+                  onClick={handleExportPDF}
+                  disabled={total === 0}
+                  style={{
+                    background: "#fff",
+                    color: C.primary,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 8,
+                    padding: "8px 14px",
+                    fontSize: "0.76rem",
+                    fontWeight: 600,
+                    cursor: total === 0 ? "not-allowed" : "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontFamily: "Poppins, sans-serif",
+                    opacity: total === 0 ? 0.5 : 1,
+                  }}
+                >
+                  <FileText size={14} /> PDF
+                </button>
+              </Can>
             </div>
           </div>
         </div>

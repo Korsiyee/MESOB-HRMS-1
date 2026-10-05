@@ -145,13 +145,21 @@ export async function apiRequest(path, options = {}) {
   };
 
   const token = localStorage.getItem("authToken");
+  console.log(`[apiRequest] ${path} - Token exists:`, !!token, 'Length:', token?.length || 0);
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
+    console.log(`[apiRequest] ${path} - Authorization header added`);
+  } else {
+    console.warn(`[apiRequest] ${path} - NO TOKEN FOUND IN LOCALSTORAGE`);
   }
 
+  // Extract headers from options to prevent overwriting our merged headers object
+  // This ensures Authorization header is preserved even when options.headers exists
+  const { headers: _, ...fetchOptions } = options;
+  
   let response = await fetch(`${API_BASE}${path}`, {
     headers,
-    ...options,
+    ...fetchOptions,
   });
 
   // Handle 401 Unauthorized
@@ -192,7 +200,7 @@ export async function apiRequest(path, options = {}) {
           headers["Authorization"] = `Bearer ${newToken}`;
           response = await fetch(`${API_BASE}${path}`, {
             headers,
-            ...options,
+            ...fetchOptions,
           });
         } catch (err) {
           console.error('Token refresh wait error:', err);
@@ -210,7 +218,7 @@ export async function apiRequest(path, options = {}) {
           headers["Authorization"] = `Bearer ${newToken}`;
           response = await fetch(`${API_BASE}${path}`, {
             headers,
-            ...options,
+            ...fetchOptions,
           });
         } catch (error) {
           isRefreshing = false;

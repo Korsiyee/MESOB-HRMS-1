@@ -2,6 +2,8 @@ import axios from 'axios';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000/api';
 
+const TERMINAL_ERROR_CODES = ['TOKEN_REVOKED', 'ACCOUNT_DEACTIVATED', 'PERMISSIONS_CHANGED', 'INVALID_TOKEN'];
+
 const api = axios.create({
   baseURL: API_BASE,
   timeout: 15000,
@@ -67,17 +69,25 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    if (originalRequest._retry) {
-      // Already retried, force logout
-      forceLogout();
-      return Promise.reject(error);
-    }
-
     // Check error type from response
     const errorCode = error.response?.data?.error;
     
-    // Force logout for these error types (don't try to refresh)
-    if (errorCode === 'INACTIVE_SESSION' || errorCode === 'TOKEN_EXPIRED' || errorCode === 'INVALID_TOKEN') {
+    // Force logout ONLY for terminal error codes  
+    if (TERMINAL_ERROR_CODES.includes(errorCode)) {
+      forceLogout();
+      return Promise.reject(error);
+    }
+    
+    // If error is generic UNAUTHORIZED and we never had a token, just reject (don't logout)
+    // This handles race condition where requests fire before login completes
+    const hasToken = localStorage.getItem('authToken');
+    if (errorCode === 'UNAUTHORIZED' && !hasToken) {
+      console.warn('[api.js] Request made before authentication - rejecting without logout');
+      return Promise.reject(error);
+    }
+    
+    // If already retried and still failing, force logout
+    if (originalRequest._retry) {
       forceLogout();
       return Promise.reject(error);
     }

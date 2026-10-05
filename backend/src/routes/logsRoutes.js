@@ -6,31 +6,30 @@ const {
   getEntityTypes,
   exportLogs,
 } = require("../controllers/logController");
-const { authorize, requireScopeFilter } = require("../middleware/authorize");
+// NEW: Use Permit middleware instead of old RBAC
+const { authorize } = require("../middleware/permitMiddleware");
 
 const router = express.Router();
 
-// List logs with filtering and pagination (with scope filtering for Dept Heads)
+// List logs with filtering and pagination (scope filtering in controller)
 router.get("/", 
-  authorize("AuditLogs.View"),
-  requireScopeFilter('audit'),
+  authorize("view", "logs"),
   listLogs
 );
 
 // Get available action types
-router.get("/actions", authorize("AuditLogs.View"), getActions);
+router.get("/actions", authorize("view", "logs"), getActions);
 
 // Get available entity types
-router.get("/entity-types", authorize("AuditLogs.View"), getEntityTypes);
+router.get("/entity-types", authorize("view", "logs"), getEntityTypes);
 
-// Export logs to CSV (with scope filtering)
+// Export logs to CSV (scope filtering in controller)
 router.get("/export", 
-  authorize("AuditLogs.Export"),
-  requireScopeFilter('audit'),
+  authorize("export", "logs"),
   exportLogs
 );
 
 // Get single log entry (must be last to avoid route conflicts)
-router.get("/:uuid", authorize("AuditLogs.View"), getLog);
+router.get("/:uuid", authorize("view", "logs"), getLog);
 
 module.exports = router;

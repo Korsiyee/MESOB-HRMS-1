@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { apiRequest } from '../utils/apiClient';
 
 const AuthContext = createContext(null);
 
@@ -75,12 +76,9 @@ export const AuthProvider = ({ children }) => {
       const token = localStorage.getItem('authToken');
       if (token && reason === 'manual') {
         // Best effort - don't wait for response
-        fetch(`${API_BASE}/auth/logout`, {
+        apiRequest('/auth/logout', {
           method: 'POST',
-          headers: { 
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
+          skipRefresh: true,
         }).catch(() => {});
       }
     } catch (err) {
@@ -135,18 +133,13 @@ export const AuthProvider = ({ children }) => {
         return false;
       }
 
-      const response = await fetch(`${API_BASE}/auth/refresh`, {
+      const response = await apiRequest('/auth/refresh', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken }),
+        skipRefresh: true,
       });
 
-      if (!response.ok) {
-        await logout('refresh_failed');
-        return false;
-      }
-
-      const { data } = await response.json();
+      const { data } = response;
       localStorage.setItem('authToken', data.accessToken);
       if (data.refreshToken) {
         localStorage.setItem('refreshToken', data.refreshToken);
@@ -177,19 +170,12 @@ export const AuthProvider = ({ children }) => {
       const token = localStorage.getItem('authToken');
       if (!token) return null;
 
-      const response = await fetch(`${API_BASE}/auth/me`, {
+      const response = await apiRequest('/auth/me', {
         method: 'GET',
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        skipRefresh: true,
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch current user');
-      }
-
-      const { data } = await response.json();
+      const { data } = response;
       return data;
     } catch (error) {
       console.error('Failed to fetch current user:', error);

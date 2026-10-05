@@ -7,19 +7,20 @@ const {
   logout,
   changePassword,
   forceLogout,
+  checkPermission,
 } = require("../controllers/authController");
 const { authenticateJwt } = require("../middleware/authMiddleware");
-const { authorize } = require("../middleware/authorize"); // NEW: Use authorize instead of requireRole
+const { authorize } = require("../middleware/permitMiddleware"); // NEW: Use Permit middleware
 const validateRequest = require("../middleware/validateRequest");
 const { authRateLimiter, refreshTokenRateLimiter } = require("../middleware/rateLimiters");
 
 const router = express.Router();
 
-// FIXED: Registration now requires authentication and accounts.create permission
+// Registration now requires authentication and accounts.create permission
 router.post("/register", 
   authRateLimiter, 
   authenticateJwt,
-  authorize({ permissions: 'accounts.create' }),
+  authorize("create", "accounts"),
   register
 );
 router.post(
@@ -51,8 +52,10 @@ router.post(
   "/force-logout/:userUuid",
   authRateLimiter,
   authenticateJwt,
-  authorize({ permissions: 'accounts.manage' }), // FIXED: Use database-driven permission
+  authorize("update", "accounts"),
   forceLogout,
 );
+// Frontend permission check endpoint
+router.get("/check-permission", authenticateJwt, checkPermission);
 
 module.exports = router;

@@ -21,20 +21,25 @@ function getBearerToken(authHeader) {
 
 async function authenticateJwt(req, res, next) {
   try {
+    console.log('[authMiddleware] Authorization header:', req.headers.authorization?.substring(0, 50) + '...');
     const token = getBearerToken(req.headers.authorization);
     if (!token) {
+      console.log('[authMiddleware] ❌ NO TOKEN extracted from header');
       return sendError(res, {
         status: 401,
         message: "Authorization token missing.",
         error: "UNAUTHORIZED",
       });
     }
+    console.log('[authMiddleware] ✅ Token extracted, length:', token.length);
 
     // Verify JWT token and check expiration
     let payload;
     try {
       payload = jwt.verify(token, JWT_SECRET);
+      console.log('[authMiddleware] ✅ JWT verified, uuid:', payload.uuid, 'token_version:', payload.token_version, 'permissions_version:', payload.permissions_version);
     } catch (error) {
+      console.log('[authMiddleware] ❌ JWT verification failed:', error.message);
       if (error.name === "TokenExpiredError") {
         return sendError(res, {
           status: 401,
@@ -75,7 +80,10 @@ async function authenticateJwt(req, res, next) {
     const userPermissionsVersion = user.permissions_version || 1;
     const tokenPermissionsVersion = payload.permissions_version || 1;
     
+    console.log('[authMiddleware] Version check - Token:', tokenVersion, 'User DB:', userTokenVersion, '| Permissions - Token:', tokenPermissionsVersion, 'User DB:', userPermissionsVersion);
+    
     if (tokenVersion !== userTokenVersion) {
+      console.log('[authMiddleware] ❌ TOKEN VERSION MISMATCH - rejecting');
       return sendError(res, {
         status: 401,
         message: "Your session has been terminated. Please login again.",

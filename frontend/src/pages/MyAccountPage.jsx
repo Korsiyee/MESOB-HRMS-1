@@ -86,9 +86,20 @@ const MyAccountPage = () => {
     : (user?.full_name || user?.username || 'Admin');
   const mesobId = empInfo?.mesob_id || user?.mesob_id || '—';
 
+  // Dynamic role color based on role string (no hardcoded map)
   const roleColor = (role) => {
-    const m = { SUPER_ADMIN:['rgba(124,58,237,0.15)','#7C3AED'], HR_ADMIN:['rgba(245,158,11,0.12)','#B45309'], HR_OFFICER:['rgba(37,99,235,0.12)','#1D4ED8'], DEPARTMENT_HEAD:['rgba(15,118,110,0.12)',C.primary], EMPLOYEE:['rgba(0,80,60,0.08)',C.textMuted] };
-    return m[role] || m.EMPLOYEE;
+    if (!role) return ['rgba(0,80,60,0.08)', C.textMuted];
+    const normalized = role.toLowerCase();
+    if (normalized.includes('super') || normalized.includes('admin')) {
+      return ['rgba(124,58,237,0.15)', '#7C3AED'];
+    }
+    if (normalized.includes('hr')) {
+      return ['rgba(245,158,11,0.12)', '#B45309'];
+    }
+    if (normalized.includes('head') || normalized.includes('manager')) {
+      return ['rgba(15,118,110,0.12)', C.primary];
+    }
+    return ['rgba(0,80,60,0.08)', C.textMuted];
   };
   const [rbg, rc] = roleColor(user?.role);
 

@@ -5,6 +5,7 @@ import LeaveRequestDetailCard from "../../components/LeaveRequestDetailCard";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import { Eye } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { usePermission } from "../../hooks/usePermission";
 import { useResponsive } from "../../hooks/useResponsive";
 
 const LEAVE_TYPES = ["Annual", "Sick", "Maternity", "Paternity", "Emergency", "Unpaid"];
@@ -261,8 +262,11 @@ const Modal = ({ open, onClose, title, subtitle, children, maxWidth = 600 }) => 
 const ManageLeavePage = () => {
   const { user } = useAuth();
   const { isMobile, isTablet, r } = useResponsive();
-  const userRole = user?.role || "";
   const userUuid = user?.uuid || "";
+  
+  // Permission-based access control
+  const canApproveHR = usePermission('leave', 'approve_hr');
+  const canApproveDept = usePermission('leave', 'approve_department');
 
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -300,10 +304,11 @@ const ManageLeavePage = () => {
   );
 
   const filtered = requests.filter((r) => {
-    const isHR = ["HR_OFFICER", "HR_ADMIN", "SUPER_ADMIN"].includes(userRole);
-    const activeStatuses = isHR
+    const activeStatuses = canApproveHR
       ? ["PENDING_HR"]
-      : ["PENDING_DEPARTMENT"];
+      : canApproveDept
+      ? ["PENDING_DEPARTMENT"]
+      : [];
     const active = activeStatuses.includes(r.status);
     if (reqWindow === "ACTIVE" && !active) return false;
     if (reqWindow === "PAST" && active) return false;
@@ -356,10 +361,9 @@ const ManageLeavePage = () => {
   };
 
   const canDecide = (s) => {
-    const isHR = ["HR_OFFICER", "HR_ADMIN", "SUPER_ADMIN"].includes(userRole);
-    if (isHR) return s === "PENDING_HR";
-    // Department head
-    return s === "PENDING_DEPARTMENT";
+    if (canApproveHR) return s === "PENDING_HR";
+    if (canApproveDept) return s === "PENDING_DEPARTMENT";
+    return false;
   };
 
   return (

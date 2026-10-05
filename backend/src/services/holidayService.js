@@ -89,47 +89,9 @@ class HolidayService {
   }
 
   static async ensureHolidaySchema() {
-    if (this.schemaInitPromise) {
-      await this.schemaInitPromise;
-      return;
-    }
-
-    this.schemaInitPromise = (async () => {
-      const pool = db.promise();
-      const [columns] = await pool.execute(
-        `
-        SELECT COLUMN_NAME
-        FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = 'Holidays'
-        `,
-      );
-
-      const columnSet = new Set(columns.map((item) => item.COLUMN_NAME));
-      const alterStatements = [];
-
-      if (!columnSet.has("isActive")) {
-        alterStatements.push(
-          "ALTER TABLE Holidays ADD COLUMN isActive BOOLEAN NOT NULL DEFAULT TRUE",
-        );
-      }
-      if (!columnSet.has("source")) {
-        alterStatements.push(
-          "ALTER TABLE Holidays ADD COLUMN source VARCHAR(30) NOT NULL DEFAULT 'MANUAL'",
-        );
-      }
-      if (!columnSet.has("description")) {
-        alterStatements.push(
-          "ALTER TABLE Holidays ADD COLUMN description TEXT NULL",
-        );
-      }
-
-      for (const statement of alterStatements) {
-        await pool.execute(statement);
-      }
-    })();
-
-    await this.schemaInitPromise;
+    // Schema changes have been moved to database migrations
+    // All required columns should exist in the schema.sql file
+    return Promise.resolve();
   }
 
   static async isHoliday(date) {

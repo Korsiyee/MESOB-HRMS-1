@@ -14,34 +14,12 @@ const {
 /* ─── helpers ─────────────────────────────────────────────────── */
 
 /**
- * Ensure the IssuedLetters table has the generated_content column.
- * Called lazily on first use so it never blocks startup.
+ * Schema changes have been moved to database migrations
+ * All required columns should exist in the schema.sql file
  */
-let _schemaReady = false;
 async function ensureLetterSchema() {
-  if (_schemaReady) return;
-  const pool = db.promise();
-  const [cols] = await pool.execute(
-    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'IssuedLetters'`
-  );
-  const names = new Set(cols.map((c) => c.COLUMN_NAME));
-  if (!names.has("generated_content")) {
-    await pool.execute(
-      "ALTER TABLE IssuedLetters ADD COLUMN generated_content LONGTEXT NULL"
-    );
-  }
-  if (!names.has("name")) {
-    await pool.execute(
-      "ALTER TABLE IssuedLetters ADD COLUMN name VARCHAR(255) NULL"
-    );
-  }
-  if (!names.has("type")) {
-    await pool.execute(
-      "ALTER TABLE IssuedLetters ADD COLUMN type VARCHAR(100) NULL"
-    );
-  }
-  _schemaReady = true;
+  // No-op: schema is managed by migrations
+  return Promise.resolve();
 }
 
 /**

@@ -6,30 +6,25 @@ const {
   rebuildAllBalances,
   getAggregatedBalances,
 } = require("../controllers/leaveController");
-const { authorize } = require("../middleware/authorize");
+// NEW: Use Permit middleware instead of old RBAC
+const { authorize, allowSelfOr } = require("../middleware/permitMiddleware");
 
 const router = express.Router();
 
-// Helper middleware for self-access OR permission
-const allowSelfOrPermission = (permission) => {
-  return (req, res, next) => {
-    const isSelf = req.params.uuid === req.user.employee_uuid;
-    if (isSelf) return next();
-    return authorize(permission)(req, res, next);
-  };
-};
-
 // Get aggregated balance stats for dashboard
-router.get("/balances/aggregated", authorize("Dashboard.View"), getAggregatedBalances);
+router.get("/balances/aggregated", authorize("view", "dashboard"), getAggregatedBalances);
 
 // Employee can view their own balance, HR can view all
-router.get("/balances/:uuid", allowSelfOrPermission("Leave.View"), getBalance);
+router.get("/balances/:uuid", 
+  allowSelfOr("view", "leave", req => req.params.uuid),
+  getBalance
+);
 
 // HR can rebuild individual balances
-router.post("/balances/:uuid/rebuild", authorize("Leave.Update"), rebuildBalance);
-router.post("/balances/rebuild", authorize("Leave.Update"), rebuildBalanceByBody);
+router.post("/balances/:uuid/rebuild", authorize("update", "leave"), rebuildBalance);
+router.post("/balances/rebuild", authorize("update", "leave"), rebuildBalanceByBody);
 
 // Only users with explicit permission can rebuild all balances (critical operation)
-router.post("/balances/rebuild-all", authorize("Leave.RebuildAll"), rebuildAllBalances);
+router.post("/balances/rebuild-all", authorize("rebuild_all", "leave"), rebuildAllBalances);
 
 module.exports = router;

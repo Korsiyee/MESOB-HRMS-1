@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { PolicyApi } from '../api/policyApi';
 import { Shield, Pencil, X, Plus, Trash2 } from 'lucide-react';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { Can } from '../components/Can';
 
 const C = { card:'#EEF1F0', border:'rgba(0,80,60,0.09)', shadow:'0 2px 12px rgba(0,60,45,0.07)', primary:'#0F766E', primaryHov:'#14B8A6', textMain:'#1A2E2B', textSub:'#1E4A42', textMuted:'#2E6058', headerBg:'linear-gradient(135deg,#0c1e1c,#1e3a37)' };
 const TH = { padding:'11px 16px', textAlign:'left', fontSize:'0.68rem', color:C.textMuted, textTransform:'uppercase', letterSpacing:'0.06em', fontWeight:700, background:'rgba(0,80,60,0.05)', borderBottom:`1px solid ${C.border}`, fontFamily:'Poppins,sans-serif' };
@@ -147,7 +148,9 @@ const PoliciesPage = () => {
       <Notice type={notice.type} message={notice.message} onClose={()=>setNotice({type:'',message:''})}/>
       <div style={{ background:C.headerBg, borderRadius:14, padding:'20px 26px', display:'flex', justifyContent:'space-between', alignItems:'center', boxShadow:'0 4px 20px rgba(0,0,0,0.18)' }}>
         <div><h1 style={{ margin:0, fontSize:'1.2rem', fontWeight:700, color:'#E8F0EE' }}>Leave Policies</h1><p style={{ margin:'3px 0 0', fontSize:'0.75rem', color:'rgba(232,240,238,0.6)' }}>Configure entitlement rules per leave type</p></div>
-        <GreenBtn onClick={()=>setShowAdd(true)} style={{ background:'#E8F0EE', color:C.primary }}><Plus size={15}/> Add Policy</GreenBtn>
+        <Can action="create" resource="policies">
+          <GreenBtn onClick={()=>setShowAdd(true)} style={{ background:'#E8F0EE', color:C.primary }}><Plus size={15}/> Add Policy</GreenBtn>
+        </Can>
       </div>
       <div style={{ background:C.card, borderRadius:14, border:`1px solid ${C.border}`, boxShadow:C.shadow, overflow:'hidden' }}>
         <table style={{ width:'100%', borderCollapse:'collapse' }}>

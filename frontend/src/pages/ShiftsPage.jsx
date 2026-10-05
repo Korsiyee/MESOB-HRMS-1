@@ -4,6 +4,7 @@ import { EmployeeApi } from '../api/employeeApi';
 import { Layers, Plus, Pencil, Trash2, X, Users, Calendar, AlertTriangle, CheckCircle, Clock, Briefcase, Search } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { Can } from '../components/Can';
 
 const C = { card:'#EEF1F0', border:'rgba(0,80,60,0.09)', shadow:'0 2px 12px rgba(0,60,45,0.07)', primary:'#0F766E', primaryHov:'#14B8A6', textMain:'#1A2E2B', textSub:'#1E4A42', textMuted:'#2E6058', headerBg:'linear-gradient(135deg,#0c1e1c,#1e3a37)' };
 const field = { width:'100%', padding:'9px 13px', borderRadius:8, border:`1px solid ${C.border}`, background:C.card, fontSize:'0.82rem', color:C.textMain, outline:'none', fontFamily:'Poppins,sans-serif', boxSizing:'border-box' };
@@ -612,7 +613,9 @@ const ShiftsPage = () => {
       <Notice type={notice.type} message={notice.message} onClose={()=>setNotice({type:'',message:''})}/>
       <div style={{ background:C.headerBg, borderRadius:14, padding:'20px 26px', display:'flex', justifyContent:'space-between', alignItems:'center', boxShadow:'0 4px 20px rgba(0,0,0,0.18)' }}>
         <div><h1 style={{ margin:0, fontSize:'1.2rem', fontWeight:700, color:'#E8F0EE' }}>Shifts</h1><p style={{ margin:'3px 0 0', fontSize:'0.75rem', color:'rgba(232,240,238,0.6)' }}>{shifts.length} shift definitions</p></div>
-        <GreenBtn onClick={()=>setShowAdd(true)} style={{ background:'#E8F0EE', color:C.primary }}><Plus size={15}/> Add Shift</GreenBtn>
+        <Can action="create" resource="shifts">
+          <GreenBtn onClick={()=>setShowAdd(true)} style={{ background:'#E8F0EE', color:C.primary }}><Plus size={15}/> Add Shift</GreenBtn>
+        </Can>
       </div>
 
       {/* Tabs */}

@@ -18,7 +18,8 @@ const {
   cancelLetterRequest,
   getPlaceholders,
 } = require("../controllers/letterController");
-const { authorize, requireScopeFilter } = require("../middleware/authorize");
+// NEW: Use Permit middleware instead of old RBAC
+const { authorize, allowSelfOr } = require("../middleware/permitMiddleware");
 const { authenticateJwt } = require("../middleware/authMiddleware");
 const {
   uploadSingle,
@@ -27,31 +28,25 @@ const {
 
 const router = express.Router();
 
-// Helper middleware for self-access OR permission
-const allowSelfOrPermission = (permission) => {
-  return (req, res, next) => {
-    const isSelf = req.params.uuid === req.user.employee_uuid;
-    if (isSelf) return next();
-    return authorize(permission)(req, res, next);
-  };
-};
-
 // Utility endpoints (all authenticated users)
 router.get("/placeholders", authenticateJwt, getPlaceholders);
 
 // Templates — read is open to all authenticated users; write requires permission
 router.get("/templates", authenticateJwt, listLetterTemplates);
-router.post("/templates", authorize("Letters.Create"), uploadSingle, handleUploadError, createLetterTemplate);
-router.patch("/templates/:uuid", authorize("Letters.Update"), updateLetterTemplate);
-router.delete("/templates/:uuid", authorize("Letters.Delete"), deleteLetterTemplate);
+router.post("/templates", authorize("create", "letters"), uploadSingle, handleUploadError, createLetterTemplate);
+router.patch("/templates/:uuid", authorize("update", "letters"), updateLetterTemplate);
+router.delete("/templates/:uuid", authorize("delete", "letters"), deleteLetterTemplate);
 
 // PDF template preview and download (all authenticated users)
 router.get("/templates/:uuid/preview", authenticateJwt, getTemplatePDFPreview);
 router.get("/templates/:uuid/download", authenticateJwt, downloadTemplatePDF);
 
 // Letter generation & retrieval
-router.post("/generate", authorize("Letters.Create"), generateLetter);
-router.get("/employee/:uuid", allowSelfOrPermission("Letters.View"), listIssuedLetters);
+router.post("/generate", authorize("create", "letters"), generateLetter);
+router.get("/employee/:uuid", 
+  allowSelfOr("view", "letters", req => req.params.uuid),
+  listIssuedLetters
+);
 router.get("/:uuid/content", authenticateJwt, downloadLetterContent);
 
 // Letter requests - employee workflow
@@ -59,18 +54,16 @@ router.post("/request", authenticateJwt, requestLetter);
 router.get("/requests/my", authenticateJwt, getMyLetterRequests);
 router.delete("/requests/:uuid", authenticateJwt, cancelLetterRequest);
 
-// Letter requests - HR workflow - with scope filtering
+// Letter requests - HR workflow - scope filtering in controller
 router.get("/requests/pending", 
-  authorize("Letters.Approve"),
-  requireScopeFilter('letter'),
+  authorize("approve", "letters"),
   getPendingLetterRequests
 );
 router.get("/requests/all", 
-  authorize("Letters.View"),
-  requireScopeFilter('letter'),
+  authorize("view", "letters"),
   getAllLetterRequests
 );
-router.post("/requests/:uuid/approve", authorize("Letters.Approve"), approveLetterRequest);
-router.post("/requests/:uuid/reject", authorize("Letters.Approve"), rejectLetterRequest);
+router.post("/requests/:uuid/approve", authorize("approve", "letters"), approveLetterRequest);
+router.post("/requests/:uuid/reject", authorize("approve", "letters"), rejectLetterRequest);
 
 module.exports = router;

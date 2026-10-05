@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { AuthApi } from '../api/authApi';
+import { usePermission } from '../hooks/usePermission';
 import DashboardLayout        from '../components/layout/DashboardLayout';
 import DashboardPage          from '../pages/DashboardPage';
 import ManageLeavePage        from '../pages/leave/ManageLeavePage';
@@ -30,7 +31,10 @@ import MyAccountPage          from '../pages/MyAccountPage';
 import PlaceholderPage        from '../pages/PlaceholderPage';
 import Login                  from '../components/Login';
 import PermissionsManagementPage from '../pages/rbac/PermissionsManagementPage';
-import RoleManagementPage from '../pages/rbac/RoleManagementPage';
+import RoleManagementPage from '../pages/RoleManagementPage';
+import RoleDetailPage from '../pages/RoleDetailPage';
+import CreateRolePage from '../pages/CreateRolePage';
+import EditRolePage from '../pages/EditRolePage';
 
 /* Redirects /employees/me → /employees/:employee_uuid of the logged-in user.
    Falls back to the All Employees list if no employee_uuid is found. */
@@ -69,68 +73,41 @@ const LoginRoute = () => {
 
 /* When clicking the top-level "Employees" nav item, go to the list overview (not personal profile) */
 
-/* Role-based Attendance Routing Component */
+/* Permission-based Attendance Routing Component */
 const AttendanceRouter = () => {
-  const { user } = useAuth();
-  const role = user?.role;
+  const canManageAll = usePermission('attendance', 'manage_all');
+  const canManageDept = usePermission('attendance', 'manage_department');
 
-  // Employees see their own attendance only
-  if (role === 'EMPLOYEE') {
-    return <EmployeeAttendancePage />;
+  // Users with manage_all see full overview
+  if (canManageAll) {
+    return <AttendanceOverviewPage />;
   }
   
-  // Department Heads see their department's attendance
-  if (role === 'DEPARTMENT_HEAD') {
+  // Users with manage_department see their department
+  if (canManageDept) {
     return <DeptHeadAttendancePage />;
   }
   
-  // HR roles see the full overview
-  return <AttendanceOverviewPage />;
+  // Everyone else sees their own attendance
+  return <EmployeeAttendancePage />;
 };
 
-/* My Attendance - Personal attendance for Department Heads and Employees */
+/* My Attendance - Personal attendance view */
 const MyAttendanceRouter = () => {
-  const { user } = useAuth();
-  const role = user?.role;
-
-  // Both Employees and Department Heads see their personal attendance
-  if (role === 'EMPLOYEE' || role === 'DEPARTMENT_HEAD') {
-    return <EmployeeAttendancePage />;
-  }
-  
-  // HR roles - redirect to main attendance
-  return <Navigate to="/attendance" replace />;
+  return <EmployeeAttendancePage />;
 };
 
-const AttendanceManageRouter = () => {
-  const { user } = useAuth();
-  const role = user?.role;
-
-  // Employees and Dept Heads don't have access to management - redirect to overview
-  if (role === 'EMPLOYEE' || role === 'DEPARTMENT_HEAD') {
-    return <Navigate to="/attendance" replace />;
-  }
-  
-  // HR roles see the full management page
-  return <AttendancePage />;
-};
-
-/* Role-based Letters Routing Component */
+/* Permission-based Letters Routing Component */
 const LettersRouter = () => {
-  const { user } = useAuth();
-  const role = user?.role;
+  const canManageLetters = usePermission('letters', 'manage');
 
-  // EMPLOYEE → EmployeeLettersPage (3 tabs: Available Templates, My Requests, Issued Letters)
-  if (role === 'EMPLOYEE') {
-    return <EmployeeLettersPage />;
+  // Users with letters.manage see management interface
+  if (canManageLetters) {
+    return <LettersPage />;
   }
   
-  // DEPARTMENT_HEAD, HR_ADMIN, SUPER_ADMIN → LettersPage (management interface)
-  // All non-employee roles see the full management page with:
-  // - Letter Templates tab (create/edit/delete)
-  // - Generate Letter tab (by Mesob ID)
-  // - Pending Requests tab (approve/reject employee requests)
-  return <LettersPage />;
+  // Everyone else sees employee letters view
+  return <EmployeeLettersPage />;
 };
 
 const AppRouter = () => (
@@ -191,6 +168,12 @@ const AppRouter = () => (
       {/* ── RBAC Management ── */}
       <Route path="rbac/permissions" element={<PermissionsManagementPage />} />
       <Route path="rbac/roles" element={<RoleManagementPage />} />
+      
+      {/* ── Role Management Routes ── */}
+      <Route path="admin/roles" element={<RoleManagementPage />} />
+      <Route path="admin/roles/new" element={<CreateRolePage />} />
+      <Route path="admin/roles/:roleUuid" element={<RoleDetailPage />} />
+      <Route path="admin/roles/:roleUuid/edit" element={<EditRolePage />} />
       
       {/* ── My Account - Everyone can access ── */}
       <Route path="my-account" element={<MyAccountPage />} />

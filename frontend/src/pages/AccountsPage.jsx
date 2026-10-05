@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import { AccountApi } from "../api/accountApi";
 import { Users, UserPlus, Shield, UserX, UserCheck, Key, X, Eye, EyeOff } from "lucide-react";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
+import { Can } from "../components/Can";
+import axios from 'axios';
 
 const C = {
   card:'#EEF1F0', cardBorder:'rgba(0,80,60,0.09)',
@@ -32,8 +34,6 @@ const Notice = ({ type, message, onClose }) => message ? (
     <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'inherit', display:'flex' }}><X size={15}/></button>
   </div>
 ) : null;
-
-const ROLES = ['EMPLOYEE','HR_OFFICER','HR_ADMIN','DEPARTMENT_HEAD','SUPER_ADMIN'];
 
 /* ── Reset Password Modal ── */
 const ResetPasswordModal = ({ account, onClose, showMsg }) => {
@@ -132,9 +132,30 @@ const CreateAccountModal = ({ onClose, onCreated, showMsg, existingAccounts = []
   const [username,    setUsername]        = useState('');
   const [password,    setPassword]        = useState('');
   const [showPwd,     setShowPwd]         = useState(false);
-  const [role,        setRole]            = useState('EMPLOYEE');
+  const [role,        setRole]            = useState('employee');
   const [saving,      setSaving]          = useState(false);
+  const [roles,       setRoles]           = useState([]);
+  const [loadingRoles, setLoadingRoles]   = useState(true);
   const dropRef = React.useRef(null);
+
+  /* Fetch dynamic roles from Permit */
+  useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        const res = await axios.get('/api/permit/roles', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setRoles(res.data?.roles || []);
+      } catch (err) {
+        console.error('Failed to load roles:', err);
+        setRoles(['employee', 'hr_officer', 'hr_admin', 'department_head', 'super_admin']);
+      } finally {
+        setLoadingRoles(false);
+      }
+    };
+    fetchRoles();
+  }, []);
 
   /* close dropdown on outside click */
   useEffect(() => {
@@ -178,7 +199,7 @@ const CreateAccountModal = ({ onClose, onCreated, showMsg, existingAccounts = []
 
     // Auto-fill role: look up from existing accounts by employee_uuid
     const existingAcc = existingAccounts.find(a => a.employee_uuid === emp.uuid);
-    setRole(existingAcc?.role || 'EMPLOYEE');
+    setRole(existingAcc?.role || 'employee');
   };
 
   /* password validation rules */
@@ -339,8 +360,12 @@ const CreateAccountModal = ({ onClose, onCreated, showMsg, existingAccounts = []
           {/* ── Role ── */}
           <div style={{ marginBottom:22 }}>
             <label style={labelStyle}>Role</label>
-            <select value={role} onChange={e => setRole(e.target.value)} style={{ ...inputStyle, cursor:'pointer' }}>
-              {ROLES.map(r => <option key={r} value={r}>{r.replace(/_/g,' ')}</option>)}
+            <select value={role} onChange={e => setRole(e.target.value)} style={{ ...inputStyle, cursor:'pointer' }} disabled={loadingRoles}>
+              {loadingRoles ? (
+                <option>Loading roles...</option>
+              ) : (
+                roles.map(r => <option key={r} value={r}>{r.replace(/_/g,' ').toUpperCase()}</option>)
+              )}
             </select>
           </div>
 
@@ -417,9 +442,11 @@ const AccountsPage = () => {
           <h1 style={{ margin:0, fontSize:'1.2rem', fontWeight:700, color:'#E8F0EE' }}>User Accounts</h1>
           <p style={{ margin:'3px 0 0', fontSize:'0.75rem', color:'rgba(232,240,238,0.6)' }}>Manage system access, roles and security</p>
         </div>
-        <GreenBtn onClick={()=>setShowCreate(true)} style={{ background:'#E8F0EE', color:C.primary }}>
-          <UserPlus size={15}/> Create Account
-        </GreenBtn>
+        <Can action="create" resource="accounts">
+          <GreenBtn onClick={()=>setShowCreate(true)} style={{ background:'#E8F0EE', color:C.primary }}>
+            <UserPlus size={15}/> Create Account
+          </GreenBtn>
+        </Can>
       </div>
 
       {/* Table */}
@@ -472,19 +499,23 @@ const AccountsPage = () => {
                   <td style={{ ...TD, textAlign:'right' }}>
                     <div style={{ display:'flex', justifyContent:'flex-end', gap:4 }}>
                       {/* Activate / Deactivate */}
-                      <button
-                        onClick={()=>toggleStatus(acc)}
-                        title={acc.is_active?'Deactivate':'Activate'}
-                        style={{ background:'none', border:'none', cursor:'pointer', color:acc.is_active?'#DC2626':C.primary, padding:6, borderRadius:6, display:'flex' }}>
-                        {acc.is_active ? <UserX size={16}/> : <UserCheck size={16}/>}
-                      </button>
+                      <Can action="update" resource="accounts">
+                        <button
+                          onClick={()=>toggleStatus(acc)}
+                          title={acc.is_active?'Deactivate':'Activate'}
+                          style={{ background:'none', border:'none', cursor:'pointer', color:acc.is_active?'#DC2626':C.primary, padding:6, borderRadius:6, display:'flex' }}>
+                          {acc.is_active ? <UserX size={16}/> : <UserCheck size={16}/>}
+                        </button>
+                      </Can>
                       {/* Reset Password */}
-                      <button
-                        onClick={()=>setResetAccount(acc)}
-                        title="Reset Password"
-                        style={{ background:'none', border:'none', cursor:'pointer', color:C.textMuted, padding:6, borderRadius:6, display:'flex' }}>
-                        <Key size={16}/>
-                      </button>
+                      <Can action="update" resource="accounts">
+                        <button
+                          onClick={()=>setResetAccount(acc)}
+                          title="Reset Password"
+                          style={{ background:'none', border:'none', cursor:'pointer', color:C.textMuted, padding:6, borderRadius:6, display:'flex' }}>
+                          <Key size={16}/>
+                        </button>
+                      </Can>
                     </div>
                   </td>
                 </tr>

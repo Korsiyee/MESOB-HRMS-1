@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AttendanceApi } from '../api/attendanceApi';
 import { EmployeeApi } from '../api/employeeApi';
 import { useAuth } from '../context/AuthContext';
+import { usePermission } from '../hooks/usePermission';
 import { RefreshCw, Pencil, Trash2, Search, X, CheckCircle, Scan, Download, FileText, UserCheck } from 'lucide-react';
 import PrettyDatePicker from '../components/PrettyDatePicker';
 import { useDialog } from '../context/DialogContext';
@@ -582,7 +583,7 @@ const CorrectModal = ({ record, onClose, onSaved, showMsg }) => {
 const AttendancePage = () => {
   const { user } = useAuth();
   const dialog = useDialog();
-  const isEmployee = user?.role === 'EMPLOYEE';
+  const canManageAll = usePermission('attendance', 'manage_all');
   const employeeUuid = user?.employee_uuid;
 
   const [records,     setRecords]     = useState([]);
@@ -646,14 +647,14 @@ const AttendancePage = () => {
         page: filters.page,
         pageSize: filters.pageSize,
       };
-      const res = isEmployee
-        ? await AttendanceApi.getEmployeeAttendance(employeeUuid, params)
-        : await AttendanceApi.getAllAttendance(params);
+      const res = canManageAll
+        ? await AttendanceApi.getAllAttendance(params)
+        : await AttendanceApi.getEmployeeAttendance(employeeUuid, params);
       setRecords(res?.data || []);
       setMeta({ total: res?.meta?.total || 0, totalPages: res?.meta?.totalPages || 1 });
     } catch(e) { showMsg('error', e.message||'Failed to load attendance records.'); }
     finally { setLoading(false); }
-  }, [filters, isEmployee, employeeUuid]);
+  }, [filters, canManageAll, employeeUuid]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -692,9 +693,9 @@ const AttendancePage = () => {
         page: 1,
         pageSize: 10000, // Large number to get all records
       };
-      const res = isEmployee
-        ? await AttendanceApi.getEmployeeAttendance(employeeUuid, params)
-        : await AttendanceApi.getAllAttendance(params);
+      const res = canManageAll
+        ? await AttendanceApi.getAllAttendance(params)
+        : await AttendanceApi.getEmployeeAttendance(employeeUuid, params);
       return res?.data || [];
     } catch(e) {
       showMsg('error', e.message || 'Failed to fetch data for export.');

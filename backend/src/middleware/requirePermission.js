@@ -183,3 +183,22 @@ module.exports = {
   requirePermission,
   requirePermissionOrSelfAccess
 };
+
+// ============================================================================
+// DEPRECATION NOTICE
+// ============================================================================
+/**
+ * @deprecated This middleware uses occupation-based permissions and is being replaced.
+ * 
+ * Please use the new authorize() middleware from './authorize.js' instead.
+ * 
+ * The new system uses:
+ * - Resource.Action format (e.g., 'Employees.View' instead of 'employees.view')
+ * - Database-driven roles and permissions
+ * - Flexible data scopes
+ * - Support for custom roles
+ * 
+ * Migration guide: See /backend/RBAC_MIGRATION_GUIDE.md
+ * 
+ * This file will be removed in a future version after migration is complete.
+ */

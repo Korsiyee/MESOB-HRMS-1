@@ -10,6 +10,7 @@ import {
 import { useLocation } from 'react-router-dom';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useDialog } from '../context/DialogContext';
+import { Can } from '../components/Can';
 
 /* ── Shared palette ── */
 const C = {
@@ -733,9 +734,11 @@ const DepartmentsManage = ({ onOverviewClick }) => {
             style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid rgba(232,240,238,0.25)', background: 'rgba(232,240,238,0.1)', color: '#E8F0EE', fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontFamily: 'Poppins,sans-serif' }}>
             <BarChart2 size={14} /> Overview
           </button>
-          <GreenBtn onClick={() => setShowAdd(true)} style={{ background: '#E8F0EE', color: C.primary }}>
-            <Plus size={15} /> Add Department
-          </GreenBtn>
+          <Can action="create" resource="departments">
+            <GreenBtn onClick={() => setShowAdd(true)} style={{ background: '#E8F0EE', color: C.primary }}>
+              <Plus size={15} /> Add Department
+            </GreenBtn>
+          </Can>
         </div>
       </div>
 
@@ -793,18 +796,22 @@ const DepartmentsManage = ({ onOverviewClick }) => {
                 <td style={{ ...TD, color: C.textMuted, fontSize: '0.75rem' }}>{d.created_at?.slice(0, 10) || '—'}</td>
                 <td style={{ ...TD, textAlign: 'right' }}>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
-                    <button onClick={() => setEditDept(d)} title="Edit"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.primary, padding: 5, borderRadius: 6, display: 'flex', transition: 'background 0.15s' }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(15,118,110,0.1)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'none'}>
-                      <Pencil size={15} />
-                    </button>
-                    <button onClick={() => handleDelete(d.uuid)} disabled={deleting === d.uuid} title="Delete"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', padding: 5, borderRadius: 6, display: 'flex', opacity: deleting === d.uuid ? 0.5 : 1, transition: 'background 0.15s' }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(220,38,38,0.08)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'none'}>
-                      <Trash2 size={15} />
-                    </button>
+                    <Can action="update" resource="departments">
+                      <button onClick={() => setEditDept(d)} title="Edit"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.primary, padding: 5, borderRadius: 6, display: 'flex', transition: 'background 0.15s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(15,118,110,0.1)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                        <Pencil size={15} />
+                      </button>
+                    </Can>
+                    <Can action="delete" resource="departments">
+                      <button onClick={() => handleDelete(d.uuid)} disabled={deleting === d.uuid} title="Delete"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', padding: 5, borderRadius: 6, display: 'flex', opacity: deleting === d.uuid ? 0.5 : 1, transition: 'background 0.15s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(220,38,38,0.08)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                        <Trash2 size={15} />
+                      </button>
+                    </Can>
                   </div>
                 </td>
               </tr>

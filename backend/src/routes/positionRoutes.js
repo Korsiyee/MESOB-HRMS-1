@@ -8,35 +8,36 @@ const {
   assignShiftToPosition,
   removeShiftFromPosition,
 } = require("../controllers/positionController");
-const { authorize } = require("../middleware/authorize");
+// NEW: Use Permit middleware instead of old RBAC
+const { authorize, requireAny } = require("../middleware/permitMiddleware");
 
 const router = express.Router();
 
 // View: Anyone who can view positions, employees, attendance, or shifts
 router.get("/", 
-  authorize([
-    "Positions.View",
-    "Employees.View",
-    "Attendance.View",
-    "Shifts.View"
+  requireAny([
+    { action: "view", resource: "positions" },
+    { action: "view", resource: "employees" },
+    { action: "view", resource: "attendance" },
+    { action: "view", resource: "shifts" }
   ]), 
   listPositions
 );
 router.get("/:uuid", 
-  authorize([
-    "Positions.View",
-    "Employees.View",
-    "Attendance.View",
-    "Shifts.View"
+  requireAny([
+    { action: "view", resource: "positions" },
+    { action: "view", resource: "employees" },
+    { action: "view", resource: "attendance" },
+    { action: "view", resource: "shifts" }
   ]), 
   getPosition
 );
 
 // Manage: Requires position management permissions
-router.post("/", authorize("Positions.Create"), createPosition);
-router.patch("/:uuid", authorize("Positions.Update"), updatePosition);
-router.delete("/:uuid", authorize("Positions.Delete"), deletePosition);
-router.post("/:uuid/assign-shift", authorize("Positions.Update"), assignShiftToPosition);
-router.delete("/:uuid/shift", authorize("Positions.Update"), removeShiftFromPosition);
+router.post("/", authorize("create", "positions"), createPosition);
+router.patch("/:uuid", authorize("update", "positions"), updatePosition);
+router.delete("/:uuid", authorize("delete", "positions"), deletePosition);
+router.post("/:uuid/assign-shift", authorize("update", "positions"), assignShiftToPosition);
+router.delete("/:uuid/shift", authorize("update", "positions"), removeShiftFromPosition);
 
 module.exports = router;

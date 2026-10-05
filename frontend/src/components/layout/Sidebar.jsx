@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import logo from "../../../assets/Logo.png";
 import { useAuth } from "../../context/AuthContext";
+import { usePermissions } from "../../hooks/usePermissions";
 
 /* Continuous spin lives in index.css as @keyframes continuousSpin */
 const SPIN_STYLE = {
@@ -128,11 +129,13 @@ const NAV_ADMIN = [
         label: "Permissions",
         icon: Shield,
         to: "/rbac/permissions",
+        permission: "Permissions.View",
       },
       {
         label: "Roles",
-        icon: Users,
-        to: "/rbac/roles",
+        icon: UserCog,
+        to: "/admin/roles",
+        permission: "Roles.View",
       },
     ],
   },
@@ -272,6 +275,7 @@ function resolveActiveRoute(pathname, navGroups) {
 const Sidebar = ({ collapsed, onToggle, pendingCount = 0, mobileOpen = false, isMobile = false, isTablet = false }) => {
   const location = useLocation();
   const { user } = useAuth();
+  const { hasPermission, hasAnyPermission } = usePermissions();
 
   const isEmployee = user?.role === "EMPLOYEE";
   const isDeptHead = user?.role === "DEPARTMENT_HEAD";
@@ -285,13 +289,28 @@ const Sidebar = ({ collapsed, onToggle, pendingCount = 0, mobileOpen = false, is
         ? NAV_HR_OFFICER
         : NAV_ADMIN;
 
+  // Filter navigation items based on permissions
+  const filteredNav = activeNav.map(group => ({
+    ...group,
+    items: group.items.filter(item => {
+      // If no permission is specified, show the item (backward compatibility)
+      if (!item.permission) return true;
+      
+      // Check if user has the required permission
+      if (Array.isArray(item.permission)) {
+        return hasAnyPermission(item.permission);
+      }
+      return hasPermission(item.permission);
+    })
+  })).filter(group => group.items.length > 0); // Remove empty groups
+
   const w = collapsed ? 72 : 240;
 
-  const activeRouteTo = resolveActiveRoute(location.pathname, activeNav);
+  const activeRouteTo = resolveActiveRoute(location.pathname, filteredNav);
 
   const [openFolders, setOpenFolders] = useState(() => {
     const active = new Set();
-    activeNav.forEach(({ items }) => {
+    filteredNav.forEach(({ items }) => {
       items.forEach((item) => {
         if (item.children?.some((c) => c.to === activeRouteTo)) {
           active.add(item.to);
@@ -302,7 +321,7 @@ const Sidebar = ({ collapsed, onToggle, pendingCount = 0, mobileOpen = false, is
   });
 
   useEffect(() => {
-    activeNav.forEach(({ items }) => {
+    filteredNav.forEach(({ items }) => {
       items.forEach((item) => {
         if (item.children?.some((c) => c.to === activeRouteTo)) {
           setOpenFolders((prev) => new Set([...prev, item.to]));
@@ -399,7 +418,7 @@ const Sidebar = ({ collapsed, onToggle, pendingCount = 0, mobileOpen = false, is
 
       {/* â”€â”€ Navigation â”€â”€ */}
       <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '8px 0' }}>
-        {activeNav.map(({ group, items }) => (
+        {filteredNav.map(({ group, items }) => (
           <div key={group}>
             {(!collapsed || isMobile) && (
               <p style={{ margin: '14px 0 4px', padding: '0 16px', fontSize: 10, fontWeight: 600, letterSpacing: 2, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase' }}>

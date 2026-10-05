@@ -57,12 +57,26 @@ exports.getCurrentUser = asyncHandler(async (req, res) => {
     throw new ApiError("Not authenticated.", 401, "UNAUTHORIZED");
   }
 
-  // Fetch fresh user data with occupations
+  // Fetch fresh user data with occupations (legacy)
   const user = await AuthService.getUserWithOccupations(req.user.uuid);
+  
+  // Fetch RBAC permissions (new system)
+  const rbacService = require("../services/rbacService");
+  const permissions = await rbacService.getUserPermissions(req.user.uuid);
+  const role = await rbacService.getUserRole(req.user.uuid);
+  
+  // Combine both systems for transition period
+  const userData = {
+    ...user,
+    rbac: {
+      role: role,
+      permissions: permissions
+    }
+  };
 
   return sendSuccess(res, {
     status: 200,
-    data: user,
+    data: userData,
   });
 });
 
@@ -203,5 +217,31 @@ exports.register = asyncHandler(async (req, res) => {
     status: 201,
     message: "Account created successfully.",
     data: result,
+  });
+});
+
+
+/**
+ * Check if user has permission (for frontend permission checks)
+ * GET /api/auth/check-permission?action=view&resource=employees
+ */
+exports.checkPermission = asyncHandler(async (req, res) => {
+  if (!req.user) {
+    throw new ApiError("Not authenticated.", 401, "UNAUTHORIZED");
+  }
+
+  const { action, resource } = req.query;
+
+  if (!action || !resource) {
+    throw new ApiError("action and resource are required.", 400, "VALIDATION_ERROR");
+  }
+
+  // Use Permit to check permission
+  const { checkPermission } = require("../middleware/permitMiddleware");
+  const allowed = await checkPermission(req.user.uuid, action, resource);
+
+  return sendSuccess(res, {
+    status: 200,
+    data: { allowed },
   });
 });

@@ -121,9 +121,9 @@ async function getUserPermissions(userId) {
   const [rows] = await executeQuery(
     `SELECT DISTINCT p.code
      FROM Users u
-     JOIN Roles r ON u.role_id = r.id
-     JOIN RolePermissions rp ON r.id = rp.role_id
-     JOIN Permissions p ON rp.permission_id = p.id
+     JOIN Roles r ON u.role_uuid = r.uuid
+     JOIN RolePermissions rp ON r.uuid = rp.role_uuid
+     JOIN Permissions p ON rp.permission_uuid = p.uuid
      WHERE u.uuid = ? 
        AND r.is_active = TRUE
        AND p.is_active = TRUE`,
@@ -147,9 +147,9 @@ async function getUserPermissionsDetailed(userId) {
   const [rows] = await executeQuery(
     `SELECT DISTINCT p.id, p.uuid, p.code, p.resource, p.action, p.description, p.requires_scope
      FROM Users u
-     JOIN Roles r ON u.role_id = r.id
-     JOIN RolePermissions rp ON r.id = rp.role_id
-     JOIN Permissions p ON rp.permission_id = p.id
+     JOIN Roles r ON u.role_uuid = r.uuid
+     JOIN RolePermissions rp ON r.uuid = rp.role_uuid
+     JOIN Permissions p ON rp.permission_uuid = p.uuid
      WHERE u.uuid = ? 
        AND r.is_active = TRUE
        AND p.is_active = TRUE

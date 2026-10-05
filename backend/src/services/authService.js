@@ -4,8 +4,9 @@ const { randomUUID } = require("crypto");
 const { requireEnv, getEnv } = require("../config/env");
 const { executeQuery } = require("../utils/dbQuery");
 const { getSignedUrl } = require("./employeeStorageService");
-const db = require("../config/db");
+const { db } = require("../config/db");
 const authorizationService = require("./authorizationService"); // NEW: Use authorization service
+const { syncUserToPermit, ensureUserInPermit } = require("./permitSyncService"); // Permit.io integration
 
 const JWT_SECRET = requireEnv("JWT_SECRET");
 const JWT_REFRESH_SECRET = requireEnv("JWT_REFRESH_SECRET");
@@ -183,6 +184,15 @@ async function login(username, password) {
         .filter(Boolean)
         .join(" ")
     : null;
+
+  // Ensure user is synced to Permit on login (just-in-time sync)
+  // This ensures the user exists in Permit even if they were created before migration
+  try {
+    await ensureUserInPermit(user.uuid);
+  } catch (permitError) {
+    // Don't block login if Permit sync fails
+    console.error('[Auth] Failed to sync user to Permit on login:', permitError.message);
+  }
 
   return {
     accessToken,
@@ -508,6 +518,29 @@ async function register(registrationData, actorRoleId = null) {
   
   // Get role info for response
   const roleInfo = await authorizationService.getRoleById(targetRoleId);
+
+  // Sync user to Permit (new user registration)
+  try {
+    const fullName = [first_name, middle_name, last_name].filter(Boolean).join(' ');
+    const email = addresses && addresses.length > 0 ? addresses[0].email : null;
+    
+    await syncUserToPermit(
+      {
+        uuid: user.uuid,
+        username: user.username,
+        role: roleInfo ? roleInfo.code : 'EMPLOYEE',
+        employee_uuid: employee.uuid,
+        department_uuid: employee.department_uuid,
+        is_active: true,
+      },
+      fullName,
+      email
+    );
+    console.log(`[Auth] Successfully synced new user ${username} to Permit`);
+  } catch (permitError) {
+    // Don't block registration if Permit sync fails
+    console.error('[Auth] Failed to sync new user to Permit:', permitError.message);
+  }
 
   return {
     accessToken,

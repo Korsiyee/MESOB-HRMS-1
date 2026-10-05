@@ -52,152 +52,8 @@ const buildDocumentObjectKey = ({
 }) =>
   `${employee_uuid}/${leaveRequestUuid}/${documentUuid}-${sanitizeFileName(originalName)}`;
 
-const ensureLeaveRequestOptionalColumns = async () => {
-  if (optionalColumnsEnsurePromise) {
-    return optionalColumnsEnsurePromise;
-  }
-
-  optionalColumnsEnsurePromise = (async () => {
-    const [rows] = await db.promise().execute(
-      `
-      SELECT COLUMN_NAME AS columnName
-      FROM information_schema.columns
-      WHERE table_schema = DATABASE()
-        AND table_name = 'leaveRequests'
-        AND COLUMN_NAME IN ('rejectionReason', 'supportingDocument', 'dayPattern', 'dailyPlanJson')
-      `,
-    );
-
-    const existing = new Set(rows.map((row) => row.columnName));
-
-    if (!existing.has("rejectionReason")) {
-      await db
-        .promise()
-        .execute(
-          "ALTER TABLE leaveRequests ADD COLUMN rejectionReason TEXT NULL",
-        );
-    }
-
-    if (!existing.has("supportingDocument")) {
-      await db
-        .promise()
-        .execute(
-          "ALTER TABLE leaveRequests ADD COLUMN supportingDocument VARCHAR(255) NULL",
-        );
-    }
-
-    if (!existing.has("dayPattern")) {
-      await db
-        .promise()
-        .execute(
-          "ALTER TABLE leaveRequests ADD COLUMN dayPattern VARCHAR(20) NULL",
-        );
-    }
-
-    if (!existing.has("dailyPlanJson")) {
-      await db
-        .promise()
-        .execute(
-          "ALTER TABLE leaveRequests ADD COLUMN dailyPlanJson TEXT NULL",
-        );
-    }
-
-    await db.promise().execute(`
-      CREATE TABLE IF NOT EXISTS leaveRequestDocuments (
-        uuid VARCHAR(50) PRIMARY KEY,
-        leaveRequestUuid VARCHAR(50) NOT NULL,
-        employee_uuid VARCHAR(50) NOT NULL,
-        originalName VARCHAR(255) NOT NULL,
-        objectKey VARCHAR(512) NOT NULL,
-        mimeType VARCHAR(120) NOT NULL,
-        sizeBytes BIGINT NOT NULL,
-        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_leave_docs_request (leaveRequestUuid),
-        INDEX idx_leave_docs_employee (employee_uuid),
-        CONSTRAINT fk_leave_docs_request
-          FOREIGN KEY (leaveRequestUuid) REFERENCES leaveRequests (uuid),
-        CONSTRAINT fk_leave_docs_employee
-          FOREIGN KEY (employee_uuid) REFERENCES Employees (uuid)
-      )
-    `);
-
-    const [dayColumnRows] = await db.promise().execute(
-      `
-      SELECT table_name AS tableName, column_name AS columnName, data_type AS dataType
-      FROM information_schema.columns
-      WHERE table_schema = DATABASE()
-        AND (
-          (table_name = 'leaveRequests' AND column_name IN ('total_days'))
-          OR
-          (table_name = 'employeeLeaveBalances' AND column_name IN ('entitledDays', 'carriedForwardDays', 'usedDays', 'remainingDays'))
-          OR
-          (table_name = 'leavePostponements' AND column_name IN ('postponedDays'))
-        )
-      `,
-    );
-
-    const dayColumnDefinitions = [
-      {
-        tableName: "leaverequests",
-        columnName: "total_days",
-        definition: "DECIMAL(8,1)",
-      },
-      {
-        tableName: "employeeleavebalances",
-        columnName: "entitleddays",
-        definition: "DECIMAL(8,1)",
-      },
-      {
-        tableName: "employeeleavebalances",
-        columnName: "carriedforwarddays",
-        definition: "DECIMAL(8,1)",
-      },
-      {
-        tableName: "employeeleavebalances",
-        columnName: "useddays",
-        definition: "DECIMAL(8,1)",
-      },
-      {
-        tableName: "employeeleavebalances",
-        columnName: "remainingdays",
-        definition: "DECIMAL(8,1)",
-      },
-      {
-        tableName: "leavepostponements",
-        columnName: "postponeddays",
-        definition: "DECIMAL(8,1)",
-      },
-    ];
-
-    for (const column of dayColumnDefinitions) {
-      const existing = dayColumnRows.find(
-        (row) =>
-          String(row.tableName || "").toLowerCase() === column.tableName &&
-          String(row.columnName || "").toLowerCase() === column.columnName,
-      );
-
-      if (!existing) {
-        continue;
-      }
-
-      if (
-        DECIMAL_DAY_DATA_TYPES.has(
-          String(existing.dataType || "").toLowerCase(),
-        )
-      ) {
-        continue;
-      }
-
-      await db
-        .promise()
-        .execute(
-          `ALTER TABLE ${existing.tableName} MODIFY COLUMN ${existing.columnName} ${column.definition}`,
-        );
-    }
-  })();
-
-  return optionalColumnsEnsurePromise;
-};
+// Schema changes have been moved to database migrations
+// All required columns should exist in the schema.sql file
 
 class RequestServiceError extends Error {
   constructor(message, statusCode) {
@@ -210,8 +66,6 @@ class RequestServiceError extends Error {
 class RequestService {
   static async createLeaveRequest(requestData) {
     try {
-      await ensureLeaveRequestOptionalColumns();
-
       const {
         employee_uuid,
         leaveType,
@@ -367,8 +221,6 @@ class RequestService {
 
   static async getRequestByUuid(requestUuid) {
     try {
-      await ensureLeaveRequestOptionalColumns();
-
       const query = `
         SELECT uuid, employee_uuid, leaveType,
                DATE_FORMAT(startDate, '%Y-%m-%d') AS startDate,
@@ -447,8 +299,6 @@ class RequestService {
         return []; // Return empty array instead of crashing
       }
 
-      await ensureLeaveRequestOptionalColumns();
-
       let query = `
         SELECT uuid, leaveType,
                DATE_FORMAT(startDate, '%Y-%m-%d') AS startDate,
@@ -507,8 +357,6 @@ class RequestService {
 
   static async getPendingRequests({ departmentUuid, role } = {}) {
     try {
-      await ensureLeaveRequestOptionalColumns();
-
       // If scoped to a department, join on employee department
       const deptJoin = "JOIN Employees e ON lr.employee_uuid = e.uuid";
       let statusFilter = "";
@@ -567,8 +415,6 @@ class RequestService {
 
   static async getAdminRequests({ budgetYear = null } = {}) {
     try {
-      await ensureLeaveRequestOptionalColumns();
-
       const parsedBudgetYear = Number.parseInt(String(budgetYear || ""), 10);
       const hasBudgetYearFilter = Number.isInteger(parsedBudgetYear);
 
@@ -638,8 +484,6 @@ class RequestService {
   }
 
   static async getRequestDocuments(requestUuid) {
-    await ensureLeaveRequestOptionalColumns();
-
     const [rows] = await db.promise().execute(
       `
         SELECT uuid, leaveRequestUuid, employee_uuid, originalName,
@@ -656,8 +500,6 @@ class RequestService {
   }
 
   static async getRequestDocumentForRequest({ requestUuid, documentUuid }) {
-    await ensureLeaveRequestOptionalColumns();
-
     const normalizedRequestUuid = parseString(requestUuid);
     const normalizedDocumentUuid = parseString(documentUuid);
 
@@ -684,8 +526,6 @@ class RequestService {
   }
 
   static async addRequestDocuments({ requestUuid, documents }) {
-    await ensureLeaveRequestOptionalColumns();
-
     const normalizedRequestUuid = parseString(requestUuid);
     if (!normalizedRequestUuid) {
       throw new RequestServiceError("Request uuid is required.", 400);
@@ -785,8 +625,6 @@ class RequestService {
   }
 
   static async replaceRequestDocument({ requestUuid, documentUuid, document }) {
-    await ensureLeaveRequestOptionalColumns();
-
     const normalizedRequestUuid = parseString(requestUuid);
     const normalizedDocumentUuid = parseString(documentUuid);
 
@@ -906,8 +744,6 @@ class RequestService {
   }
 
   static async deleteRequestDocument({ requestUuid, documentUuid }) {
-    await ensureLeaveRequestOptionalColumns();
-
     const normalizedRequestUuid = parseString(requestUuid);
     const normalizedDocumentUuid = parseString(documentUuid);
 
@@ -991,8 +827,6 @@ class RequestService {
   }
 
   static async updatePendingRequest(requestUuid, fields) {
-    await ensureLeaveRequestOptionalColumns();
-
     const normalizedUuid = parseString(requestUuid);
     if (!normalizedUuid) {
       throw new RequestServiceError("Request uuid is required.", 400);
@@ -1280,8 +1114,6 @@ class RequestService {
     employee_uuid,
     newEndDate,
   }) {
-    await ensureLeaveRequestOptionalColumns();
-
     const normalizedUuid        = parseString(requestUuid);
     const normalizedEmployeeUuid = parseString(employee_uuid);
     const normalizedNewEndDate  = parseString(newEndDate);
@@ -1507,8 +1339,6 @@ class RequestService {
    *  - If the request was APPROVED its balance deduction is reversed.
    */
   static async cancelLeaveRequest({ requestUuid, cancelledByUuid }) {
-    await ensureLeaveRequestOptionalColumns();
-
     const normalizedUuid = parseString(requestUuid);
     const normalizedCancelledBy = parseString(cancelledByUuid);
 
@@ -2013,8 +1843,6 @@ const handleDepartmentDecision = async ({
   rejectionReason,
   approvedDays,
 }) => {
-  await ensureLeaveRequestOptionalColumns();
-
   if (!parseString(requestUuid)) {
     throw new RequestServiceError("Request uuid is required.", 400);
   }

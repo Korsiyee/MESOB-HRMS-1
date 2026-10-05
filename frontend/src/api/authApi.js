@@ -9,14 +9,27 @@ export const AuthApi = {
     });
     
     // Store tokens if login successful
+    console.log('[AuthApi.login] Response data:', { 
+      hasAccessToken: !!response.data?.accessToken,
+      hasRefreshToken: !!response.data?.refreshToken,
+      hasUser: !!response.data?.user 
+    });
+    
     if (response.data?.accessToken) {
       localStorage.setItem("authToken", response.data.accessToken);
+      console.log('[AuthApi.login] ✅ Access token stored, length:', response.data.accessToken.length);
+    } else {
+      console.error('[AuthApi.login] ❌ NO ACCESS TOKEN in response!');
     }
+    
     if (response.data?.refreshToken) {
       localStorage.setItem("refreshToken", response.data.refreshToken);
+      console.log('[AuthApi.login] ✅ Refresh token stored');
     }
+    
     if (response.data?.user) {
       localStorage.setItem("user", JSON.stringify(response.data.user));
+      console.log('[AuthApi.login] ✅ User stored');
     }
     
     return response;

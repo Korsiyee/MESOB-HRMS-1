@@ -150,15 +150,42 @@ exports.createAccount = async (req, res) => {
     // Get role info for response
     const roleInfo = await authorizationService.getRoleById(targetRoleId);
 
-    // Fetch created user
+    // Fetch created user with department info
     const [newUser] = await pool.execute(
       `SELECT u.uuid, u.employee_uuid, u.username, u.role_id, u.is_active, u.must_change_password,
-              u.created_at, u.updated_at, e.first_name, e.last_name, e.mesob_id
+              u.created_at, u.updated_at, 
+              e.first_name, e.middle_name, e.last_name, e.mesob_id, e.department_uuid,
+              a.email
        FROM Users u
        LEFT JOIN Employees e ON e.uuid = u.employee_uuid
+       LEFT JOIN EmployeeAddresses a ON e.uuid = a.employee_uuid AND a.address_type = 'CURRENT'
        WHERE u.uuid = ?`,
       [userUuid]
     );
+
+    // Sync user to Permit
+    try {
+      const { syncUserToPermit } = require("../services/permitSyncService");
+      const user = newUser[0];
+      const fullName = [user.first_name, user.middle_name, user.last_name].filter(Boolean).join(' ');
+      
+      await syncUserToPermit(
+        {
+          uuid: user.uuid,
+          username: user.username,
+          role: roleInfo ? roleInfo.code : 'EMPLOYEE',
+          employee_uuid: user.employee_uuid,
+          department_uuid: user.department_uuid,
+          is_active: Boolean(user.is_active),
+        },
+        fullName,
+        user.email
+      );
+      console.log(`[Account] Successfully synced new user ${user.username} to Permit`);
+    } catch (permitError) {
+      // Don't block account creation if Permit sync fails
+      console.error('[Account] Failed to sync new user to Permit:', permitError.message);
+    }
 
     // Audit log
     await safeLogEvent({
@@ -166,7 +193,7 @@ exports.createAccount = async (req, res) => {
       action: "CREATE_USER_ACCOUNT",
       entityType: "USER",
       entityUuid: userUuid,
-      diff: { username, role_id: role, employee_uuid },
+      diff: { username, role_id: targetRoleId, employee_uuid },
       ipAddress: req.ip,
     });
 
@@ -401,6 +428,20 @@ exports.changeAccountRole = async (req, res) => {
       [newRoleId, uuid]
     );
 
+    // Sync role change to Permit
+    try {
+      const { changeUserRole } = require("../services/permitSyncService");
+      await changeUserRole(
+        uuid,
+        oldRoleInfo?.code || 'EMPLOYEE',
+        newRoleInfo?.code || 'EMPLOYEE'
+      );
+      console.log(`[Account] Successfully synced role change for ${targetUser.username} to Permit`);
+    } catch (permitError) {
+      // Don't block role change if Permit sync fails
+      console.error('[Account] Failed to sync role change to Permit:', permitError.message);
+    }
+
     // Audit log
     await safeLogEvent({
       actorUuid: req.user.uuid,
@@ -473,6 +514,7 @@ exports.changeAccountStatus = async (req, res) => {
     }
 
     const oldStatus = Boolean(existing[0].is_active);
+    const targetUsername = existing[0].username;
 
     // SECURITY FIX: When deactivating, revoke all tokens immediately
     if (!active) {
@@ -485,6 +527,27 @@ exports.changeAccountStatus = async (req, res) => {
       active ? 1 : 0,
       uuid,
     ]);
+
+    // Sync activation/deactivation to Permit
+    try {
+      const { deactivateUser, reactivateUser } = require("../services/permitSyncService");
+      const [userInfo] = await pool.execute(
+        "SELECT role FROM Users WHERE uuid = ?",
+        [uuid]
+      );
+      const userRole = userInfo[0]?.role || 'EMPLOYEE';
+      
+      if (active) {
+        await reactivateUser(uuid, userRole);
+        console.log(`[Account] Successfully reactivated user ${targetUsername} in Permit`);
+      } else {
+        await deactivateUser(uuid, userRole);
+        console.log(`[Account] Successfully deactivated user ${targetUsername} in Permit`);
+      }
+    } catch (permitError) {
+      // Don't block status change if Permit sync fails
+      console.error('[Account] Failed to sync status change to Permit:', permitError.message);
+    }
 
     // Fetch updated account
     const [updated] = await pool.execute(

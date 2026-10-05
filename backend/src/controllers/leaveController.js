@@ -6,7 +6,7 @@ const {
 const { safeLogEvent } = require("../services/auditLogService");
 const { sendSuccess, sendError } = require("../utils/response");
 const { isValidUuid } = require("../utils/validation");
-const db = require("../config/db");
+const { db } = require("../config/db");
 
 exports.getBalance = async (req, res) => {
   try {

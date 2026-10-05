@@ -21,68 +21,73 @@ const {
   uploadEmployeePhoto: uploadPhoto,
   uploadEmployeeDocuments,
 } = require("../middleware/employeeUploadMiddleware");
-const { authorize, requireScopeFilter } = require("../middleware/authorize");
+// NEW: Use Permit middleware instead of old RBAC
+const { authorize, allowSelfOr, requireAny } = require("../middleware/permitMiddleware");
 const { authenticateJwt } = require("../middleware/authMiddleware");
-
-// Helper middleware for self-access OR permission
-const allowSelfOrPermission = (permission) => {
-  return (req, res, next) => {
-    const isSelf = req.params.uuid === req.user.employee_uuid;
-    if (isSelf) return next();
-    return authorize(permission)(req, res, next);
-  };
-};
 
 const router = express.Router();
 
 // Draft endpoints
-router.post("/draft", authorize("Employees.Create"), saveDraft);
-router.get("/draft/:uuid", authorize("Employees.Create"), getDraft);
+router.post("/draft", authorize("create", "employees"), saveDraft);
+router.get("/draft/:uuid", authorize("create", "employees"), getDraft);
 
 // Employee creation
-router.post("/", authorize("Employees.Create"), createEmployee);
+router.post("/", authorize("create", "employees"), createEmployee);
 
-// List all employees (with scope filtering for Dept Heads)
+// List all employees (allow if user can view employees, attendance, or shifts)
 router.get("/", 
-  authorize(["Employees.View", "Attendance.View", "Shifts.View"]),
-  requireScopeFilter('employee'),
+  requireAny([
+    { action: "view", resource: "employees" },
+    { action: "view", resource: "attendance" },
+    { action: "view", resource: "shifts" }
+  ]),
   listEmployees
 );
 
-// Search employees for attendance (with scope filtering)
+// Search employees for attendance
 router.get("/search/attendance", 
-  authorize("Attendance.View"),
-  requireScopeFilter('employee'),
+  authorize("view", "attendance"),
   searchEmployeesForAttendance
 );
 
 // Department head specific endpoints
-router.get("/dept-head/stats", authorize("Dashboard.View"), getDeptHeadStats);
+router.get("/dept-head/stats", authorize("view", "dashboard"), getDeptHeadStats);
 router.get("/dept-head/employees", 
-  authorize("Employees.View"),
-  requireScopeFilter('employee'),
+  authorize("view", "employees"),
   getDeptEmployees
 );
 
 // Employee dashboard (self-access OR permission)
-router.get("/:uuid/dashboard", allowSelfOrPermission("Employees.View"), getEmployeeDashboard);
+router.get("/:uuid/dashboard", 
+  allowSelfOr("view", "employees", req => req.params.uuid),
+  getEmployeeDashboard
+);
 
 // Get single employee (self-access OR permission)
-router.get("/:uuid", allowSelfOrPermission("Employees.View"), getEmployee);
+router.get("/:uuid", 
+  allowSelfOr("view", "employees", req => req.params.uuid),
+  getEmployee
+);
 
 // Update employee
-router.patch("/:uuid", authorize("Employees.Update"), updateEmployee);
-router.patch("/:uuid/status", authorize("Employees.Update"), updateEmployeeStatus);
+router.patch("/:uuid", authorize("update", "employees"), updateEmployee);
+router.patch("/:uuid/status", authorize("update", "employees"), updateEmployeeStatus);
 
 // Photo upload
-router.post("/:uuid/photo", authorize("Employees.Update"), uploadPhoto, uploadEmployeePhoto);
+router.post("/:uuid/photo", authorize("update", "employees"), uploadPhoto, uploadEmployeePhoto);
 
 // Documents (self-access OR permission)
-router.get("/:uuid/documents", allowSelfOrPermission("Employees.View"), listEmployeeDocuments);
-router.post("/:uuid/documents", authorize("Employees.Update"), uploadEmployeeDocuments, addEmployeeDocument);
-router.delete("/:uuid/documents/:docUuid", authorize("Employees.Update"), removeEmployeeDocument);
+router.get("/:uuid/documents", 
+  allowSelfOr("view", "employees", req => req.params.uuid),
+  listEmployeeDocuments
+);
+router.post("/:uuid/documents", authorize("update", "employees"), uploadEmployeeDocuments, addEmployeeDocument);
+router.delete("/:uuid/documents/:docUuid", authorize("update", "employees"), removeEmployeeDocument);
 
 // Shift (self-access OR permission)
-router.get("/:uuid/shift", allowSelfOrPermission("Shifts.View"), getEmployeeShift);
+router.get("/:uuid/shift", 
+  allowSelfOr("view", "shifts", req => req.params.uuid),
+  getEmployeeShift
+);
 
 module.exports = router;

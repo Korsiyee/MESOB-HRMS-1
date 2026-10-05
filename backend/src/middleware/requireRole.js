@@ -78,3 +78,23 @@ function requireRole(roles) {
 module.exports = {
   requireRole
 };
+
+// ============================================================================
+// DEPRECATION NOTICE
+// ============================================================================
+/**
+ * @deprecated This middleware uses hardcoded role checks and is being phased out.
+ * 
+ * Please use the new authorize() middleware from './authorize.js' instead.
+ * 
+ * Migration guide: See /backend/RBAC_MIGRATION_GUIDE.md and MIGRATION_EXAMPLES.md
+ * 
+ * Migration examples:
+ *   OLD: requireRole(['HR_ADMIN', 'SUPER_ADMIN'])
+ *   NEW: authorize({ permissions: 'Resource.Action' })
+ * 
+ *   OLD: requireRole('DEPARTMENT_HEAD')
+ *   NEW: authorize({ permissions: 'Resource.View', enforceScope: true })
+ * 
+ * This file will be removed in a future version after all controllers are migrated.
+ */

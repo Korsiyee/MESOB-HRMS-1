@@ -20,7 +20,8 @@ const {
   uploadRequestDocuments,
   uploadSingleRequestDocument,
 } = require("../middleware/requestUploadMiddleware");
-const { authorize, requireScopeFilter } = require("../middleware/authorize"); // NEW: Use authorize
+// NEW: Use Permit middleware instead of old RBAC
+const { authorize, allowSelfOr } = require("../middleware/permitMiddleware");
 const { authenticateJwt } = require("../middleware/authMiddleware");
 
 const router = express.Router();
@@ -31,34 +32,28 @@ router.get("/preview", authenticateJwt, previewLeaveDates);
 // Pending requests - MUST BE BEFORE /:uuid
 router.get("/pending", 
   authenticateJwt,
-  authorize({ permissions: 'leave.view_pending' }), // FIXED: Removed Dashboard from OR list
-  requireScopeFilter('leave'),
+  authorize("view", "requests"),
   getPendingRequests
 );
 
-// Admin routes (requires leave management permission with scope)
+// Admin routes (requires request management permission)
 router.get("/admin/all", 
   authenticateJwt,
-  authorize({ permissions: 'leave.view_all' }),
-  requireScopeFilter('leave'),
+  authorize("view", "requests"),
   getAdminRequests
 );
 
 // Employee requests - MUST BE BEFORE /:uuid to avoid matching "employee" as uuid
 router.get("/employee/:uuid", 
   authenticateJwt,
-  authorize({
-    permissions: 'leave.view_all',
-    allowSelfAccess: true,
-    getResourceOwnerId: (req) => req.params.uuid
-  }),
+  allowSelfOr("view", "requests", req => req.params.uuid),
   getEmployeeRequests
 );
 
 // Create request (all employees)
 router.post("/", 
   authenticateJwt,
-  authorize({ permissions: 'leave.create_own' }), // FIXED: Explicit permission
+  authorize("create", "requests"),
   uploadRequestDocuments,
   createRequest
 );
@@ -66,78 +61,67 @@ router.post("/",
 // Get single request with complete details (self-access OR permission)
 router.get("/:uuid", 
   authenticateJwt,
-  authorize({
-    permissions: 'leave.view_all',
-    allowSelfAccess: true,
-    getResourceOwnerId: (req) => {
-      // Ownership validated in controller
-      return null; // Defer to controller for actual check
-    }
-  }),
+  authorize("view", "requests"), // Ownership validation in controller
   getRequestById
 );
 
 // Document management
 router.get("/:uuid/documents", 
   authenticateJwt,
-  authorize({
-    permissions: 'leave.view_all',
-    allowSelfAccess: true,
-    getResourceOwnerId: (req) => null // Defer to controller
-  }),
+  authorize("view", "requests"), // Ownership validation in controller
   getRequestDocuments
 );
 
 router.post("/:uuid/documents",
   authenticateJwt,
-  authorize({ permissions: 'leave.update_own' }), // FIXED: Explicit permission
+  authorize("update", "requests"),
   uploadRequestDocuments,
   addRequestDocuments
 );
 
 router.get("/:uuid/documents/:documentUuid/content",
   authenticateJwt,
-  authorize({ permissions: 'leave.view_all', allowSelfAccess: true }),
+  authorize("view", "requests"),
   streamRequestDocumentContent
 );
 
 router.put("/:uuid/documents/:documentUuid",
   authenticateJwt,
-  authorize({ permissions: 'leave.update_own' }), // FIXED
+  authorize("update", "requests"),
   uploadSingleRequestDocument,
   replaceRequestDocument
 );
 
 router.delete("/:uuid/documents/:documentUuid",
   authenticateJwt,
-  authorize({ permissions: 'leave.update_own' }), // FIXED
+  authorize("update", "requests"),
   deleteRequestDocument
 );
 
 // Update/shorten requests
 router.patch("/:uuid",
   authenticateJwt,
-  authorize({ permissions: 'leave.update_own' }), // FIXED
+  authorize("update", "requests"),
   updateRequest
 );
 
 router.patch("/:uuid/shorten",
   authenticateJwt,
-  authorize({ permissions: 'leave.shorten' }),
+  authorize("update", "requests"),
   shortenApprovedRequest
 );
 
-// Department decision
+// Department decision (approval/rejection)
 router.patch("/:uuid/department-decision", 
   authenticateJwt,
-  authorize({ permissions: 'leave.approve' }), // FIXED: Removed Dashboard from OR list
+  authorize("approve", "requests"),
   departmentApproveRejectRequest
 );
 
 // Cancel request
 router.patch("/:uuid/cancel",
   authenticateJwt,
-  authorize({ permissions: 'leave.cancel_own' }), // FIXED
+  authorize("delete", "requests"),
   cancelRequest
 );
 

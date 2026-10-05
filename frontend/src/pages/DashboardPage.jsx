@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { usePermission } from '../hooks/usePermission';
 import { Users, CalendarOff, Clock, AlertCircle } from 'lucide-react';
 import KpiCard from '../components/dashboard/KpiCard';
 import AttendanceChart from '../components/dashboard/AttendanceChart';
@@ -35,14 +36,21 @@ const DonutRing = ({ pct = 80 }) => {
 
 const DashboardPage = () => {
   const { user } = useAuth();
+  const canViewOrgStats = usePermission('dashboard', 'view_organization');
+  const canViewDeptStats = usePermission('dashboard', 'view_department');
 
-  // Route EMPLOYEE role to their dedicated dashboard
-  if (user?.role === 'EMPLOYEE') return <EmployeeDashboardPage />;
+  // Route based on permissions, not roles
+  // If no org-wide view, check for department view
+  if (!canViewOrgStats && canViewDeptStats) {
+    return <DeptHeadDashboardPage />;
+  }
 
-  // Route DEPARTMENT_HEAD to their scoped dashboard
-  if (user?.role === 'DEPARTMENT_HEAD') return <DeptHeadDashboardPage />;
+  // If neither org nor dept view, show employee dashboard
+  if (!canViewOrgStats && !canViewDeptStats) {
+    return <EmployeeDashboardPage />;
+  }
 
-  // Admin / HR / Department Head → existing analytics dashboard
+  // Admin / HR with dashboard.view_organization → analytics dashboard
   const { stats, departments, attendanceData, recentActivity, upcomingHolidays, leaveBalance, loading, error, refetch } = useDashboard();
 
   const attendancePct = stats.totalEmployees > 0

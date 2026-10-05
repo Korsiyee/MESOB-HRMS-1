@@ -23,59 +23,9 @@ const DECIMAL_DAY_TYPES = new Set([
 let decimalDayColumnsEnsurePromise = null;
 
 async function ensureDecimalDayColumns() {
-  if (decimalDayColumnsEnsurePromise) {
-    return decimalDayColumnsEnsurePromise;
-  }
-
-  decimalDayColumnsEnsurePromise = (async () => {
-    const [rows] = await db.promise().execute(
-      `
-      SELECT table_name AS tableName, column_name AS columnName, data_type AS dataType
-      FROM information_schema.columns
-      WHERE table_schema = DATABASE()
-        AND (
-          (table_name = 'leaveRequests' AND column_name IN ('total_days'))
-          OR
-          (table_name = 'employeeLeaveBalances' AND column_name IN ('entitledDays', 'carriedForwardDays', 'usedDays', 'remainingDays'))
-          OR
-          (table_name = 'leavePostponements' AND column_name IN ('postponedDays'))
-        )
-      `,
-    );
-
-    const targets = [
-      ["leaverequests", "total_days"],
-      ["employeeleavebalances", "entitleddays"],
-      ["employeeleavebalances", "carriedforwarddays"],
-      ["employeeleavebalances", "useddays"],
-      ["employeeleavebalances", "remainingdays"],
-      ["leavepostponements", "postponeddays"],
-    ];
-
-    for (const [tableName, columnName] of targets) {
-      const current = rows.find(
-        (row) =>
-          String(row.tableName || "").toLowerCase() === tableName &&
-          String(row.columnName || "").toLowerCase() === columnName,
-      );
-
-      if (!current) {
-        continue;
-      }
-
-      if (DECIMAL_DAY_TYPES.has(String(current.dataType || "").toLowerCase())) {
-        continue;
-      }
-
-      await db
-        .promise()
-        .execute(
-          `ALTER TABLE ${current.tableName} MODIFY COLUMN ${current.columnName} DECIMAL(8,1)`,
-        );
-    }
-  })();
-
-  return decimalDayColumnsEnsurePromise;
+  // Schema changes have been moved to database migrations
+  // All required columns should exist in the schema.sql file with correct data types
+  return Promise.resolve();
 }
 
 function normalizeDays(value) {

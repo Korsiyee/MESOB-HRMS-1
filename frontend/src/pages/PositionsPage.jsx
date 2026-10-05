@@ -7,6 +7,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useResponsive } from '../hooks/useResponsive';
 import { useDialog } from '../context/DialogContext';
 import { apiRequest } from '../utils/apiClient';
+import { Can } from '../components/Can';
 
 /* ── Palette ── */
 const C = {
@@ -178,16 +179,20 @@ const PositionRow = ({ pos, expanded, onToggle, onEdit, onDelete }) => {
         </td>
         <td style={{ padding: '14px 16px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
-            <button onClick={() => onEdit(pos)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 5, borderRadius: 6, display: 'flex', alignItems: 'center', transition: 'background 0.15s' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(15,118,110,0.1)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-              <Pencil size={15} color={C.primary} />
-            </button>
-            <button onClick={() => onDelete(pos)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 5, borderRadius: 6, display: 'flex', alignItems: 'center', transition: 'background 0.15s' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(220,38,38,0.1)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-              <Trash2 size={15} color="#DC2626" />
-            </button>
+            <Can action="update" resource="positions">
+              <button onClick={() => onEdit(pos)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 5, borderRadius: 6, display: 'flex', alignItems: 'center', transition: 'background 0.15s' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(15,118,110,0.1)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <Pencil size={15} color={C.primary} />
+              </button>
+            </Can>
+            <Can action="delete" resource="positions">
+              <button onClick={() => onDelete(pos)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 5, borderRadius: 6, display: 'flex', alignItems: 'center', transition: 'background 0.15s' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(220,38,38,0.1)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <Trash2 size={15} color="#DC2626" />
+              </button>
+            </Can>
           </div>
         </td>
       </tr>
@@ -684,9 +689,11 @@ const PositionsManagementPage = () => {
               <option value="">All Departments</option>
               {deptList.map(d => <option key={d.uuid} value={d.uuid}>{d.name}</option>)}
             </select>
-            <GreenBtn onClick={() => { setEditingPosition(null); setShowModal(true); }}>
-              <Plus size={14} /> Add Position
-            </GreenBtn>
+            <Can action="create" resource="positions">
+              <GreenBtn onClick={() => { setEditingPosition(null); setShowModal(true); }}>
+                <Plus size={14} /> Add Position
+              </GreenBtn>
+            </Can>
           </div>
 
           {/* Positions Table */}

@@ -7,39 +7,39 @@ const {
   changeAccountStatus,
   resetAccountPassword,
 } = require("../controllers/accountController");
-const { authorize, requireScopeFilter } = require("../middleware/authorize");
+// NEW: Use Permit middleware instead of old RBAC
+const { authorize } = require("../middleware/permitMiddleware");
 
 const router = express.Router();
 
 // All account management operations require "accounts" permissions
 router.post("/", 
-  authorize({ permissions: 'accounts.create' }),
+  authorize("create", "accounts"),
   createAccount
 );
 
 router.get("/", 
-  authorize({ permissions: 'accounts.view' }),
-  requireScopeFilter('account'),
+  authorize("view", "accounts"),
   listAccounts
 );
 
 router.get("/:uuid",
-  authorize({ permissions: 'accounts.view' }),
+  authorize("view", "accounts"),
   getAccount
 );
 
 router.patch("/:uuid/role",
-  authorize({ permissions: 'accounts.update_role' }),
+  authorize("assign_role", "accounts"),
   changeAccountRole
 );
 
 router.patch("/:uuid/status",
-  authorize({ permissions: 'accounts.update' }),
+  authorize("update", "accounts"),
   changeAccountStatus
 );
 
 router.patch("/:uuid/reset-password",
-  authorize({ permissions: 'accounts.reset_password' }),
+  authorize("reset_password", "accounts"),
   resetAccountPassword
 );
 

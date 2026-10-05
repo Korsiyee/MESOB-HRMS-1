@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { useNavigate } from 'react-router-dom';
 import Avatar from '../common/Avatar';
+import apiClient from '../../api/apiClient';
 
 /* ── tiny helpers ──────────────────────────────────────────────── */
 const fmtTime = (iso) => {
@@ -183,13 +184,19 @@ const Topbar = ({ title = 'Dashboard', sidebarWidth = 240, onHamburger, isMobile
   /* Fetch employee record to get full name */
   useEffect(() => {
     if (!user?.employee_uuid) return;
-    const token = localStorage.getItem('authToken');
-    fetch(`/api/employees/${encodeURIComponent(user.employee_uuid)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(r => r.ok ? r.json() : null)
-      .then(payload => { if (payload?.data) setEmpInfo(payload.data); })
-      .catch(() => {});
+    
+    // Use centralized apiClient for automatic authentication token injection
+    apiClient.get(`/employees/${encodeURIComponent(user.employee_uuid)}`)
+      .then(response => {
+        // apiClient returns { data: payload } format
+        if (response.data) {
+          setEmpInfo(response.data);
+        }
+      })
+      .catch(err => {
+        console.error('[Topbar] Failed to fetch employee data:', err);
+        // Don't block UI or trigger logout on employee fetch failure
+      });
   }, [user?.employee_uuid]);
 
   const handleLogout = async () => { await logout(); navigate('/login'); };

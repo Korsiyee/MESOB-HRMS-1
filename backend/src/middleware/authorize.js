@@ -1,31 +1,68 @@
 /**
- * Centralized Authorization Middleware
+ * Centralized Authorization Middleware - RBAC System
  * 
- * Database-driven permission checking that replaces:
- * - requireRole.js ❌
- * - requirePermission.js ❌
- * - Hardcoded role checks ❌
+ * Complete permission-based authorization system that replaces:
+ * - requireRole.js ❌ (hardcoded role checks)
+ * - requirePermission.js ❌ (occupation-based)
+ * - All hardcoded role comparisons ❌
  * 
- * Usage:
- *   authorize({ permissions: 'employees.view' })
- *   authorize({ permissions: ['leave.approve', 'leave.reject'], logic: 'OR' })
- *   authorize({ permissions: 'employees.update', allowSelfAccess: true, getResourceOwnerId: (req) => req.params.uuid })
+ * Features:
+ * - Database-driven permission checking
+ * - Super Admin bypass (configurable)
+ * - Self-access rules for own data
+ * - AND/OR logic for multiple permissions
+ * - Data scope enforcement
+ * - Audit logging for denials
+ * 
+ * Usage Examples:
+ *   authorize({ permissions: 'Employees.View' })
+ *   authorize({ permissions: ['Leave.Approve', 'Leave.Reject'], logic: 'OR' })
+ *   authorize({ permissions: 'Employees.Update', allowSelfAccess: true })
+ *   authorize({ permissions: 'Employees.View', enforceScope: true })
  */
 
-const authorizationService = require("../services/authorizationService");
+const rbacService = require("../services/rbacService");
 const { sendError } = require("../utils/response");
 
 /**
- * Authorization middleware
+ * Main Authorization Middleware
  * 
- * @param {Object} options
- * @param {string|string[]} [options.permissions] - Required permission code(s)
+ * @param {Object} options - Authorization options
+ * @param {string|string[]} [options.permissions] - Required permission code(s) (e.g., 'Employees.View')
  * @param {string} [options.logic='OR'] - 'AND' or 'OR' for multiple permissions
  * @param {boolean} [options.allowSelfAccess=false] - Allow if user is accessing their own resource
  * @param {Function} [options.getResourceOwnerId] - Function to extract resource owner ID from request
  * @param {boolean} [options.skipSuperAdminBypass=false] - Don't auto-grant access to Super Admin
+ * @param {boolean} [options.enforceScope=false] - Enforce data scope and attach to req.scope
+ * @param {string} [options.scopePermission] - Permission to use for scope (defaults to first permission)
  * 
  * @returns {Function} Express middleware
+ * 
+ * @example
+ * // Simple permission check
+ * router.get('/employees', authorize({ permissions: 'Employees.View' }), handler);
+ * 
+ * @example
+ * // Multiple permissions with OR logic
+ * router.post('/approve', authorize({ 
+ *   permissions: ['Leave.Approve', 'Leave.Reject'],
+ *   logic: 'OR'
+ * }), handler);
+ * 
+ * @example
+ * // With self-access (own profile)
+ * router.get('/profile/:uuid', authorize({
+ *   permissions: 'Employees.View',
+ *   allowSelfAccess: true,
+ *   getResourceOwnerId: (req) => req.params.uuid
+ * }), handler);
+ * 
+ * @example
+ * // With scope enforcement
+ * router.get('/employees', authorize({
+ *   permissions: 'Employees.View',
+ *   enforceScope: true
+ * }), handler);
  */
 function authorize(options = {}) {
   const {
@@ -34,6 +71,8 @@ function authorize(options = {}) {
     allowSelfAccess = false,
     getResourceOwnerId = null,
     skipSuperAdminBypass = false,
+    enforceScope = false,
+    scopePermission = null,
   } = options;
   
   // Normalize permissions to array
@@ -56,9 +95,20 @@ function authorize(options = {}) {
       
       // Super Admin bypass (unless explicitly disabled)
       if (!skipSuperAdminBypass) {
-        const isSuperAdmin = await authorizationService.isSuperAdmin(userId);
+        const isSuperAdmin = await rbacService.isSuperAdmin(userId);
         if (isSuperAdmin) {
           console.log(`[authorize] ✅ Super Admin bypass - ${req.user.username} → ${req.originalUrl}`);
+          
+          // Attach ALL scope even for super admin if enforceScope is true
+          if (enforceScope) {
+            req.scope = {
+              type: 'ALL',
+              code: 'ALL',
+              configuration: null,
+              source: 'SUPER_ADMIN'
+            };
+          }
+          
           return next();
         }
       }
@@ -71,6 +121,17 @@ function authorize(options = {}) {
           // If resource belongs to the user, grant access
           if (resourceOwnerId === userId || resourceOwnerId === req.user.employee_uuid) {
             console.log(`[authorize] ✅ Self-access granted - ${req.user.username} → ${req.originalUrl}`);
+            
+            // Attach OWN scope if enforceScope is true
+            if (enforceScope) {
+              req.scope = {
+                type: 'OWN',
+                code: 'OWN',
+                configuration: null,
+                source: 'SELF_ACCESS'
+              };
+            }
+            
             return next();
           }
         } catch (err) {
@@ -89,9 +150,9 @@ function authorize(options = {}) {
       let hasAccess = false;
       
       if (logic === 'AND') {
-        hasAccess = await authorizationService.hasAllPermissions(userId, requiredPermissions);
+        hasAccess = await rbacService.hasAllPermissions(userId, requiredPermissions);
       } else {
-        hasAccess = await authorizationService.hasAnyPermission(userId, requiredPermissions);
+        hasAccess = await rbacService.hasAnyPermission(userId, requiredPermissions);
       }
       
       if (!hasAccess) {
@@ -115,6 +176,17 @@ function authorize(options = {}) {
         `[authorize] ✅ Access granted - User: ${req.user.username}, ` +
         `Permissions: [${requiredPermissions.join(', ')}], Endpoint: ${req.originalUrl}`
       );
+      
+      // Attach data scope if enforceScope is true
+      if (enforceScope) {
+        const permissionForScope = scopePermission || requiredPermissions[0];
+        const scope = await rbacService.getPermissionScope(userId, permissionForScope);
+        req.scope = scope;
+        
+        console.log(
+          `[authorize] 📊 Scope attached - Type: ${scope.type}, Source: ${scope.source}`
+        );
+      }
       
       return next();
     } catch (error) {
@@ -161,12 +233,21 @@ async function logAuthorizationDenial(req, requiredPermissions, logic) {
 
 /**
  * Helper: Require specific scope for data filtering
- * Can be used in combination with authorize()
  * 
- * @param {string} resourceType - Resource type for scope filtering
+ * This middleware attaches scope information to req.scope for use in controllers.
+ * Controllers should use this scope to filter database queries appropriately.
+ * 
+ * @param {string} permissionCode - Permission code to get scope for
  * @returns {Function} Express middleware
+ * 
+ * @example
+ * router.get('/employees', 
+ *   authorize({ permissions: 'Employees.View' }),
+ *   requireScopeFilter('Employees.View'),
+ *   handler
+ * );
  */
-function requireScopeFilter(resourceType) {
+function requireScopeFilter(permissionCode) {
   return async (req, res, next) => {
     try {
       if (!req.user || !req.user.uuid) {
@@ -177,22 +258,21 @@ function requireScopeFilter(resourceType) {
         });
       }
       
-      // Super Admin and HR Admin always get ALL scope
-      const role = await authorizationService.getUserRole(req.user.uuid);
+      const scope = await rbacService.getPermissionScope(req.user.uuid, permissionCode);
+      req.scope = scope;
       
-      if (role && (role.code === 'SUPER_ADMIN' || role.code === 'HR_ADMIN')) {
-        req.scopeFilter = { type: 'ALL', value: null };
-        console.log(`[requireScopeFilter] Admin bypass - scope set to ALL for ${req.user.username}`);
-        return next();
-      }
-      
-      // Get user's assigned scope
-      const scope = await authorizationService.getUserScope(req.user.uuid);
-      req.scopeFilter = scope;
+      // Attach user context for scope resolution
+      req.scopeContext = {
+        userUuid: req.user.uuid,
+        employeeUuid: req.user.employee_uuid,
+        departmentUuid: req.user.department_uuid,
+        branchUuid: req.user.branch_uuid || null,
+        regionUuid: req.user.region_uuid || null,
+      };
       
       console.log(
         `[requireScopeFilter] Scope applied - User: ${req.user.username}, ` +
-        `Type: ${scope.type}, Value: ${scope.value || 'N/A'}`
+        `Permission: ${permissionCode}, Type: ${scope.type}, Source: ${scope.source}`
       );
       
       return next();

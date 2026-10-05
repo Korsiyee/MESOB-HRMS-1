@@ -22,7 +22,9 @@ const syncRoutes = require("./routes/syncRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const faceRecognitionRoutes = require("./routes/faceRecognitionRoutes");
 const networkSettingsRoutes = require("./routes/networkSettingsRoutes");
-const rbacRoutes = require("./routes/rbacRoutes"); // NEW: RBAC management routes
+const rbacRoutes = require("./routes/rbacRoutes"); // OLD: Occupation-based RBAC (deprecated)
+const roleManagementRoutes = require("./routes/roleManagementRoutes"); // NEW: Complete RBAC management routes
+const permitRoutes = require("./routes/permitRoutes"); // PERMIT.IO: Dynamic role management
 const { authenticateJwt } = require("./middleware/authMiddleware");
 const notFoundHandler = require("./middleware/notFoundHandler");
 const errorHandler = require("./middleware/errorHandler");
@@ -54,7 +56,9 @@ app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/sync", syncRoutes);
 app.use(authenticateJwt);
-app.use("/api/rbac", rbacRoutes); // NEW: RBAC management endpoints
+app.use("/api/permit", permitRoutes); // PERMIT.IO: Fetch roles, resources, permissions
+app.use("/api/rbac", rbacRoutes); // OLD: Occupation-based (deprecated, keep for backward compatibility)
+app.use("/api/role-management", roleManagementRoutes); // NEW: Complete RBAC system
 app.use("/api/employees", employeeRoutes);
 app.use("/api/departments", departmentRoutes);
 app.use("/api/positions", positionRoutes);

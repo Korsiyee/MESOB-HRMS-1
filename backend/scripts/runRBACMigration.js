@@ -38,7 +38,10 @@ async function runMigration() {
     process.exit(1);
   }
 
+  log.info(`Migration file: ${migrationPath}`);
+  
   const sqlContent = fs.readFileSync(migrationPath, 'utf8');
+  log.info(`File size: ${sqlContent.length} bytes`);
   
   // Split SQL into individual statements
   // Remove comments and split by semicolons
@@ -55,6 +58,10 @@ async function runMigration() {
   const pool = db.promise();
   let successCount = 0;
   let errorCount = 0;
+
+  // Show database info
+  const [dbInfo] = await pool.execute("SELECT DATABASE() as db");
+  log.info(`Connected to database: ${dbInfo[0].db}`);
 
   try {
     log.section('Executing Migration');

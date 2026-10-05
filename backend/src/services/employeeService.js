@@ -36,47 +36,9 @@ function buildEmployeeFullName(payload) {
 }
 
 async function ensureEmployeeDocumentSchema() {
-  const [rows] = await executeQuery(
-    `
-      SELECT COLUMN_NAME AS columnName
-      FROM information_schema.columns
-      WHERE table_schema = DATABASE()
-        AND table_name = 'EmployeeIDDocuments'
-        AND COLUMN_NAME IN ('original_name', 'mime_type', 'file_size', 'created_at', 'updated_at')
-    `,
-  );
-
-  const existing = new Set(rows.map((row) => row.columnName));
-
-  if (!existing.has("original_name")) {
-    await executeQuery(
-      "ALTER TABLE EmployeeIDDocuments ADD COLUMN original_name VARCHAR(255) NULL",
-    );
-  }
-
-  if (!existing.has("mime_type")) {
-    await executeQuery(
-      "ALTER TABLE EmployeeIDDocuments ADD COLUMN mime_type VARCHAR(120) NULL",
-    );
-  }
-
-  if (!existing.has("file_size")) {
-    await executeQuery(
-      "ALTER TABLE EmployeeIDDocuments ADD COLUMN file_size BIGINT NULL",
-    );
-  }
-
-  if (!existing.has("created_at")) {
-    await executeQuery(
-      "ALTER TABLE EmployeeIDDocuments ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
-    );
-  }
-
-  if (!existing.has("updated_at")) {
-    await executeQuery(
-      "ALTER TABLE EmployeeIDDocuments ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
-    );
-  }
+  // Schema changes have been moved to database migrations
+  // All required columns should exist in the schema.sql file
+  return Promise.resolve();
 }
 
 async function generateMesobId(connection) {
