@@ -632,17 +632,57 @@ class LetterGenerationService {
    * Get list of all available placeholders
    */
   static async getAvailablePlaceholders() {
-    const pool = db.promise();
-    
-    const [placeholders] = await pool.execute(
-      `SELECT placeholder_key, display_name_en, display_name_am, 
-              description_en, description_am, category
-       FROM LetterPlaceholders
-       WHERE is_active = TRUE
-       ORDER BY category, placeholder_key`
-    );
-
-    return placeholders;
+    // Return hardcoded placeholders (LetterPlaceholders table doesn't exist yet)
+    return [
+      {
+        placeholder_key: '{{employee_name}}',
+        display_name_en: 'Employee Name',
+        display_name_am: 'የሰራተኛ ስም',
+        description_en: 'Full name of the employee',
+        description_am: 'የሰራተኛው ሙሉ ስም',
+        category: 'Employee'
+      },
+      {
+        placeholder_key: '{{employee_id}}',
+        display_name_en: 'Employee ID',
+        display_name_am: 'የሰራተኛ መለያ',
+        description_en: 'Employee identification number',
+        description_am: 'የሰራተኛ መለያ ቁጥር',
+        category: 'Employee'
+      },
+      {
+        placeholder_key: '{{department}}',
+        display_name_en: 'Department',
+        display_name_am: 'ክፍል',
+        description_en: 'Employee department',
+        description_am: 'የሰራተኛ ክፍል',
+        category: 'Employee'
+      },
+      {
+        placeholder_key: '{{position}}',
+        display_name_en: 'Position',
+        display_name_am: 'የስራ መደብ',
+        description_en: 'Employee position/title',
+        description_am: 'የሰራተኛ የስራ መደብ',
+        category: 'Employee'
+      },
+      {
+        placeholder_key: '{{hire_date}}',
+        display_name_en: 'Hire Date',
+        display_name_am: 'የቅጥር ቀን',
+        description_en: 'Date employee was hired',
+        description_am: 'ሰራተኛው የተቀጠረበት ቀን',
+        category: 'Employee'
+      },
+      {
+        placeholder_key: '{{today_date}}',
+        display_name_en: 'Today Date',
+        display_name_am: 'የዛሬ ቀን',
+        description_en: 'Current date',
+        description_am: 'የዛሬ ቀን',
+        category: 'Date'
+      }
+    ];
   }
 }
 

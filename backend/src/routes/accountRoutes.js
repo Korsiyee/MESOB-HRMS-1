@@ -7,40 +7,17 @@ const {
   changeAccountStatus,
   resetAccountPassword,
 } = require("../controllers/accountController");
-// NEW: Use Permit middleware instead of old RBAC
-const { authorize } = require("../middleware/permitMiddleware");
+// Use module-level authorization (accounts are part of ORGANIZATION module)
+const { requireModule } = require("../middleware/moduleAuth");
 
 const router = express.Router();
 
-// All account management operations require "accounts" permissions
-router.post("/", 
-  authorize("create", "accounts"),
-  createAccount
-);
-
-router.get("/", 
-  authorize("view", "accounts"),
-  listAccounts
-);
-
-router.get("/:uuid",
-  authorize("view", "accounts"),
-  getAccount
-);
-
-router.patch("/:uuid/role",
-  authorize("assign_role", "accounts"),
-  changeAccountRole
-);
-
-router.patch("/:uuid/status",
-  authorize("update", "accounts"),
-  changeAccountStatus
-);
-
-router.patch("/:uuid/reset-password",
-  authorize("reset_password", "accounts"),
-  resetAccountPassword
-);
+// All account management operations require ORGANIZATION module
+router.post("/", requireModule('ORGANIZATION'), createAccount);
+router.get("/", requireModule('ORGANIZATION'), listAccounts);
+router.get("/:uuid", requireModule('ORGANIZATION'), getAccount);
+router.patch("/:uuid/role", requireModule('ORGANIZATION'), changeAccountRole);
+router.patch("/:uuid/status", requireModule('ORGANIZATION'), changeAccountStatus);
+router.patch("/:uuid/reset-password", requireModule('ORGANIZATION'), resetAccountPassword);
 
 module.exports = router;

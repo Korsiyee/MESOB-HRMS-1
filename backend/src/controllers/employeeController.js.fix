@@ -1,0 +1,15 @@
+// Fix line 100: scope is not defined - should be req.moduleAccess.scope
+
+const fs = require('fs');
+const file = fs.readFileSync('/home/wty/Downloads/FDRE-Mesob-HRMS-main/Mesob HRMS/backend/src/controllers/employeeController.js', 'utf8');
+
+const fixed = file.replace(
+  /if \(scope === "DEPARTMENT"\)/,
+  'if (req.moduleAccess?.scope === "DEPARTMENT")'
+).replace(
+  /} else if \(scope === "OWN"\)/,
+  '} else if (req.moduleAccess?.scope === "OWN")'
+);
+
+fs.writeFileSync('/home/wty/Downloads/FDRE-Mesob-HRMS-main/Mesob HRMS/backend/src/controllers/employeeController.js', fixed);
+console.log('✅ Fixed scope reference in employeeController.js');

@@ -163,29 +163,8 @@ exports.createAccount = async (req, res) => {
       [userUuid]
     );
 
-    // Sync user to Permit
-    try {
-      const { syncUserToPermit } = require("../services/permitSyncService");
-      const user = newUser[0];
-      const fullName = [user.first_name, user.middle_name, user.last_name].filter(Boolean).join(' ');
-      
-      await syncUserToPermit(
-        {
-          uuid: user.uuid,
-          username: user.username,
-          role: roleInfo ? roleInfo.code : 'EMPLOYEE',
-          employee_uuid: user.employee_uuid,
-          department_uuid: user.department_uuid,
-          is_active: Boolean(user.is_active),
-        },
-        fullName,
-        user.email
-      );
-      console.log(`[Account] Successfully synced new user ${user.username} to Permit`);
-    } catch (permitError) {
-      // Don't block account creation if Permit sync fails
-      console.error('[Account] Failed to sync new user to Permit:', permitError.message);
-    }
+    // Note: Permit.io sync removed - using database-driven permissions now
+    console.log(`[Account] Created new user ${newUser[0].username}`);
 
     // Audit log
     await safeLogEvent({
@@ -428,19 +407,8 @@ exports.changeAccountRole = async (req, res) => {
       [newRoleId, uuid]
     );
 
-    // Sync role change to Permit
-    try {
-      const { changeUserRole } = require("../services/permitSyncService");
-      await changeUserRole(
-        uuid,
-        oldRoleInfo?.code || 'EMPLOYEE',
-        newRoleInfo?.code || 'EMPLOYEE'
-      );
-      console.log(`[Account] Successfully synced role change for ${targetUser.username} to Permit`);
-    } catch (permitError) {
-      // Don't block role change if Permit sync fails
-      console.error('[Account] Failed to sync role change to Permit:', permitError.message);
-    }
+    // Note: Permit.io sync removed - using database-driven permissions now
+    console.log(`[Account] Changed role for ${targetUser.username} from ${oldRoleInfo?.code} to ${newRoleInfo?.code}`);
 
     // Audit log
     await safeLogEvent({
@@ -528,26 +496,8 @@ exports.changeAccountStatus = async (req, res) => {
       uuid,
     ]);
 
-    // Sync activation/deactivation to Permit
-    try {
-      const { deactivateUser, reactivateUser } = require("../services/permitSyncService");
-      const [userInfo] = await pool.execute(
-        "SELECT role FROM Users WHERE uuid = ?",
-        [uuid]
-      );
-      const userRole = userInfo[0]?.role || 'EMPLOYEE';
-      
-      if (active) {
-        await reactivateUser(uuid, userRole);
-        console.log(`[Account] Successfully reactivated user ${targetUsername} in Permit`);
-      } else {
-        await deactivateUser(uuid, userRole);
-        console.log(`[Account] Successfully deactivated user ${targetUsername} in Permit`);
-      }
-    } catch (permitError) {
-      // Don't block status change if Permit sync fails
-      console.error('[Account] Failed to sync status change to Permit:', permitError.message);
-    }
+    // Note: Permit.io sync removed - using database-driven permissions now
+    console.log(`[Account] ${active ? 'Activated' : 'Deactivated'} user ${targetUsername}`);
 
     // Fetch updated account
     const [updated] = await pool.execute(

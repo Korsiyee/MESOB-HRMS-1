@@ -6,7 +6,6 @@ const { executeQuery } = require("../utils/dbQuery");
 const { getSignedUrl } = require("./employeeStorageService");
 const { db } = require("../config/db");
 const authorizationService = require("./authorizationService"); // NEW: Use authorization service
-const { syncUserToPermit, ensureUserInPermit } = require("./permitSyncService"); // Permit.io integration
 
 const JWT_SECRET = requireEnv("JWT_SECRET");
 const JWT_REFRESH_SECRET = requireEnv("JWT_REFRESH_SECRET");
@@ -185,14 +184,13 @@ async function login(username, password) {
         .join(" ")
     : null;
 
-  // Ensure user is synced to Permit on login (just-in-time sync)
-  // This ensures the user exists in Permit even if they were created before migration
-  try {
-    await ensureUserInPermit(user.uuid);
-  } catch (permitError) {
-    // Don't block login if Permit sync fails
-    console.error('[Auth] Failed to sync user to Permit on login:', permitError.message);
-  }
+  // OLD Permit.io removed - ensureUserInPermit disabled
+  // This used to sync user to Permit on login
+  // try {
+  //   await ensureUserInPermit(user.uuid);
+  // } catch (permitError) {
+  //   console.error('[Auth] Failed to sync user to Permit on login:', permitError.message);
+  // }
 
   return {
     accessToken,
@@ -365,21 +363,21 @@ async function getUserWithOccupations(userUuid) {
 
   // Fetch occupations (DEPRECATED - using old tables for now)
   let occupations = [];
-  // NEW: Get permissions from new authorization service
-  let permissions = [];
-  try {
-    permissions = await authorizationService.getUserPermissions(userUuid);
-  } catch (err) {
-    console.error("Error fetching permissions:", err);
-  }
+  // OLD: permissions system disabled
+  // let permissions = [];
+  // try {
+  //   permissions = await authorizationService.getUserPermissions(userUuid);
+  // } catch (err) {
+  //   console.error("Error fetching permissions:", err);
+  // }
   
-  // Get role info
-  let roleInfo = null;
-  try {
-    roleInfo = await authorizationService.getUserRole(userUuid);
-  } catch (err) {
-    console.error("Error fetching role:", err);
-  }
+  // OLD: role info system disabled
+  // let roleInfo = null;
+  // try {
+  //   roleInfo = await authorizationService.getUserRole(userUuid);
+  // } catch (err) {
+  //   console.error("Error fetching role:", err);
+  // }
 
   // Build full name from employee data
   const fullName = employeeData
@@ -395,14 +393,14 @@ async function getUserWithOccupations(userUuid) {
     username: user.username,
     email: employeeData?.email || null,
     role_id: user.role_id,
-    role: roleInfo ? roleInfo.code : user.role, // Return role code (backward compat)
-    role_name: roleInfo ? roleInfo.name : null, // Human-readable role name
+    role_uuid: user.role_uuid, // Using module system now
+    role_id: user.role_id, // Legacy support
     is_active: Boolean(user.is_active),
     full_name: fullName,
     profile_photo_url: profilePhotoUrl,
     mesob_id: employeeData?.mesob_id || null,
-    permissions, // NEW: Array of permission codes
-    occupations: occupations, // DEPRECATED: Empty for backward compat
+    // permissions: fetched separately by getCurrentUser endpoint
+    occupations: [], // DEPRECATED: Empty for backward compat
   };
 }
 
@@ -524,18 +522,19 @@ async function register(registrationData, actorRoleId = null) {
     const fullName = [first_name, middle_name, last_name].filter(Boolean).join(' ');
     const email = addresses && addresses.length > 0 ? addresses[0].email : null;
     
-    await syncUserToPermit(
-      {
-        uuid: user.uuid,
-        username: user.username,
-        role: roleInfo ? roleInfo.code : 'EMPLOYEE',
-        employee_uuid: employee.uuid,
-        department_uuid: employee.department_uuid,
-        is_active: true,
-      },
-      fullName,
-      email
-    );
+    // OLD Permit.io removed
+    // await syncUserToPermit(
+    //       {
+    //         uuid: user.uuid,
+    //         username: user.username,
+    //         role: roleInfo ? roleInfo.code : 'EMPLOYEE',
+    //         employee_uuid: employee.uuid,
+    //         department_uuid: employee.department_uuid,
+    //         is_active: true,
+    //       },
+    //       fullName,
+    //       email
+    // );
     console.log(`[Auth] Successfully synced new user ${username} to Permit`);
   } catch (permitError) {
     // Don't block registration if Permit sync fails

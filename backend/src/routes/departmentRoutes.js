@@ -6,32 +6,16 @@ const {
   updateDepartment,
   deleteDepartment,
 } = require("../controllers/departmentController");
-// NEW: Use Permit middleware instead of old RBAC
-const { authorize, requireAny } = require("../middleware/permitMiddleware");
+// Use module-level authorization
+const { requireModule, withScope } = require("../middleware/moduleAuth");
 
 const router = express.Router();
 
-// View: Anyone who can view departments, employees, or attendance
-router.get("/", 
-  requireAny([
-    { action: "view", resource: "departments" },
-    { action: "view", resource: "employees" },
-    { action: "view", resource: "attendance" }
-  ]), 
-  listDepartments
-);
-router.get("/:uuid", 
-  requireAny([
-    { action: "view", resource: "departments" },
-    { action: "view", resource: "employees" },
-    { action: "view", resource: "attendance" }
-  ]), 
-  getDepartment
-);
-
-// Manage: Requires department management permission
-router.post("/", authorize("create", "departments"), createDepartment);
-router.patch("/:uuid", authorize("update", "departments"), updateDepartment);
-router.delete("/:uuid", authorize("delete", "departments"), deleteDepartment);
+// All department operations require ORGANIZATION module
+router.get("/", requireModule('ORGANIZATION'), withScope(), listDepartments);
+router.get("/:uuid", requireModule('ORGANIZATION'), getDepartment);
+router.post("/", requireModule('ORGANIZATION'), createDepartment);
+router.patch("/:uuid", requireModule('ORGANIZATION'), updateDepartment);
+router.delete("/:uuid", requireModule('ORGANIZATION'), deleteDepartment);
 
 module.exports = router;

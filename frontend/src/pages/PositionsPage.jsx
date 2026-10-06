@@ -8,6 +8,7 @@ import { useResponsive } from '../hooks/useResponsive';
 import { useDialog } from '../context/DialogContext';
 import { apiRequest } from '../utils/apiClient';
 import { Can } from '../components/Can';
+import TabSwipe from '../components/ui/TabSwipe';
 
 /* ── Palette ── */
 const C = {
@@ -407,7 +408,7 @@ const PositionModal = ({ position, deptList, onClose, onSaved, showMsg }) => {
 /* ══════════════════════════════════════════
    POSITIONS OVERVIEW (Cards View)
 ══════════════════════════════════════════ */
-const PositionsOverview = ({ onManageClick }) => {
+const PositionsOverview = () => {
   const { isMobile, isTablet, r } = useResponsive();
   const [positions, setPositions] = useState([]);
   const [depts, setDepts] = useState([]);
@@ -804,29 +805,150 @@ const PositionsManagementPage = () => {
 };
 
 /* ══════════════════════════════════════════
-   MAIN POSITIONS PAGE (Router)
+   ADD POSITION VIEW (Quick Add Form)
 ══════════════════════════════════════════ */
-const PositionsPage = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [view, setView] = useState(location.pathname.includes('/manage') ? 'manage' : 'overview');
+const AddPositionView = () => {
+  const [form, setForm] = useState({ title: '', grade: '', department_uuid: '' });
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState({ type: '', message: '' });
+  const [deptList, setDeptList] = useState([]);
+
+  const showMsg = (type, message) => {
+    setNotice({ type, message });
+    setTimeout(() => setNotice({ type: '', message: '' }), 4500);
+  };
 
   useEffect(() => {
-    setView(location.pathname.includes('/manage') ? 'manage' : 'overview');
-  }, [location.pathname]);
+    DeptApi.list()
+      .then(r => setDeptList(r?.data || []))
+      .catch(() => {});
+  }, []);
 
-  const handleManageClick = () => {
-    navigate('/positions/manage');
-    setView('manage');
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.title.trim() || !form.department_uuid) {
+      showMsg('error', 'Position title and department are required.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const body = {
+        title: form.title.trim(),
+        grade: form.grade.trim() || null,
+        department_uuid: form.department_uuid,
+      };
+      await PositionApi.create(body);
+      showMsg('success', `Position "${form.title}" created successfully!`);
+      // Reset form
+      setForm({ title: '', grade: '', department_uuid: '' });
+    } catch (err) {
+      showMsg('error', err.message || 'Failed to create position.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
+    <div style={{ fontFamily: 'Poppins,sans-serif', maxWidth: 700, margin: '0 auto' }}>
+      <Notice type={notice.type} message={notice.message} onClose={() => setNotice({ type: '', message: '' })} />
+
+      {/* Header */}
+      <div style={{ background: C.headerBg, borderRadius: 14, padding: '20px 26px', marginBottom: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.18)' }}>
+        <p style={{ margin: '0 0 3px', fontSize: '0.7rem', color: 'rgba(232,240,238,0.45)', letterSpacing: '0.04em' }}>Positions › Add New</p>
+        <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#E8F0EE' }}>Add New Position</h1>
+        <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: 'rgba(232,240,238,0.6)' }}>Create a new position within a department</p>
+      </div>
+
+      {/* Form Card */}
+      <div style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.border}`, boxShadow: C.shadow, padding: 28 }}>
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: 18 }}>
+            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: C.textSub, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Department *
+            </label>
+            <select
+              value={form.department_uuid}
+              onChange={e => setForm(p => ({ ...p, department_uuid: e.target.value }))}
+              required
+              style={{ width: '100%', padding: '10px 13px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, fontSize: '0.82rem', color: C.textMain, outline: 'none', fontFamily: 'Poppins,sans-serif', cursor: 'pointer' }}
+            >
+              <option value="">Select Department</option>
+              {deptList.map(d => <option key={d.uuid} value={d.uuid}>{d.name}</option>)}
+            </select>
+          </div>
+
+          <div style={{ marginBottom: 18 }}>
+            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: C.textSub, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Position Title *
+            </label>
+            <input
+              value={form.title}
+              onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+              required
+              placeholder="e.g., Senior Developer, HR Manager"
+              style={{ width: '100%', padding: '10px 13px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, fontSize: '0.82rem', color: C.textMain, outline: 'none', fontFamily: 'Poppins,sans-serif' }}
+            />
+          </div>
+
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: C.textSub, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Grade <span style={{ color: C.textMuted, fontWeight: 400, fontSize: '0.68rem' }}>(optional)</span>
+            </label>
+            <input
+              value={form.grade}
+              onChange={e => setForm(p => ({ ...p, grade: e.target.value }))}
+              placeholder="e.g., G5, Senior, Level 3"
+              style={{ width: '100%', padding: '10px 13px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, fontSize: '0.82rem', color: C.textMain, outline: 'none', fontFamily: 'Poppins,sans-serif' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+            <button
+              type="button"
+              onClick={() => setForm({ title: '', grade: '', department_uuid: '' })}
+              style={{ padding: '9px 18px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', color: C.textSub, fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'Poppins,sans-serif' }}
+            >
+              Clear Form
+            </button>
+            <GreenBtn type="submit" disabled={saving}>
+              {saving ? 'Creating…' : <><Plus size={15} /> Create Position</>}
+            </GreenBtn>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+/* ══════════════════════════════════════════
+   MAIN POSITIONS PAGE (Tabbed Interface)
+══════════════════════════════════════════ */
+const PositionsPage = () => {
+  const tabs = [
+    {
+      key: 'overview',
+      label: 'Overview',
+      path: '/positions',
+      content: <PositionsOverview />
+    },
+    {
+      key: 'add',
+      label: 'Add Position',
+      path: '/positions/add',
+      content: <AddPositionView />
+    },
+    {
+      key: 'manage',
+      label: 'Manage',
+      path: '/positions/manage',
+      content: <PositionsManagementPage />
+    },
+  ];
+
+  return (
     <div style={{ fontFamily: 'Poppins,sans-serif' }}>
-      {view === 'overview' ? (
-        <PositionsOverview onManageClick={handleManageClick} />
-      ) : (
-        <PositionsManagementPage />
-      )}
+      <TabSwipe tabs={tabs} defaultTab="overview" />
     </div>
   );
 };

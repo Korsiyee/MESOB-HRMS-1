@@ -8,23 +8,14 @@ import {
   CalendarDays,
   Layers,
   FileText,
-  UserCog,
-  ScrollText,
-  Shield,
-  Palmtree,
   ChevronLeft,
   ChevronRight,
-  Circle,
   UserCircle,
-  Briefcase,
-  BookOpen,
   ChevronDown,
-  BellRing,
-  Award,
 } from "lucide-react";
 import logo from "../../../assets/Logo.png";
 import { useAuth } from "../../context/AuthContext";
-import { usePermissions } from "../../hooks/usePermissions";
+import { useModulePermissions } from "../../hooks/useModulePermissions";
 
 /* Continuous spin lives in index.css as @keyframes continuousSpin */
 const SPIN_STYLE = {
@@ -32,218 +23,88 @@ const SPIN_STYLE = {
   filter: "drop-shadow(0 0 10px rgba(20,184,166,0.55))",
 };
 
-/* Nav items shown to admin/HR roles */
-const NAV_ADMIN = [
+/* 
+ * Module-based navigation structure matching requirements
+ * Uses existing professional pages - no stubs
+ */
+const NAV_CONFIG = [
   {
-    group: "CORE",
+    group: "HOME",
     items: [
-      { label: "Dashboard", icon: LayoutDashboard, to: "/" },
-      {
-        label: "Employees",
-        icon: Users,
-        to: "/employees/all",
-        children: [
-          { label: "Overview", to: "/employees" },
-          { label: "Registration", to: "/employees/register" },
-        ],
-      },
-      {
-        label: "Departments",
-        icon: Building2,
-        to: "/departments",
-        children: [
-          { label: "Overview", to: "/departments" },
-          { label: "Manage", to: "/departments/manage" },
-        ],
-      },
-      {
-        label: "Positions",
-        icon: Briefcase,
-        to: "/positions",
-        children: [
-          { label: "Overview", to: "/positions" },
-          { label: "Manage", to: "/positions/manage" },
-        ],
-      },
-      {
-        label: "Levels",
-        icon: Award,
-        to: "/levels",
-      },
+      { label: "Home", icon: LayoutDashboard, to: "/", module: "HOME" },
     ],
   },
   {
-    group: "WORKFORCE",
+    group: "MODULES",
     items: [
+      {
+        label: "Employees",
+        icon: Users,
+        to: "/employees",
+        module: "EMPLOYEES",
+        children: [
+          { label: "Employee List", to: "/employees" },
+          { label: "Register Employee", to: "/employees/register" },
+        ],
+      },
+      {
+        label: "Organization",
+        icon: Building2,
+        to: "/departments",
+        module: "ORGANIZATION",
+        children: [
+          { label: "Departments", to: "/departments" },
+          { label: "Positions", to: "/positions" },
+          { label: "Levels", to: "/levels" },
+        ],
+      },
       {
         label: "Attendance",
         icon: Clock,
         to: "/attendance",
+        module: "ATTENDANCE",
         children: [
-          { label: "Overview", to: "/attendance" },
-          { label: "Manage Attendance", to: "/attendance/manage" },
-        ],
-      },
-      {
-        label: "Leave",
-        icon: CalendarDays,
-        to: "/leave/manage",
-        badgeKey: "pending",
-        children: [
-          { label: "Manage Requests", to: "/leave/manage" },
-          { label: "My Leave", to: "/leave/my-requests" },
+          { label: "Attendance Records", to: "/attendance" },
+          { label: "Attendance Analytics", to: "/attendance-overview" },
         ],
       },
       {
         label: "Shifts",
         icon: Layers,
         to: "/shifts",
-        children: [
-          { label: "Overview", to: "/shifts" },
-          { label: "Manage Assignments", to: "/shifts/assignments" },
-        ],
+        module: "SHIFTS",
       },
-    ],
-  },
-  {
-    group: "ADMINISTRATION",
-    items: [
       {
         label: "Letters",
         icon: FileText,
         to: "/letters",
-        children: [
-          { label: "Issued Letters", to: "/letters/manage" },
-          { label: "My Letters", to: "/letters/my" },
-        ],
-      },
-      { label: "Accounts", icon: UserCog, to: "/accounts" },
-      { label: "Audit Logs", icon: ScrollText, to: "/logs" },
-      { label: "Network Settings", icon: Shield, to: "/network-settings" },
-    ],
-  },
-  {
-    group: "ACCESS CONTROL",
-    items: [
-      {
-        label: "Permissions",
-        icon: Shield,
-        to: "/rbac/permissions",
-        permission: "Permissions.View",
+        module: "LETTERS",
       },
       {
-        label: "Roles",
-        icon: UserCog,
-        to: "/admin/roles",
-        permission: "Roles.View",
-      },
-    ],
-  },
-  {
-    group: "SETTINGS",
-    items: [
-      { label: "Leave Policies", icon: Shield, to: "/policies" },
-      { label: "Day off", icon: Palmtree, to: "/holidays" },
-      { label: "Notifications", icon: BellRing, to: "/notifications" },
-      { label: "My Account", icon: UserCircle, to: "/my-account" },
-    ],
-  },
-];
-
-/* Nav items shown to employees only */
-const NAV_EMPLOYEE = [
-  {
-    group: "MY WORKSPACE",
-    items: [
-      { label: "Dashboard", icon: LayoutDashboard, to: "/" },
-      { label: "My Attendance", icon: Clock, to: "/attendance" },
-      { label: "Leave", icon: CalendarDays, to: "/leave" },
-      { label: "Letters", icon: FileText, to: "/letters" },
-    ],
-  },
-  {
-    group: "SETTINGS",
-    items: [
-      { label: "Notifications", icon: BellRing, to: "/notifications" },
-      { label: "My Account", icon: UserCircle, to: "/my-account" },
-    ],
-  },
-];
-
-/* Nav items shown to department heads */
-const NAV_DEPT_HEAD = [
-  {
-    group: "OVERVIEW",
-    items: [{ label: "Dashboard", icon: LayoutDashboard, to: "/" }],
-  },
-  {
-    group: "MY WORKSPACE",
-    items: [
-      { label: "My Attendance", icon: Clock, to: "/attendance/my" },
-      { label: "My Leave", icon: CalendarDays, to: "/leave/my-requests" },
-    ],
-  },
-  {
-    group: "MY DEPARTMENT",
-    items: [
-      { label: "Department Attendance", icon: Clock, to: "/attendance" },
-      {
-        label: "Leave Requests",
+        label: "Leave",
         icon: CalendarDays,
-        to: "/leave/manage",
+        to: "/leave",
+        module: "LEAVE",
         badgeKey: "pending",
+        children: [
+          { label: "Leave Requests", to: "/leave/manage" },
+          { label: "My Leave", to: "/leave/my-requests" },
+        ],
       },
     ],
   },
   {
-    group: "REQUESTS",
+    group: "PERSONAL SPACE",
     items: [
-      {
-        label: "Letters",
-        icon: FileText,
-        to: "/letters",
-        children: [{ label: "My Letters", to: "/letters/my" }],
-      },
-    ],
-  },
-  {
-    group: "SETTINGS",
-    items: [
-      { label: "Notifications", icon: BellRing, to: "/notifications" },
-      { label: "My Account", icon: UserCircle, to: "/my-account" },
+      { label: "My Attendance", icon: Clock, to: "/attendance/my", alwaysShow: true },
+      { label: "My Letters", icon: FileText, to: "/letters/my", alwaysShow: true },
+      { label: "My Leaves", icon: CalendarDays, to: "/leave/my-requests", alwaysShow: true },
+      { label: "My Account", icon: UserCircle, to: "/my-account", alwaysShow: true },
     ],
   },
 ];
 
-/* Nav items shown to HR officers (occupation-based access) */
-const NAV_HR_OFFICER = [
-  {
-    group: "OVERVIEW",
-    items: [{ label: "Dashboard", icon: LayoutDashboard, to: "/" }],
-  },
-  {
-    group: "SETTINGS",
-    items: [
-      { label: "Notifications", icon: BellRing, to: "/notifications" },
-      { label: "My Account", icon: UserCircle, to: "/my-account" },
-    ],
-  },
-];
-
-const NAV = NAV_ADMIN; // not used directly â€” activeNav is selected per role at render time
-
-/**
- * Given a pathname and the full nav config, find the single exact matching child `to`.
- * Rules (in priority order):
- *  1. Exact match with any nav item `to` â†’ that item is active, nothing else.
- *  2. The path starts with a known nav `to` AND that nav `to` is the longest prefix match
- *     among all known routes â†’ that item is active (handles /employees/:uuid â†’ Overview).
- *  3. Nothing matches â†’ no item active.
- *
- * This completely prevents false positives from startsWith leaking across sibling routes.
- */
 function resolveActiveRoute(pathname, navGroups) {
-  // Collect every known route `to` across all items and children
   const allKnownRoutes = new Set();
   for (const { items } of navGroups) {
     for (const item of items) {
@@ -254,14 +115,12 @@ function resolveActiveRoute(pathname, navGroups) {
     }
   }
 
-  // 1. Exact match
   if (allKnownRoutes.has(pathname)) return pathname;
 
-  // 2. Longest prefix match (for dynamic routes like /employees/emp-123)
   let bestMatch = null;
   let bestLen = 0;
   for (const route of allKnownRoutes) {
-    if (route === "/") continue; // never let '/' match everything
+    if (route === "/") continue;
     if (pathname.startsWith(route + "/") || pathname.startsWith(route)) {
       if (route.length > bestLen) {
         bestLen = route.length;
@@ -269,43 +128,24 @@ function resolveActiveRoute(pathname, navGroups) {
       }
     }
   }
-  return bestMatch; // null if no match
+  return bestMatch;
 }
 
 const Sidebar = ({ collapsed, onToggle, pendingCount = 0, mobileOpen = false, isMobile = false, isTablet = false }) => {
   const location = useLocation();
   const { user } = useAuth();
-  const { hasPermission, hasAnyPermission } = usePermissions();
+  const { hasModule } = useModulePermissions();
 
-  const isEmployee = user?.role === "EMPLOYEE";
-  const isDeptHead = user?.role === "DEPARTMENT_HEAD";
-  const isHrOfficer = user?.role === "HR_OFFICER";
-
-  const activeNav = isEmployee
-    ? NAV_EMPLOYEE
-    : isDeptHead
-      ? NAV_DEPT_HEAD
-      : isHrOfficer
-        ? NAV_HR_OFFICER
-        : NAV_ADMIN;
-
-  // Filter navigation items based on permissions
-  const filteredNav = activeNav.map(group => ({
+  const filteredNav = NAV_CONFIG.map(group => ({
     ...group,
     items: group.items.filter(item => {
-      // If no permission is specified, show the item (backward compatibility)
-      if (!item.permission) return true;
-      
-      // Check if user has the required permission
-      if (Array.isArray(item.permission)) {
-        return hasAnyPermission(item.permission);
-      }
-      return hasPermission(item.permission);
+      if (item.alwaysShow) return true;
+      if (item.module) return hasModule(item.module);
+      return true;
     })
-  })).filter(group => group.items.length > 0); // Remove empty groups
+  })).filter(group => group.items.length > 0);
 
   const w = collapsed ? 72 : 240;
-
   const activeRouteTo = resolveActiveRoute(location.pathname, filteredNav);
 
   const [openFolders, setOpenFolders] = useState(() => {
@@ -339,84 +179,50 @@ const Sidebar = ({ collapsed, onToggle, pendingCount = 0, mobileOpen = false, is
     });
   };
 
-  // Mobile: full-width drawer that slides in/out
-  // Tablet: fixed icon-only sidebar (72px)
-  // Desktop: fixed sidebar, collapsible
   const sidebarStyle = isMobile
     ? {
-        position: 'fixed',
-        top: 0, left: 0, bottom: 0,
-        width: 260,
-        zIndex: 39,
+        position: 'fixed', top: 0, left: 0, bottom: 0, width: 260, zIndex: 39,
         transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)',
         transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1)',
       }
     : {
-        position: 'fixed',
-        top: 0, left: 0, bottom: 0,
-        width: w,
-        zIndex: 40,
+        position: 'fixed', top: 0, left: 0, bottom: 0, width: w, zIndex: 40,
         transition: 'width 0.3s ease',
       };
 
   return (
-    <aside
-      style={{
-        ...sidebarStyle,
-        display: 'flex',
-        flexDirection: 'column',
-        background: 'linear-gradient(180deg, #1e3a37 0%, #162e2b 100%)',
-        borderRight: '1px solid rgba(255,255,255,0.05)',
-        overflowX: 'hidden',
-        fontFamily: 'Poppins, sans-serif',
-        boxShadow: '4px 0 24px rgba(0,0,0,0.15)',
-      }}
-    >
-      {/* â”€â”€ Logo + collapse toggle â”€â”€ */}
-      <div
-        style={{
-          padding: collapsed && !isMobile ? '20px 0 16px' : '24px 16px 20px',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          flexShrink: 0,
-        }}
-      >
+    <aside style={{
+      ...sidebarStyle, display: 'flex', flexDirection: 'column',
+      background: 'linear-gradient(180deg, #1e3a37 0%, #162e2b 100%)',
+      borderRight: '1px solid rgba(255,255,255,0.05)', overflowX: 'hidden',
+      fontFamily: 'Poppins, sans-serif', boxShadow: '4px 0 24px rgba(0,0,0,0.15)',
+    }}>
+      <div style={{
+        padding: collapsed && !isMobile ? '20px 0 16px' : '24px 16px 20px',
+        borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex',
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        gap: 12, flexShrink: 0,
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: collapsed && !isMobile ? 'none' : 1 }}>
-          <img
-            src={logo}
-            alt="MESOB Logo"
-            style={{
-              width: collapsed && !isMobile ? 44 : 64,
-              height: collapsed && !isMobile ? 44 : 64,
-              objectFit: 'contain',
-              flexShrink: 0,
-              ...SPIN_STYLE,
-            }}
-          />
+          <img src={logo} alt="MESOB Logo" style={{
+            width: collapsed && !isMobile ? 44 : 64,
+            height: collapsed && !isMobile ? 44 : 64,
+            objectFit: 'contain', flexShrink: 0, ...SPIN_STYLE,
+          }} />
         </div>
-
-        {/* Collapse/close toggle â€” always shown */}
-        <button
-          onClick={onToggle}
-          style={{
-            width: 28, height: 28, borderRadius: 8, border: 'none',
-            background: 'rgba(255,255,255,0.08)', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'rgba(255,255,255,0.5)', flexShrink: 0, transition: 'background 0.15s',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
-          aria-label={isMobile ? 'Close menu' : collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
+        <button onClick={onToggle} style={{
+          width: 28, height: 28, borderRadius: 8, border: 'none',
+          background: 'rgba(255,255,255,0.08)', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'rgba(255,255,255,0.5)', flexShrink: 0, transition: 'background 0.15s',
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+        onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
+        aria-label={isMobile ? 'Close menu' : collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
           {isMobile ? <ChevronLeft size={14} /> : collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
         </button>
       </div>
 
-      {/* â”€â”€ Navigation â”€â”€ */}
       <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '8px 0' }}>
         {filteredNav.map(({ group, items }) => (
           <div key={group}>
@@ -425,9 +231,7 @@ const Sidebar = ({ collapsed, onToggle, pendingCount = 0, mobileOpen = false, is
                 {group}
               </p>
             )}
-            {collapsed && !isMobile && (
-              <div style={{ margin: '8px 12px', borderTop: '1px solid rgba(255,255,255,0.08)' }} />
-            )}
+            {collapsed && !isMobile && <div style={{ margin: '8px 12px', borderTop: '1px solid rgba(255,255,255,0.08)' }} />}
 
             {items.map(({ label, icon: Icon, to, badgeKey, children }) => {
               const hasChildren = children && children.length > 0;
@@ -444,35 +248,27 @@ const Sidebar = ({ collapsed, onToggle, pendingCount = 0, mobileOpen = false, is
               const showLabel = !collapsed || isMobile;
 
               const itemStyle = {
-                width: '100%', display: 'flex', alignItems: 'center',
-                gap: showLabel ? 10 : 0,
+                width: '100%', display: 'flex', alignItems: 'center', gap: showLabel ? 10 : 0,
                 margin: '1px 8px', padding: (collapsed && !isMobile) ? '11px 0' : '10px 12px',
                 borderRadius: 10, textDecoration: 'none',
                 justifyContent: (collapsed && !isMobile) ? 'center' : 'flex-start',
-                background: parentBg, boxShadow: parentShadow,
-                transition: 'background 0.15s', position: 'relative',
-                border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                background: parentBg, boxShadow: parentShadow, transition: 'background 0.15s',
+                position: 'relative', border: 'none', cursor: 'pointer',
+                fontFamily: 'inherit', textAlign: 'left',
               };
 
               return (
                 <div key={to}>
                   {hasChildren ? (
-                    <button
-                      onClick={() => toggleFolder(to)}
-                      title={(collapsed && !isMobile) ? label : undefined}
-                      style={itemStyle}
+                    <button onClick={() => toggleFolder(to)}
+                      title={(collapsed && !isMobile) ? label : undefined} style={itemStyle}
                       onMouseEnter={(e) => { if (!isActive && !isChildActive) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
-                      onMouseLeave={(e) => { if (!isActive && !isChildActive) e.currentTarget.style.background = 'transparent'; }}
-                    >
+                      onMouseLeave={(e) => { if (!isActive && !isChildActive) e.currentTarget.style.background = 'transparent'; }}>
                       <Icon size={18} style={{ flexShrink: 0, color: parentIconColor }} />
-                      {showLabel && (
-                        <>
-                          <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, color: parentTextColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                            {label}
-                          </span>
-                          <ChevronDown size={14} style={{ flexShrink: 0, color: parentTextColor, transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s ease' }} />
-                        </>
-                      )}
+                      {showLabel && (<>
+                        <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, color: parentTextColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{label}</span>
+                        <ChevronDown size={14} style={{ flexShrink: 0, color: parentTextColor, transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s ease' }} />
+                      </>)}
                       {showLabel && count > 0 && (
                         <span style={{ marginLeft: 'auto', minWidth: 20, height: 20, borderRadius: 99, background: '#F59E0B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: 'white', padding: '0 5px' }}>{count}</span>
                       )}
@@ -481,18 +277,13 @@ const Sidebar = ({ collapsed, onToggle, pendingCount = 0, mobileOpen = false, is
                       )}
                     </button>
                   ) : (
-                    <NavLink
-                      to={to}
-                      title={(collapsed && !isMobile) ? label : undefined}
+                    <NavLink to={to} title={(collapsed && !isMobile) ? label : undefined}
                       style={{ ...itemStyle, display: 'flex' }}
                       onMouseEnter={(e) => { if (!isActive && !isChildActive) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
-                      onMouseLeave={(e) => { if (!isActive && !isChildActive) e.currentTarget.style.background = 'transparent'; }}
-                    >
+                      onMouseLeave={(e) => { if (!isActive && !isChildActive) e.currentTarget.style.background = 'transparent'; }}>
                       <Icon size={18} style={{ flexShrink: 0, color: parentIconColor }} />
                       {showLabel && (
-                        <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, color: parentTextColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                          {label}
-                        </span>
+                        <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, color: parentTextColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{label}</span>
                       )}
                       {showLabel && count > 0 && (
                         <span style={{ marginLeft: 'auto', minWidth: 20, height: 20, borderRadius: 99, background: '#F59E0B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: 'white', padding: '0 5px' }}>{count}</span>
@@ -509,20 +300,16 @@ const Sidebar = ({ collapsed, onToggle, pendingCount = 0, mobileOpen = false, is
                       {children.map((child) => {
                         const childActive = activeRouteTo === child.to;
                         return (
-                          <NavLink
-                            key={child.to}
-                            to={child.to}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 8,
-                              margin: '1px 8px 1px 0', padding: '8px 12px',
-                              borderRadius: 8, textDecoration: 'none',
-                              background: childActive ? 'rgba(20,184,166,0.18)' : 'transparent',
-                              boxShadow: childActive ? 'inset 2px 0 0 #14B8A6' : 'none',
-                              transition: 'background 0.15s',
-                            }}
-                            onMouseEnter={(e) => { if (!childActive) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
-                            onMouseLeave={(e) => { if (!childActive) e.currentTarget.style.background = 'transparent'; }}
-                          >
+                          <NavLink key={child.to} to={child.to} style={{
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            margin: '1px 8px 1px 0', padding: '8px 12px', borderRadius: 8,
+                            textDecoration: 'none',
+                            background: childActive ? 'rgba(20,184,166,0.18)' : 'transparent',
+                            boxShadow: childActive ? 'inset 2px 0 0 #14B8A6' : 'none',
+                            transition: 'background 0.15s',
+                          }}
+                          onMouseEnter={(e) => { if (!childActive) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+                          onMouseLeave={(e) => { if (!childActive) e.currentTarget.style.background = 'transparent'; }}>
                             <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: childActive ? '#14B8A6' : 'rgba(255,255,255,0.25)' }} />
                             <span style={{ fontSize: 12, fontWeight: childActive ? 600 : 400, color: childActive ? 'white' : 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}>
                               {child.label}
@@ -539,7 +326,6 @@ const Sidebar = ({ collapsed, onToggle, pendingCount = 0, mobileOpen = false, is
         ))}
       </nav>
 
-      {/* â”€â”€ Footer â”€â”€ */}
       <div style={{ padding: (collapsed && !isMobile) ? '12px 0' : '12px 16px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', alignItems: (collapsed && !isMobile) ? 'center' : 'flex-start', flexShrink: 0 }}>
         {(!collapsed || isMobile) && (
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontFamily: 'Poppins, sans-serif' }}>FDRE Mesob HRMS</span>
@@ -548,6 +334,5 @@ const Sidebar = ({ collapsed, onToggle, pendingCount = 0, mobileOpen = false, is
     </aside>
   );
 };
-
 
 export default Sidebar;

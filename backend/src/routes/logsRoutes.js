@@ -6,30 +6,16 @@ const {
   getEntityTypes,
   exportLogs,
 } = require("../controllers/logController");
-// NEW: Use Permit middleware instead of old RBAC
-const { authorize } = require("../middleware/permitMiddleware");
+// Use module-level authorization (logs are part of ORGANIZATION module for admins)
+const { requireModule, withScope } = require("../middleware/moduleAuth");
 
 const router = express.Router();
 
-// List logs with filtering and pagination (scope filtering in controller)
-router.get("/", 
-  authorize("view", "logs"),
-  listLogs
-);
-
-// Get available action types
-router.get("/actions", authorize("view", "logs"), getActions);
-
-// Get available entity types
-router.get("/entity-types", authorize("view", "logs"), getEntityTypes);
-
-// Export logs to CSV (scope filtering in controller)
-router.get("/export", 
-  authorize("export", "logs"),
-  exportLogs
-);
-
-// Get single log entry (must be last to avoid route conflicts)
-router.get("/:uuid", authorize("view", "logs"), getLog);
+// All log operations require ORGANIZATION module with scope filtering
+router.get("/", requireModule('ORGANIZATION'), withScope(), listLogs);
+router.get("/actions", requireModule('ORGANIZATION'), getActions);
+router.get("/entity-types", requireModule('ORGANIZATION'), getEntityTypes);
+router.get("/export", requireModule('ORGANIZATION'), withScope(), exportLogs);
+router.get("/:uuid", requireModule('ORGANIZATION'), getLog);
 
 module.exports = router;

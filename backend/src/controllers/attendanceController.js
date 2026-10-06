@@ -124,7 +124,7 @@ exports.getEmployeeSummary = asyncHandler(async (req, res) => {
 /* ─── Admin: all attendance records (paginated) ─── */
 exports.getAllAttendance = asyncHandler(async (req, res) => {
   const { departmentUuid, positionUuid, startDate, endDate, status, search, page, pageSize } = req.query || {};
-  const scope = assertEmployeeListAccess(req.user);
+  const scope = await assertEmployeeListAccess(req.user, req.moduleAccess);
   const resolvedDepartmentUuid =
     scope.scope === "department" ? scope.departmentUuid : departmentUuid;
   const result = await Analytics.getAttendanceRecords({

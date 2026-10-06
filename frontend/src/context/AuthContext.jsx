@@ -184,10 +184,15 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Login function
-  const login = useCallback(async (userData) => {
+  const login = useCallback(async (userData, permissions = null) => {
     // Fetch fresh user data with occupations from backend
     const freshUserData = await fetchCurrentUser();
     const fullUserData = freshUserData ? { ...userData, ...freshUserData } : userData;
+    
+    // Include module permissions if provided
+    if (permissions) {
+      fullUserData.permissions = permissions;
+    }
     
     setUser(fullUserData);
     localStorage.setItem('user', JSON.stringify(fullUserData));
@@ -196,7 +201,7 @@ export const AuthProvider = ({ children }) => {
     setShowWarning(false);
     setWarningCountdown(60);
 
-    console.log('[AuthContext] Login - User data with occupations:', fullUserData.occupations?.length || 0);
+    console.log('[AuthContext] Login - User data with permissions:', fullUserData.permissions ? 'loaded' : 'none');
 
     // Broadcast login to other tabs
     if (broadcastChannelRef.current) {

@@ -6,8 +6,8 @@ const {
   updatePolicy,
   deletePolicy,
 } = require("../controllers/policyController");
-// NEW: Use Permit middleware instead of old RBAC
-const { authorize } = require("../middleware/permitMiddleware");
+// Use module-level authorization (policies are part of LEAVE module)
+const { requireModule } = require("../middleware/moduleAuth");
 const { authenticateJwt } = require("../middleware/authMiddleware");
 
 const router = express.Router();
@@ -16,11 +16,9 @@ const router = express.Router();
 router.get("/", authenticateJwt, listPolicies);
 router.get("/:leaveType", authenticateJwt, getPolicy);
 
-// Manage policies (requires Policies permission)
-router.post("/", authorize("create", "policies"), createPolicy);
-router.patch("/:leaveType", authorize("update", "policies"), updatePolicy);
-
-// Delete policy (critical operation - requires delete permission)
-router.delete("/:leaveType", authorize("delete", "policies"), deletePolicy);
+// Manage policies (requires LEAVE module)
+router.post("/", requireModule('LEAVE'), createPolicy);
+router.patch("/:leaveType", requireModule('LEAVE'), updatePolicy);
+router.delete("/:leaveType", requireModule('LEAVE'), deletePolicy);
 
 module.exports = router;

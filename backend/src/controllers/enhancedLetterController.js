@@ -302,11 +302,8 @@ exports.previewEnhancedLetter = async (req, res) => {
       `SELECT 
         lt.uuid, lt.title, lt.type, lt.category,
         lt.recipient_info, lt.subject, lt.main_body,
-        lt.closing_text, lt.cc_recipients,
-        llc.header_template, llc.footer_template,
-        llc.page_margins, llc.font_family, llc.font_size, llc.additional_styles
+        lt.closing_text, lt.cc_recipients
       FROM LetterTemplates lt
-      LEFT JOIN LetterLayoutConfig llc ON llc.id = lt.layout_config_id
       WHERE lt.uuid = ? AND lt.is_active = TRUE`,
       [template_uuid]
     );

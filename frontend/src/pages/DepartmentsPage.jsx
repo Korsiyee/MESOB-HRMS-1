@@ -11,6 +11,7 @@ import { useLocation } from 'react-router-dom';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useDialog } from '../context/DialogContext';
 import { Can } from '../components/Can';
+import TabSwipe from '../components/ui/TabSwipe';
 
 /* ── Shared palette ── */
 const C = {
@@ -407,7 +408,7 @@ const OrgNode = ({ node, depth = 0 }) => {
    VIEW 1 — DEPARTMENTS OVERVIEW
    Department-focused analytics dashboard
 ══════════════════════════════════════════ */
-const DepartmentsOverview = ({ onManageClick }) => {
+const DepartmentsOverview = () => {
   const { isMobile, isTablet, r } = useResponsive();
   const [depts,       setDepts]       = useState([]);
   const [tree,        setTree]        = useState([]);
@@ -665,7 +666,7 @@ const DepartmentsOverview = ({ onManageClick }) => {
 /* ══════════════════════════════════════════
    VIEW 2 — DEPARTMENTS MANAGE
 ══════════════════════════════════════════ */
-const DepartmentsManage = ({ onOverviewClick }) => {
+const DepartmentsManage = () => {
   const [depts,    setDepts]    = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [notice,   setNotice]   = useState({ type: '', message: '' });
@@ -729,17 +730,11 @@ const DepartmentsManage = ({ onOverviewClick }) => {
           <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#E8F0EE' }}>Manage Departments</h1>
           <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: 'rgba(232,240,238,0.6)' }}>{depts.length} departments</p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onOverviewClick}
-            style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid rgba(232,240,238,0.25)', background: 'rgba(232,240,238,0.1)', color: '#E8F0EE', fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontFamily: 'Poppins,sans-serif' }}>
-            <BarChart2 size={14} /> Overview
-          </button>
-          <Can action="create" resource="departments">
-            <GreenBtn onClick={() => setShowAdd(true)} style={{ background: '#E8F0EE', color: C.primary }}>
-              <Plus size={15} /> Add Department
-            </GreenBtn>
-          </Can>
-        </div>
+        <Can action="create" resource="departments">
+          <GreenBtn onClick={() => setShowAdd(true)} style={{ background: '#E8F0EE', color: C.primary }}>
+            <Plus size={15} /> Add Department
+          </GreenBtn>
+        </Can>
       </div>
 
       {/* Search + refresh */}
@@ -833,24 +828,225 @@ const DepartmentsManage = ({ onOverviewClick }) => {
 };
 
 /* ══════════════════════════════════════════
-   ROOT — DepartmentsPage (view router)
+   VIEW 3 — ADD DEPARTMENT
+   Quick-add form for new departments
+══════════════════════════════════════════ */
+const AddDepartmentView = () => {
+  const [form, setForm] = useState({
+    name: '',
+    parent_uuid: '',
+    head_employee_uuid: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState({ type: '', message: '' });
+  const [employees, setEmployees] = useState([]);
+  const [depts, setAllDepts] = useState([]);
+  const [empSearch, setEmpSearch] = useState('');
+  const [dropOpen, setDropOpen] = useState(false);
+  const searchWrapRef = React.useRef(null);
+  
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  const showMsg = (type, message) => {
+    setNotice({ type, message });
+    setTimeout(() => setNotice({ type: '', message: '' }), 4500);
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e) => {
+      if (searchWrapRef.current && !searchWrapRef.current.contains(e.target)) {
+        setDropOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    const h = { Authorization: `Bearer ${token}` };
+    Promise.all([
+      fetch('/api/employees?status=ACTIVE&limit=300', { headers: h }).then(r => r.json()),
+      fetch('/api/departments', { headers: h }).then(r => r.json()),
+    ]).then(([eRes, dRes]) => {
+      setEmployees(eRes?.data || []);
+      setAllDepts(dRes?.data || []);
+    }).catch(() => {});
+  }, []);
+
+  const filteredEmps = empSearch
+    ? employees.filter(e => `${e.first_name} ${e.middle_name || ''} ${e.last_name} ${e.mesob_id}`.toLowerCase().includes(empSearch.toLowerCase()))
+    : employees;
+
+  const selectedEmp = employees.find(e => e.uuid === form.head_employee_uuid);
+
+  const selectEmployee = (emp) => {
+    set('head_employee_uuid', emp.uuid);
+    setEmpSearch('');
+    setDropOpen(false);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim()) {
+      showMsg('error', 'Department name is required.');
+      return;
+    }
+    
+    setSaving(true);
+    try {
+      const body = {
+        name: form.name,
+        ...(form.parent_uuid ? { parent_uuid: form.parent_uuid } : { parent_uuid: null }),
+        ...(form.head_employee_uuid ? { head_employee_uuid: form.head_employee_uuid } : { head_employee_uuid: null }),
+      };
+      await DepartmentApi.create(body);
+      showMsg('success', `Department "${form.name}" created successfully!`);
+      // Reset form
+      setForm({ name: '', parent_uuid: '', head_employee_uuid: '' });
+      setEmpSearch('');
+    } catch (err) {
+      showMsg('error', err.message || 'Failed to create department.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ fontFamily: 'Poppins,sans-serif', maxWidth: 700, margin: '0 auto' }}>
+      <Notice type={notice.type} message={notice.message} onClose={() => setNotice({ type: '', message: '' })} />
+
+      {/* Header */}
+      <div style={{ background: C.headerBg, borderRadius: 14, padding: '20px 26px', marginBottom: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.18)' }}>
+        <p style={{ margin: '0 0 3px', fontSize: '0.7rem', color: 'rgba(232,240,238,0.45)', letterSpacing: '0.04em' }}>Departments › Add New</p>
+        <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#E8F0EE' }}>Add New Department</h1>
+        <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: 'rgba(232,240,238,0.6)' }}>Create a new department in your organization</p>
+      </div>
+
+      {/* Form Card */}
+      <div style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.border}`, boxShadow: C.shadow, padding: 28 }}>
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: 18 }}>
+            <label style={lbl}>Department Name *</label>
+            <input
+              value={form.name}
+              onChange={e => set('name', e.target.value)}
+              required
+              placeholder="e.g., Human Resources"
+              style={field}
+              onFocus={e => e.target.style.borderColor = C.primary}
+              onBlur={e => e.target.style.borderColor = C.border}
+            />
+          </div>
+
+          <div style={{ marginBottom: 18 }}>
+            <label style={lbl}>Parent Department <span style={{ color: C.textMuted, fontWeight: 400, fontSize: '0.68rem' }}>(optional)</span></label>
+            <select value={form.parent_uuid} onChange={e => set('parent_uuid', e.target.value)} style={field}>
+              <option value="">Root Department (no parent)</option>
+              {depts.map(d => <option key={d.uuid} value={d.uuid}>{d.name}</option>)}
+            </select>
+          </div>
+
+          <div style={{ marginBottom: 24 }}>
+            <label style={lbl}>Head Employee <span style={{ color: C.textMuted, fontWeight: 400, fontSize: '0.68rem' }}>(optional)</span></label>
+
+            {/* Selected employee chip */}
+            {selectedEmp && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '7px 12px', background: 'rgba(15,118,110,0.08)', borderRadius: 8, border: `1px solid ${C.primary}` }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: C.primary, flex: 1 }}>
+                  ✓ {selectedEmp.first_name} {selectedEmp.middle_name} {selectedEmp.last_name} — {selectedEmp.mesob_id}
+                </span>
+                <button type="button" onClick={() => { set('head_employee_uuid', ''); setEmpSearch(''); setDropOpen(false); }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted, fontSize: '0.7rem', fontWeight: 600, padding: '2px 4px' }}>
+                  ✕ Clear
+                </button>
+              </div>
+            )}
+
+            {/* Search input + dropdown */}
+            <div ref={searchWrapRef} style={{ position: 'relative' }}>
+              <input
+                value={empSearch}
+                onChange={e => { setEmpSearch(e.target.value); setDropOpen(true); }}
+                onFocus={() => setDropOpen(true)}
+                placeholder={selectedEmp ? 'Search to change…' : 'Search by name or ID…'}
+                style={field}
+              />
+              {dropOpen && empSearch && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, border: `1px solid ${C.border}`, borderRadius: 8, background: '#fff', maxHeight: 200, overflowY: 'auto', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', marginTop: 2 }}>
+                  {filteredEmps.length === 0 ? (
+                    <div style={{ padding: '10px 14px', fontSize: '0.78rem', color: C.textMuted }}>No employees found.</div>
+                  ) : (
+                    filteredEmps.slice(0, 20).map(e => (
+                      <button
+                        key={e.uuid}
+                        type="button"
+                        onMouseDown={ev => { ev.preventDefault(); selectEmployee(e); }}
+                        style={{ width: '100%', padding: '9px 14px', textAlign: 'left', border: 'none', background: form.head_employee_uuid === e.uuid ? 'rgba(15,118,110,0.1)' : 'transparent', cursor: 'pointer', fontSize: '0.8rem', color: C.textMain, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                        onMouseEnter={ev => ev.currentTarget.style.background = 'rgba(15,118,110,0.07)'}
+                        onMouseLeave={ev => ev.currentTarget.style.background = form.head_employee_uuid === e.uuid ? 'rgba(15,118,110,0.1)' : 'transparent'}
+                      >
+                        <span style={{ fontWeight: form.head_employee_uuid === e.uuid ? 700 : 400 }}>
+                          {e.first_name} {e.middle_name} {e.last_name}
+                        </span>
+                        <span style={{ color: C.textMuted, fontSize: '0.72rem' }}>{e.mesob_id}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+            <button
+              type="button"
+              onClick={() => setForm({ name: '', parent_uuid: '', head_employee_uuid: '' })}
+              style={{ padding: '9px 18px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', color: C.textSub, fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'Poppins,sans-serif' }}
+            >
+              Clear Form
+            </button>
+            <GreenBtn type="submit" disabled={saving}>
+              {saving ? 'Creating…' : <><Plus size={15} /> Create Department</>}
+            </GreenBtn>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+/* ══════════════════════════════════════════
+   ROOT — DepartmentsPage (Tabbed Interface)
 ══════════════════════════════════════════ */
 const DepartmentsPage = () => {
   const dialog = useDialog();
-  const location = useLocation();
-  const [view, setView] = useState(
-    location.pathname.includes('/manage') ? 'manage' : 'overview'
-  );
 
-  useEffect(() => {
-    setView(location.pathname.includes('/manage') ? 'manage' : 'overview');
-  }, [location.pathname]);
+  const tabs = [
+    {
+      key: 'overview',
+      label: 'Overview',
+      path: '/departments',
+      content: <DepartmentsOverview onManageClick={() => {}} />
+    },
+    {
+      key: 'add',
+      label: 'Add Department',
+      path: '/departments/add',
+      content: <AddDepartmentView />
+    },
+    {
+      key: 'manage',
+      label: 'Manage',
+      path: '/departments/manage',
+      content: <DepartmentsManage onOverviewClick={() => {}} />
+    },
+  ];
 
   return (
     <div style={{ fontFamily: 'Poppins,sans-serif' }}>
-      {view === 'overview'
-        ? <DepartmentsOverview onManageClick={() => setView('manage')} />
-        : <DepartmentsManage   onOverviewClick={() => setView('overview')} />}
+      <TabSwipe tabs={tabs} defaultTab="overview" />
     </div>
   );
 };

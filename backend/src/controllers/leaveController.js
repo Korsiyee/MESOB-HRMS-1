@@ -20,13 +20,13 @@ exports.getBalance = async (req, res) => {
       });
     }
 
-    // Authorization: Users can only view their own balance unless they're HR/Admin
-    // Authorization: Check if user can view this employee's balance
-    const authorizationService = require("../services/authorizationService");
-    const canViewBalances = await authorizationService.hasPermission(req.user.uuid, 'leave.view_balances');
+    // Authorization: moduleAuth middleware already checked LEAVE module access
+    // Additional check: Users can view their own balance, or if they have module access
     const isOwnBalance = req.user.employee_uuid === employeeUuid;
+    const hasModuleAccess = req.moduleAccess && req.moduleAccess.scope;
     
-    if (!isOwnBalance && !canViewBalances) {
+    // If not own balance and no module access, deny
+    if (!isOwnBalance && !hasModuleAccess) {
       return sendError(res, {
         status: 403,
         message: "You can only view your own leave balance.",

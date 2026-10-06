@@ -10,17 +10,17 @@ const {
   checkPermission,
 } = require("../controllers/authController");
 const { authenticateJwt } = require("../middleware/authMiddleware");
-const { authorize } = require("../middleware/permitMiddleware"); // NEW: Use Permit middleware
+const { requireModule } = require("../middleware/moduleAuth");
 const validateRequest = require("../middleware/validateRequest");
 const { authRateLimiter, refreshTokenRateLimiter } = require("../middleware/rateLimiters");
 
 const router = express.Router();
 
-// Registration now requires authentication and accounts.create permission
+// Registration now requires authentication and ORGANIZATION module access
 router.post("/register", 
   authRateLimiter, 
   authenticateJwt,
-  authorize("create", "accounts"),
+  requireModule('ORGANIZATION'),
   register
 );
 router.post(
@@ -52,7 +52,7 @@ router.post(
   "/force-logout/:userUuid",
   authRateLimiter,
   authenticateJwt,
-  authorize("update", "accounts"),
+  requireModule('ORGANIZATION'),
   forceLogout,
 );
 // Frontend permission check endpoint

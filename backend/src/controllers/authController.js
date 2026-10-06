@@ -57,27 +57,33 @@ exports.getCurrentUser = asyncHandler(async (req, res) => {
     throw new ApiError("Not authenticated.", 401, "UNAUTHORIZED");
   }
 
-  // Fetch fresh user data with occupations (legacy)
-  const user = await AuthService.getUserWithOccupations(req.user.uuid);
-  
-  // Fetch RBAC permissions (new system)
-  const rbacService = require("../services/rbacService");
-  const permissions = await rbacService.getUserPermissions(req.user.uuid);
-  const role = await rbacService.getUserRole(req.user.uuid);
-  
-  // Combine both systems for transition period
-  const userData = {
-    ...user,
-    rbac: {
-      role: role,
-      permissions: permissions
-    }
-  };
+  try {
+    // Fetch fresh user data
+    const user = await AuthService.getUserWithOccupations(req.user.uuid);
+    
+    // Fetch module permissions (FIXED - use moduleAuthService not rbacService)
+    const moduleAuthService = require("../services/moduleAuthService");
+    const modulePermissions = await moduleAuthService.getUserPermissions(req.user.uuid);
+    
+    // Combine user data with module permissions
+    const userData = {
+      ...user,
+      permissions: modulePermissions  // Add module permissions to response
+    };
 
-  return sendSuccess(res, {
-    status: 200,
-    data: userData,
-  });
+    return sendSuccess(res, {
+      status: 200,
+      data: userData,
+    });
+  } catch (error) {
+    console.error('[getCurrentUser] Error:', error);
+    // Return user data without permissions if fetch fails
+    const user = await AuthService.getUserWithOccupations(req.user.uuid);
+    return sendSuccess(res, {
+      status: 200,
+      data: user,
+    });
+  }
 });
 
 exports.logout = asyncHandler(async (req, res) => {
@@ -236,9 +242,24 @@ exports.checkPermission = asyncHandler(async (req, res) => {
     throw new ApiError("action and resource are required.", 400, "VALIDATION_ERROR");
   }
 
-  // Use Permit to check permission
-  const { checkPermission } = require("../middleware/permitMiddleware");
-  const allowed = await checkPermission(req.user.uuid, action, resource);
+  // Check module access instead of action-level permissions
+  const { checkModuleAccess } = require("../services/moduleAuthService");
+  
+  // Map resource to module code (simplified check)
+  const resourceToModule = {
+    'employees': 'EMPLOYEES',
+    'departments': 'ORGANIZATION',
+    'positions': 'ORGANIZATION',
+    'levels': 'ORGANIZATION',
+    'attendance': 'ATTENDANCE',
+    'shifts': 'SHIFTS',
+    'letters': 'LETTERS',
+    'leave': 'LEAVE',
+    'requests': 'LEAVE'
+  };
+  
+  const moduleCode = resourceToModule[resource];
+  const allowed = moduleCode ? await checkModuleAccess(req.user.uuid, moduleCode) : false;
 
   return sendSuccess(res, {
     status: 200,

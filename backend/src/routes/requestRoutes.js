@@ -20,8 +20,8 @@ const {
   uploadRequestDocuments,
   uploadSingleRequestDocument,
 } = require("../middleware/requestUploadMiddleware");
-// NEW: Use Permit middleware instead of old RBAC
-const { authorize, allowSelfOr } = require("../middleware/permitMiddleware");
+// Use module-level authorization (requests are part of LEAVE module)
+const { requireModule, checkSelfAccess, withScope } = require("../middleware/moduleAuth");
 const { authenticateJwt } = require("../middleware/authMiddleware");
 
 const router = express.Router();
@@ -30,99 +30,35 @@ const router = express.Router();
 router.get("/preview", authenticateJwt, previewLeaveDates);
 
 // Pending requests - MUST BE BEFORE /:uuid
-router.get("/pending", 
-  authenticateJwt,
-  authorize("view", "requests"),
-  getPendingRequests
-);
+router.get("/pending", requireModule('LEAVE'), withScope(), getPendingRequests);
 
-// Admin routes (requires request management permission)
-router.get("/admin/all", 
-  authenticateJwt,
-  authorize("view", "requests"),
-  getAdminRequests
-);
+// Admin routes with scope filtering
+router.get("/admin/all", requireModule('LEAVE'), withScope(), getAdminRequests);
 
-// Employee requests - MUST BE BEFORE /:uuid to avoid matching "employee" as uuid
-router.get("/employee/:uuid", 
-  authenticateJwt,
-  allowSelfOr("view", "requests", req => req.params.uuid),
-  getEmployeeRequests
-);
+// Employee requests - self-access or LEAVE module
+router.get("/employee/:uuid", checkSelfAccess('LEAVE'), getEmployeeRequests);
 
-// Create request (all employees)
-router.post("/", 
-  authenticateJwt,
-  authorize("create", "requests"),
-  uploadRequestDocuments,
-  createRequest
-);
+// Create request (all employees allowed)
+router.post("/", authenticateJwt, uploadRequestDocuments, createRequest);
 
-// Get single request with complete details (self-access OR permission)
-router.get("/:uuid", 
-  authenticateJwt,
-  authorize("view", "requests"), // Ownership validation in controller
-  getRequestById
-);
+// Get single request - requires LEAVE module or ownership check in controller
+router.get("/:uuid", requireModule('LEAVE'), getRequestById);
 
 // Document management
-router.get("/:uuid/documents", 
-  authenticateJwt,
-  authorize("view", "requests"), // Ownership validation in controller
-  getRequestDocuments
-);
-
-router.post("/:uuid/documents",
-  authenticateJwt,
-  authorize("update", "requests"),
-  uploadRequestDocuments,
-  addRequestDocuments
-);
-
-router.get("/:uuid/documents/:documentUuid/content",
-  authenticateJwt,
-  authorize("view", "requests"),
-  streamRequestDocumentContent
-);
-
-router.put("/:uuid/documents/:documentUuid",
-  authenticateJwt,
-  authorize("update", "requests"),
-  uploadSingleRequestDocument,
-  replaceRequestDocument
-);
-
-router.delete("/:uuid/documents/:documentUuid",
-  authenticateJwt,
-  authorize("update", "requests"),
-  deleteRequestDocument
-);
+router.get("/:uuid/documents", requireModule('LEAVE'), getRequestDocuments);
+router.post("/:uuid/documents", requireModule('LEAVE'), uploadRequestDocuments, addRequestDocuments);
+router.get("/:uuid/documents/:documentUuid/content", requireModule('LEAVE'), streamRequestDocumentContent);
+router.put("/:uuid/documents/:documentUuid", requireModule('LEAVE'), uploadSingleRequestDocument, replaceRequestDocument);
+router.delete("/:uuid/documents/:documentUuid", requireModule('LEAVE'), deleteRequestDocument);
 
 // Update/shorten requests
-router.patch("/:uuid",
-  authenticateJwt,
-  authorize("update", "requests"),
-  updateRequest
-);
-
-router.patch("/:uuid/shorten",
-  authenticateJwt,
-  authorize("update", "requests"),
-  shortenApprovedRequest
-);
+router.patch("/:uuid", requireModule('LEAVE'), updateRequest);
+router.patch("/:uuid/shorten", requireModule('LEAVE'), shortenApprovedRequest);
 
 // Department decision (approval/rejection)
-router.patch("/:uuid/department-decision", 
-  authenticateJwt,
-  authorize("approve", "requests"),
-  departmentApproveRejectRequest
-);
+router.patch("/:uuid/department-decision", requireModule('LEAVE'), departmentApproveRejectRequest);
 
 // Cancel request
-router.patch("/:uuid/cancel",
-  authenticateJwt,
-  authorize("delete", "requests"),
-  cancelRequest
-);
+router.patch("/:uuid/cancel", requireModule('LEAVE'), cancelRequest);
 
 module.exports = router;

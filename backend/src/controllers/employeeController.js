@@ -82,10 +82,8 @@ exports.createEmployee = asyncHandler(async (req, res) => {
 });
 
 exports.listEmployees = asyncHandler(async (req, res) => {
-  // Get user's scope from authorization service
-  const { getUserScope } = require("../services/authorizationService");
-  const { buildScopeFilter } = require("../middleware/permitMiddleware");
-  const scope = await getUserScope(req.user.uuid);
+  // Scope filtering is now handled by withScope() middleware
+  // Just build the query filters from request
   
   const pagination = parsePaginationFromQuery(req.query || {});
 
@@ -99,10 +97,10 @@ exports.listEmployees = asyncHandler(async (req, res) => {
   };
 
   // Apply scope-based filtering
-  if (scope === "DEPARTMENT") {
+  if (req.moduleAccess?.scope === "DEPARTMENT") {
     // Department scope: only employees in user's department
     filters.departmentUuid = req.user.department_uuid;
-  } else if (scope === "OWN") {
+  } else if (req.moduleAccess?.scope === "OWN") {
     // OWN scope: only user's own employee record
     filters.employeeUuid = req.user.employee_uuid;
   }

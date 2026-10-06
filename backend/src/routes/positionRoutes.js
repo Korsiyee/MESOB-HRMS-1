@@ -8,36 +8,18 @@ const {
   assignShiftToPosition,
   removeShiftFromPosition,
 } = require("../controllers/positionController");
-// NEW: Use Permit middleware instead of old RBAC
-const { authorize, requireAny } = require("../middleware/permitMiddleware");
+// Use module-level authorization
+const { requireModule, withScope } = require("../middleware/moduleAuth");
 
 const router = express.Router();
 
-// View: Anyone who can view positions, employees, attendance, or shifts
-router.get("/", 
-  requireAny([
-    { action: "view", resource: "positions" },
-    { action: "view", resource: "employees" },
-    { action: "view", resource: "attendance" },
-    { action: "view", resource: "shifts" }
-  ]), 
-  listPositions
-);
-router.get("/:uuid", 
-  requireAny([
-    { action: "view", resource: "positions" },
-    { action: "view", resource: "employees" },
-    { action: "view", resource: "attendance" },
-    { action: "view", resource: "shifts" }
-  ]), 
-  getPosition
-);
-
-// Manage: Requires position management permissions
-router.post("/", authorize("create", "positions"), createPosition);
-router.patch("/:uuid", authorize("update", "positions"), updatePosition);
-router.delete("/:uuid", authorize("delete", "positions"), deletePosition);
-router.post("/:uuid/assign-shift", authorize("update", "positions"), assignShiftToPosition);
-router.delete("/:uuid/shift", authorize("update", "positions"), removeShiftFromPosition);
+// All position operations require ORGANIZATION module
+router.get("/", requireModule('ORGANIZATION'), withScope(), listPositions);
+router.get("/:uuid", requireModule('ORGANIZATION'), getPosition);
+router.post("/", requireModule('ORGANIZATION'), createPosition);
+router.patch("/:uuid", requireModule('ORGANIZATION'), updatePosition);
+router.delete("/:uuid", requireModule('ORGANIZATION'), deletePosition);
+router.post("/:uuid/assign-shift", requireModule('ORGANIZATION'), assignShiftToPosition);
+router.delete("/:uuid/shift", requireModule('ORGANIZATION'), removeShiftFromPosition);
 
 module.exports = router;

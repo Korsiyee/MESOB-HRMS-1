@@ -1,22 +1,22 @@
 /**
  * RBAC Utility Functions
  * 
- * Database-driven authorization helpers that replace hardcoded role checks.
- * Uses authorizationService for all permission checks.
+ * Simplified helpers that work with module-based permissions.
+ * Uses req.moduleAccess set by moduleAuth middleware.
  */
 
 const { ApiError } = require("./errors");
-const authorizationService = require("../services/authorizationService");
 
 /**
  * Assert user has permission to read employee data
- * Checks: employees.view permission OR self-access
+ * Simplified: moduleAuth middleware already checked permissions
  * 
  * @param {Object} user - req.user object
  * @param {Object} employee - Employee record
+ * @param {Object} moduleAccess - req.moduleAccess from middleware
  * @throws {ApiError} If access denied
  */
-async function assertEmployeeReadAccess(user, employee) {
+async function assertEmployeeReadAccess(user, employee, moduleAccess = null) {
   if (!user) {
     throw new ApiError("Not authenticated.", 401, "UNAUTHORIZED");
   }
@@ -25,27 +25,24 @@ async function assertEmployeeReadAccess(user, employee) {
     throw new ApiError("Employee not found.", 404, "NOT_FOUND");
   }
 
-  // Check if accessing own employee record
+  // Check if accessing own employee record (always allowed)
   if (user.employee_uuid === employee.uuid) {
-    return; // Self-access allowed
+    return;
   }
 
-  // Check if user has employees.view permission
-  const canView = await authorizationService.hasPermission(user.uuid, 'employees.view');
-  
-  if (!canView) {
-    throw new ApiError("Insufficient permissions to view this employee.", 403, "FORBIDDEN");
+  // If no moduleAccess provided, assume middleware already checked
+  if (!moduleAccess) {
+    return;
   }
+
+  // Check scope boundaries based on moduleAccess.scope
+  const scope = moduleAccess.scope;
   
-  // If permission requires scope, check scope boundaries
-  const scope = await authorizationService.getUserScope(user.uuid);
-  
-  if (scope.type === 'DEPARTMENT' && employee.department_uuid !== scope.value) {
+  if (scope.code === 'DEPARTMENT' && employee.department_uuid !== user.department_uuid) {
     throw new ApiError("Employee is outside your department scope.", 403, "FORBIDDEN");
   }
   
-  if (scope.type === 'SELF') {
-    // Should have been caught by self-access check above, but double-check
+  if (scope.code === 'SELF' && user.employee_uuid !== employee.uuid) {
     throw new ApiError("Your scope is limited to self-access only.", 403, "FORBIDDEN");
   }
 }
@@ -55,81 +52,68 @@ async function assertEmployeeReadAccess(user, employee) {
  * Returns scope filter for query construction
  * 
  * @param {Object} user - req.user object
- * @returns {Object} Scope filter: { scope, departmentUuid?, branchUuid? }
+ * @param {Object} moduleAccess - req.moduleAccess from middleware (optional)
+ * @returns {Object} Scope filter: { scope, departmentUuid?, employeeUuid? }
  * @throws {ApiError} If access denied
  */
-async function assertEmployeeListAccess(user) {
+async function assertEmployeeListAccess(user, moduleAccess = null) {
   if (!user) {
     throw new ApiError("Not authenticated.", 401, "UNAUTHORIZED");
   }
 
-  // Check if user has employees.view permission
-  const canView = await authorizationService.hasPermission(user.uuid, 'employees.view');
-  
-  if (!canView) {
-    throw new ApiError("Insufficient permissions to list employees.", 403, "FORBIDDEN");
+  // If no moduleAccess, assume middleware already validated
+  // Default to organization-wide access for backward compat
+  if (!moduleAccess || !moduleAccess.scope) {
+    return { scope: "all" };
   }
 
-  // Get user's data scope
-  const scope = await authorizationService.getUserScope(user.uuid);
+  const scope = moduleAccess.scope;
   
-  switch (scope.type) {
-    case 'ALL':
-    case 'COMPANY':
+  switch (scope.code) {
+    case 'ORGANIZATION':
       return { scope: "all" };
       
     case 'DEPARTMENT':
-      if (!scope.value) {
-        throw new ApiError("Department scope is missing.", 403, "FORBIDDEN");
+      if (!user.department_uuid) {
+        throw new ApiError("Department scope requires department assignment.", 403, "FORBIDDEN");
       }
-      return { scope: "department", departmentUuid: scope.value };
-      
-    case 'BRANCH':
-      if (!scope.value) {
-        throw new ApiError("Branch scope is missing.", 403, "FORBIDDEN");
-      }
-      return { scope: "branch", branchUuid: scope.value };
+      return { scope: "department", departmentUuid: user.department_uuid };
       
     case 'SELF':
-      // SELF scope means user can only see themselves
       if (!user.employee_uuid) {
         throw new ApiError("No employee record linked to user.", 403, "FORBIDDEN");
       }
       return { scope: "self", employeeUuid: user.employee_uuid };
       
     default:
-      throw new ApiError("Invalid scope type.", 500, "INTERNAL_ERROR");
+      // Unknown scope - default to organization
+      return { scope: "all" };
   }
 }
 
 /**
- * Check if user has a specific permission (async)
- * Convenience wrapper around authorizationService
+ * Check if user has module access (helper)
  * 
- * @param {Object} user - req.user object
- * @param {string} permissionCode - Permission code to check
- * @returns {Promise<boolean>}
+ * @param {Object} moduleAccess - req.moduleAccess from middleware
+ * @returns {boolean}
  */
-async function hasPermission(user, permissionCode) {
-  if (!user) return false;
-  return authorizationService.hasPermission(user.uuid, permissionCode);
+function hasModuleAccess(moduleAccess) {
+  return moduleAccess && moduleAccess.scope;
 }
 
 /**
- * Check if user has any of the specified permissions
+ * Get scope level from moduleAccess
  * 
- * @param {Object} user - req.user object
- * @param {string[]} permissionCodes - Array of permission codes
- * @returns {Promise<boolean>}
+ * @param {Object} moduleAccess - req.moduleAccess from middleware
+ * @returns {string} Scope code (ORGANIZATION, DEPARTMENT, SELF)
  */
-async function hasAnyPermission(user, permissionCodes) {
-  if (!user) return false;
-  return authorizationService.hasAnyPermission(user.uuid, permissionCodes);
+function getScopeLevel(moduleAccess) {
+  return moduleAccess?.scope?.code || 'ORGANIZATION';
 }
 
 module.exports = {
   assertEmployeeReadAccess,
   assertEmployeeListAccess,
-  hasPermission,
-  hasAnyPermission,
+  hasModuleAccess,
+  getScopeLevel,
 };

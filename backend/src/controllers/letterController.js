@@ -744,7 +744,7 @@ exports.getMyLetterRequests = async (req, res) => {
 
     const pool = db.promise();
     const [rows] = await pool.execute(
-      `SELECT lr.uuid, lr.template_uuid, lr.employee_uuid, lr.ref_no,
+      `SELECT lr.uuid, lr.template_uuid, lr.employee_uuid,
               lr.generated_content, lr.status, lr.requested_at,
               lr.reviewed_at, lr.rejection_reason,
               lt.title AS template_name, lt.type AS template_type,
@@ -805,7 +805,7 @@ exports.getAllLetterRequests = async (req, res) => {
   try {
     const pool = db.promise();
     const [rows] = await pool.execute(
-      `SELECT lr.uuid, lr.template_uuid, lr.employee_uuid, lr.ref_no,
+      `SELECT lr.uuid, lr.template_uuid, lr.employee_uuid,
               lr.generated_content, lr.status, lr.requested_at,
               lr.reviewed_at, lr.rejection_reason,
               lt.title AS template_name, lt.type AS template_type,

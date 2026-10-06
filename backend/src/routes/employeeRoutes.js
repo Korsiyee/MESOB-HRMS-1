@@ -21,73 +21,48 @@ const {
   uploadEmployeePhoto: uploadPhoto,
   uploadEmployeeDocuments,
 } = require("../middleware/employeeUploadMiddleware");
-// NEW: Use Permit middleware instead of old RBAC
-const { authorize, allowSelfOr, requireAny } = require("../middleware/permitMiddleware");
+// Use module-level authorization
+const { requireModule, withScope, checkSelfAccess } = require("../middleware/moduleAuth");
 const { authenticateJwt } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
 // Draft endpoints
-router.post("/draft", authorize("create", "employees"), saveDraft);
-router.get("/draft/:uuid", authorize("create", "employees"), getDraft);
+router.post("/draft", requireModule('EMPLOYEES'), saveDraft);
+router.get("/draft/:uuid", requireModule('EMPLOYEES'), getDraft);
 
 // Employee creation
-router.post("/", authorize("create", "employees"), createEmployee);
+router.post("/", requireModule('EMPLOYEES'), createEmployee);
 
-// List all employees (allow if user can view employees, attendance, or shifts)
-router.get("/", 
-  requireAny([
-    { action: "view", resource: "employees" },
-    { action: "view", resource: "attendance" },
-    { action: "view", resource: "shifts" }
-  ]),
-  listEmployees
-);
+// List all employees with scope filtering
+router.get("/", requireModule('EMPLOYEES'), withScope(), listEmployees);
 
 // Search employees for attendance
-router.get("/search/attendance", 
-  authorize("view", "attendance"),
-  searchEmployeesForAttendance
-);
+router.get("/search/attendance", requireModule('ATTENDANCE'), searchEmployeesForAttendance);
 
 // Department head specific endpoints
-router.get("/dept-head/stats", authorize("view", "dashboard"), getDeptHeadStats);
-router.get("/dept-head/employees", 
-  authorize("view", "employees"),
-  getDeptEmployees
-);
+router.get("/dept-head/stats", requireModule('HOME'), getDeptHeadStats);
+router.get("/dept-head/employees", requireModule('EMPLOYEES'), withScope(), getDeptEmployees);
 
-// Employee dashboard (self-access OR permission)
-router.get("/:uuid/dashboard", 
-  allowSelfOr("view", "employees", req => req.params.uuid),
-  getEmployeeDashboard
-);
+// Employee dashboard (self-access always allowed)
+router.get("/:uuid/dashboard", checkSelfAccess(), getEmployeeDashboard);
 
-// Get single employee (self-access OR permission)
-router.get("/:uuid", 
-  allowSelfOr("view", "employees", req => req.params.uuid),
-  getEmployee
-);
+// Get single employee (self-access OR has EMPLOYEES module)
+router.get("/:uuid", checkSelfAccess('EMPLOYEES'), getEmployee);
 
 // Update employee
-router.patch("/:uuid", authorize("update", "employees"), updateEmployee);
-router.patch("/:uuid/status", authorize("update", "employees"), updateEmployeeStatus);
+router.patch("/:uuid", requireModule('EMPLOYEES'), updateEmployee);
+router.patch("/:uuid/status", requireModule('EMPLOYEES'), updateEmployeeStatus);
 
 // Photo upload
-router.post("/:uuid/photo", authorize("update", "employees"), uploadPhoto, uploadEmployeePhoto);
+router.post("/:uuid/photo", requireModule('EMPLOYEES'), uploadPhoto, uploadEmployeePhoto);
 
-// Documents (self-access OR permission)
-router.get("/:uuid/documents", 
-  allowSelfOr("view", "employees", req => req.params.uuid),
-  listEmployeeDocuments
-);
-router.post("/:uuid/documents", authorize("update", "employees"), uploadEmployeeDocuments, addEmployeeDocument);
-router.delete("/:uuid/documents/:docUuid", authorize("update", "employees"), removeEmployeeDocument);
+// Documents (self-access OR has EMPLOYEES module)
+router.get("/:uuid/documents", checkSelfAccess('EMPLOYEES'), listEmployeeDocuments);
+router.post("/:uuid/documents", requireModule('EMPLOYEES'), uploadEmployeeDocuments, addEmployeeDocument);
+router.delete("/:uuid/documents/:docUuid", requireModule('EMPLOYEES'), removeEmployeeDocument);
 
-// Shift (self-access OR permission)
-router.get("/:uuid/shift", 
-  allowSelfOr("view", "shifts", req => req.params.uuid),
-  getEmployeeShift
-);
+// Shift (always allow self-access)
+router.get("/:uuid/shift", checkSelfAccess(), getEmployeeShift);
 
 module.exports = router;
