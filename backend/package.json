@@ -23,7 +23,7 @@
     "db:reset": "npm run db:clean && npm run db:init",
     "db:trim": "node scripts/trimEmployees.js",
     "db:seed-attendance": "node scripts/seedAttendance.js",
-    "db:setup": "npm run db:init && npm run db:trim && npm run db:seed-attendance",
+    "db:setup": "node scripts/dbInit.js",
     "holidays:init": "node scripts/initHolidays.js"
   },
   "keywords": [],
