@@ -12,6 +12,8 @@ import {
   ChevronRight,
   UserCircle,
   ChevronDown,
+  Shield,
+  ScrollText,
 } from "lucide-react";
 import logo from "../../../assets/Logo.png";
 import { useAuth } from "../../context/AuthContext";
@@ -88,9 +90,20 @@ const NAV_CONFIG = [
         badgeKey: "pending",
         children: [
           { label: "Leave Requests", to: "/leave/manage" },
-          { label: "My Leave", to: "/leave/my-requests" },
+          { label: "Leave Settings", to: "/policies", children: [
+            { label: "Leave Policies", to: "/policies" },
+            { label: "Days Off", to: "/holidays" },
+          ]},
         ],
       },
+    ],
+  },
+  {
+    group: "ADMINISTRATION",
+    items: [
+      { label: "Accounts", icon: Users, to: "/accounts", module: "ADMIN" },
+      { label: "Roles & Permissions", icon: Shield, to: "/admin/roles", module: "ADMIN" },
+      { label: "Audit Log", icon: ScrollText, to: "/logs", module: "ADMIN" },
     ],
   },
   {

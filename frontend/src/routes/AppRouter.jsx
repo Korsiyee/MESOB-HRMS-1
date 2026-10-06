@@ -136,10 +136,12 @@ const AppRouter = () => (
 
       {/* ── Position module ── */}
       <Route path="positions" element={<PositionsPage />} />
+      <Route path="positions/add" element={<PositionsPage />} />
       <Route path="positions/manage" element={<PositionsPage />} />
 
       {/* ── Level module ── */}
       <Route path="levels" element={<LevelsPage />} />
+      <Route path="levels/add" element={<LevelsPage />} />
       <Route path="levels/manage" element={<LevelsPage />} />
 
       {/* ── Attendance module ── Role-based routing */}
@@ -151,6 +153,7 @@ const AppRouter = () => (
       
       {/* ── Shifts module ── */}
       <Route path="shifts" element={<ShiftsPage />} />
+      <Route path="shifts/add" element={<ShiftsPage />} />
       <Route path="shifts/assignments" element={<ShiftsPage />} />
       
       {/* ── Letters module ── Role-based routing */}

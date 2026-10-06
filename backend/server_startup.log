@@ -1,0 +1,5 @@
+[dotenv@17.3.1] injecting env (15) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
+Using Puppeteer for PDF generation
+Database connection verified.
+Server running on port 5000
+[scheduler] Internal rebuild scheduler enabled (10 0 * * *)

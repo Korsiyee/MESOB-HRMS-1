@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { LevelApi } from '../api/levelApi';
 import { useDialog } from '../context/DialogContext';
+import TabSwipe from '../components/ui/TabSwipe';
 
 /* ── Palette ── */
 const C = {
@@ -595,9 +596,339 @@ const LevelDetailsModal = ({ level, onClose }) => {
 };
 
 /* ══════════════════════════════════════════
-   MAIN PAGE
+   OVERVIEW VIEW
 ══════════════════════════════════════════ */
-const LevelsPage = () => {
+const LevelsOverview = () => {
+  const [levels, setLevels] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedLevel, setSelectedLevel] = useState(null);
+
+  useEffect(() => {
+    fetchLevels();
+  }, []);
+
+  const fetchLevels = async () => {
+    setLoading(true);
+    try {
+      const res = await LevelApi.list({ includeCurrentVersion: true });
+      setLevels(res.data || []);
+    } catch (err) {
+      console.error('Failed to load levels:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewDetails = (level) => {
+    setSelectedLevel(level);
+    setShowDetailsModal(true);
+  };
+
+  // Calculate stats
+  const totalLevels = levels.length;
+  const activeLevels = levels.filter(l => l.is_active).length;
+  const totalEmployees = levels.reduce((sum, l) => sum + Number(l.employee_count || 0), 0);
+  const totalCompensation = levels.reduce((sum, l) => {
+    const salary = Number(l.current_base_salary || 0);
+    const empCount = Number(l.employee_count || 0);
+    return sum + (salary * empCount);
+  }, 0);
+
+  return (
+    <div style={{ fontFamily: 'Poppins,sans-serif' }}>
+      {/* Hero Header */}
+      <div style={{ background: C.headerBg, borderRadius: 14, padding: '22px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', marginBottom: 20 }}>
+        <div>
+          <p style={{ margin: '0 0 4px', fontSize: '0.7rem', color: 'rgba(232,240,238,0.45)', letterSpacing: '0.04em' }}>Levels › Overview</p>
+          <h1 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: '#E8F0EE' }}>Levels Overview</h1>
+          <p style={{ margin: '4px 0 0', fontSize: '0.76rem', color: 'rgba(232,240,238,0.55)' }}>
+            {loading ? 'Loading…' : `${totalLevels} levels · ${totalEmployees} employees · ${totalCompensation.toLocaleString()} Br total compensation`}
+          </p>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
+        {[
+          { label: 'Total Levels', value: totalLevels, icon: <Layers size={22} />, bg: 'linear-gradient(135deg, #0F766E 0%, #14B8A6 100%)' },
+          { label: 'Active Levels', value: activeLevels, icon: <Award size={22} />, bg: 'linear-gradient(135deg, #059669 0%, #34D399 100%)' },
+          { label: 'Total Employees', value: totalEmployees, icon: <Users size={22} />, bg: 'linear-gradient(135deg, #0F766E 0%, #14B8A6 100%)' },
+          { label: 'Total Compensation', value: `${(totalCompensation / 1000000).toFixed(2)}M Br`, icon: <Banknote size={22} />, bg: 'linear-gradient(135deg, #B45309 0%, #D97706 100%)' },
+        ].map(({ label, value, icon, bg }) => (
+          <div key={label} style={{ background: bg, borderRadius: 12, padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 16px rgba(15,118,110,0.15)' }}>
+            <div>
+              <p style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>{loading ? '…' : value}</p>
+              <p style={{ margin: '4px 0 0', fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>{label}</p>
+            </div>
+            <div style={{ color: 'rgba(255,255,255,0.7)' }}>{icon}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Loading State */}
+      {loading && (
+        <div style={{ textAlign: 'center', padding: '60px 20px', fontSize: '0.85rem', color: C.textMuted }}>Loading levels...</div>
+      )}
+
+      {/* Empty State */}
+      {!loading && levels.length === 0 && (
+        <div style={{ background: C.card, borderRadius: 14, padding: '60px 40px', textAlign: 'center', border: `1px solid ${C.cardBorder}`, boxShadow: C.shadow }}>
+          <Layers size={48} color={C.textMuted} style={{ marginBottom: 16, opacity: 0.5 }} />
+          <h3 style={{ margin: '0 0 8px', fontSize: '1rem', fontWeight: 700, color: C.textMain }}>No Levels Yet</h3>
+          <p style={{ margin: '0 0 0', fontSize: '0.8rem', color: C.textMuted }}>Create your first organizational level to get started.</p>
+        </div>
+      )}
+
+      {/* Levels Grid */}
+      {!loading && levels.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+          {levels.map(level => {
+            const empCount = Number(level.employee_count || 0);
+            const baseSalary = level.current_base_salary ? Number(level.current_base_salary).toLocaleString() : '—';
+            
+            return (
+              <div key={level.uuid} style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.cardBorder}`, boxShadow: C.shadow, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 12, transition: 'box-shadow 0.15s, transform 0.15s', fontFamily: 'Poppins,sans-serif', cursor: 'pointer' }}
+                onClick={() => handleViewDetails(level)}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 8px 28px rgba(0,60,45,0.13)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = C.shadow; e.currentTarget.style.transform = 'none'; }}
+              >
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(15,118,110,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Award size={17} color={C.primary} />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: C.textMain }}>{level.name}</h3>
+                      {level.description && <p style={{ margin: '2px 0 0', fontSize: '0.68rem', color: C.textMuted }}>{level.description}</p>}
+                    </div>
+                  </div>
+                  {level.is_active && (
+                    <span style={{ background: 'rgba(15,118,110,0.12)', color: C.primary, border: '1px solid rgba(15,118,110,0.25)', borderRadius: 99, padding: '2px 8px', fontSize: '0.65rem', fontWeight: 700 }}>ACTIVE</span>
+                  )}
+                </div>
+
+                {/* Stats */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 4 }}>
+                  <div>
+                    <div style={{ fontSize: '0.68rem', color: C.textMuted, fontWeight: 600, marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Employees</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: C.textMain, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Users size={16} color={C.primary} />
+                      {empCount}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.68rem', color: C.textMuted, fontWeight: 600, marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Base Salary</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: C.textMain, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Banknote size={16} color={C.primary} />
+                      {baseSalary} Br
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Details Modal */}
+      {showDetailsModal && selectedLevel && (
+        <LevelDetailsModal
+          level={selectedLevel}
+          onClose={() => { setShowDetailsModal(false); setSelectedLevel(null); }}
+        />
+      )}
+    </div>
+  );
+};
+
+/* ══════════════════════════════════════════
+   ADD LEVEL VIEW
+══════════════════════════════════════════ */
+const AddLevelView = () => {
+  const [form, setForm] = useState({
+    name: '',
+    description: '',
+    sort_order: 0,
+    base_salary: '',
+    is_active: true,
+    allowances: [],
+  });
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState({ type: '', message: '' });
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  const showMsg = (type, message) => {
+    setNotice({ type, message });
+    setTimeout(() => setNotice({ type: '', message: '' }), 4500);
+  };
+
+  const addAllowance = () => {
+    set('allowances', [...form.allowances, {
+      allowance_name: '',
+      allowance_type: 'TRANSPORT',
+      amount: '',
+      is_taxable: false,
+    }]);
+  };
+
+  const updateAllowance = (index, field, value) => {
+    const updated = [...form.allowances];
+    updated[index] = { ...updated[index], [field]: value };
+    set('allowances', updated);
+  };
+
+  const removeAllowance = (index) => {
+    set('allowances', form.allowances.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim()) {
+      showMsg('error', 'Level name is required.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const body = {
+        name: form.name.trim(),
+        description: form.description.trim() || undefined,
+        sort_order: Number(form.sort_order),
+        is_active: form.is_active,
+      };
+
+      if (form.base_salary) {
+        body.base_salary = Number(form.base_salary);
+      }
+      if (form.allowances.length > 0) {
+        body.allowances = form.allowances.map(a => ({
+          allowance_name: a.allowance_name.trim(),
+          allowance_type: a.allowance_type,
+          amount: Number(a.amount),
+          is_taxable: a.is_taxable,
+        }));
+      }
+
+      await LevelApi.create(body);
+      showMsg('success', `Level "${form.name}" created successfully!`);
+      // Reset form
+      setForm({ name: '', description: '', sort_order: 0, base_salary: '', is_active: true, allowances: [] });
+    } catch (err) {
+      showMsg('error', err.response?.data?.message || err.message || 'Failed to create level.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const ALLOWANCE_TYPES = ['TRANSPORT', 'HOUSING', 'RESPONSIBILITY', 'MEAL', 'COMMUNICATION', 'OTHER'];
+
+  return (
+    <div style={{ fontFamily: 'Poppins,sans-serif', maxWidth: 700, margin: '0 auto' }}>
+      <Notice type={notice.type} message={notice.message} onClose={() => setNotice({ type: '', message: '' })} />
+
+      {/* Header */}
+      <div style={{ background: C.headerBg, borderRadius: 14, padding: '20px 26px', marginBottom: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.18)' }}>
+        <p style={{ margin: '0 0 3px', fontSize: '0.7rem', color: 'rgba(232,240,238,0.45)', letterSpacing: '0.04em' }}>Levels › Add New</p>
+        <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#E8F0EE' }}>Add New Level</h1>
+        <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: 'rgba(232,240,238,0.6)' }}>Create a new organizational level with compensation details</p>
+      </div>
+
+      {/* Form Card */}
+      <div style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.border}`, boxShadow: C.shadow, padding: 28 }}>
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: 16 }}>
+            <label style={styles.lbl}>Level Name *</label>
+            <input value={form.name} onChange={e => set('name', e.target.value)} required style={styles.field} placeholder="e.g., Level 13" />
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <label style={styles.lbl}>Description</label>
+            <textarea value={form.description} onChange={e => set('description', e.target.value)} style={{ ...styles.field, minHeight: 70, resize: 'vertical' }} placeholder="Brief description..." />
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <label style={styles.lbl}>Sort Order</label>
+            <input type="number" value={form.sort_order} onChange={e => set('sort_order', e.target.value)} style={styles.field} />
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <label style={styles.lbl}>Initial Base Salary (Br) <span style={{ color: C.textMuted, fontWeight: 400, fontSize: '0.68rem' }}>(optional)</span></label>
+            <input type="number" step="0.01" value={form.base_salary} onChange={e => set('base_salary', e.target.value)} style={styles.field} placeholder="0.00" />
+          </div>
+
+          {/* Allowances Section */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <label style={styles.lbl}>Allowances <span style={{ color: C.textMuted, fontWeight: 400, fontSize: '0.68rem' }}>(optional)</span></label>
+              <button type="button" onClick={addAllowance} style={{ background: 'rgba(15,118,110,0.1)', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: '0.72rem', fontWeight: 600, color: C.primary, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Plus size={14} /> Add Allowance
+              </button>
+            </div>
+            {form.allowances.length === 0 ? (
+              <div style={{ padding: '16px', background: 'rgba(0,0,0,0.02)', borderRadius: 8, fontSize: '0.75rem', color: C.textMuted, textAlign: 'center', border: `1px dashed ${C.border}` }}>
+                No allowances added yet. Click "Add Allowance" to create one.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {form.allowances.map((allowance, index) => (
+                  <div key={index} style={{ padding: '12px', background: 'rgba(15,118,110,0.03)', borderRadius: 8, border: `1px solid ${C.border}` }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                      <div>
+                        <label style={{ ...styles.lbl, fontSize: '0.68rem' }}>Allowance Name</label>
+                        <input value={allowance.allowance_name} onChange={e => updateAllowance(index, 'allowance_name', e.target.value)} style={{ ...styles.field, fontSize: '0.75rem', padding: '8px 10px' }} placeholder="e.g., Transport" />
+                      </div>
+                      <div>
+                        <label style={{ ...styles.lbl, fontSize: '0.68rem' }}>Type</label>
+                        <select value={allowance.allowance_type} onChange={e => updateAllowance(index, 'allowance_type', e.target.value)} style={{ ...styles.field, fontSize: '0.75rem', padding: '8px 10px' }}>
+                          {ALLOWANCE_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 10, alignItems: 'end' }}>
+                      <div>
+                        <label style={{ ...styles.lbl, fontSize: '0.68rem' }}>Amount (Br)</label>
+                        <input type="number" step="0.01" value={allowance.amount} onChange={e => updateAllowance(index, 'amount', e.target.value)} style={{ ...styles.field, fontSize: '0.75rem', padding: '8px 10px' }} placeholder="0.00" />
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 8 }}>
+                        <input type="checkbox" id={`tax-${index}`} checked={allowance.is_taxable} onChange={e => updateAllowance(index, 'is_taxable', e.target.checked)} style={{ width: 14, height: 14, cursor: 'pointer' }} />
+                        <label htmlFor={`tax-${index}`} style={{ fontSize: '0.7rem', fontWeight: 500, color: C.textSub, cursor: 'pointer', whiteSpace: 'nowrap' }}>Taxable</label>
+                      </div>
+                      <button type="button" onClick={() => removeAllowance(index)} style={{ background: 'rgba(220,38,38,0.1)', border: 'none', borderRadius: 6, padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Trash2 size={14} color="#DC2626" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginBottom: 22, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input type="checkbox" id="is_active" checked={form.is_active} onChange={e => set('is_active', e.target.checked)} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+            <label htmlFor="is_active" style={{ fontSize: '0.78rem', fontWeight: 600, color: C.textSub, cursor: 'pointer' }}>Active</label>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+            <button
+              type="button"
+              onClick={() => setForm({ name: '', description: '', sort_order: 0, base_salary: '', is_active: true, allowances: [] })}
+              style={{ padding: '9px 18px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', color: C.textSub, fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'Poppins,sans-serif' }}
+            >
+              Clear Form
+            </button>
+            <GreenBtn type="submit" disabled={saving}>
+              {saving ? 'Creating…' : <><Plus size={15} /> Create Level</>}
+            </GreenBtn>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+/* ══════════════════════════════════════════
+   MANAGE LEVELS VIEW
+══════════════════════════════════════════ */
+const ManageLevelsView = () => {
   const [levels, setLevels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showLevelModal, setShowLevelModal] = useState(false);
@@ -691,10 +1022,10 @@ const LevelsPage = () => {
   const totalEmployees = levels.reduce((sum, l) => sum + Number(l.employee_count || 0), 0);
 
   return (
-    <div style={{ padding: '24px 32px', background: C.page, minHeight: '100vh', fontFamily: 'Poppins,sans-serif' }}>
+    <div style={{ fontFamily: 'Poppins,sans-serif' }}>
       <PageHeader
-        title="Organizational Levels"
-        subtitle="Manage organizational levels and compensation structures"
+        title="Manage Levels"
+        subtitle="Edit, delete, and create salary revisions for organizational levels"
         action={
           <GreenBtn onClick={handleCreateLevel}>
             <Plus size={16} /> Add Level
@@ -780,6 +1111,38 @@ const LevelsPage = () => {
           onClose={() => { setShowDetailsModal(false); setEditingLevel(null); }}
         />
       )}
+    </div>
+  );
+};
+
+/* ══════════════════════════════════════════
+   MAIN PAGE (Tabbed Interface)
+══════════════════════════════════════════ */
+const LevelsPage = () => {
+  const tabs = [
+    {
+      key: 'overview',
+      label: 'Overview',
+      path: '/levels',
+      content: <LevelsOverview />
+    },
+    {
+      key: 'add',
+      label: 'Add Level',
+      path: '/levels/add',
+      content: <AddLevelView />
+    },
+    {
+      key: 'manage',
+      label: 'Manage',
+      path: '/levels/manage',
+      content: <ManageLevelsView />
+    },
+  ];
+
+  return (
+    <div style={{ fontFamily: 'Poppins,sans-serif' }}>
+      <TabSwipe tabs={tabs} defaultTab="overview" />
     </div>
   );
 };
