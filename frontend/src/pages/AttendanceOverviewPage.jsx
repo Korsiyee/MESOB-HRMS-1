@@ -4,7 +4,6 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend,
 } from 'recharts';
-import { Users, CheckCircle, XCircle, Clock, TrendingUp, Building2, Star, AlertCircle, Calendar, BarChart3, TrendingDown } from 'lucide-react';
 import AttendanceStatsCards from '../components/AttendanceStatsCards';
 import AttendanceHoursChart from '../components/AttendanceHoursChart';
 
@@ -29,23 +28,17 @@ const Skeleton = ({ h = 80 }) => (
   </div>
 );
 
-const StatCard = ({ icon: Icon, label, value, color, loading, trend, subtitle }) => (
+const StatCard = ({ label, value, color, loading, trend, subtitle }) => (
   <Card style={{ padding: 20 }}>
     {loading ? <Skeleton /> : (
       <>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <div>
-            <p style={{ margin: 0, fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, color: C.textMuted }}>{label}</p>
-            <p style={{ margin: '6px 0 0', fontSize: '1.9rem', fontWeight: 700, color, fontFamily: 'Poppins,sans-serif', lineHeight: 1 }}>{value ?? '—'}</p>
-            {subtitle && <p style={{ margin: '4px 0 0', fontSize: '0.7rem', color: C.textMuted }}>{subtitle}</p>}
-          </div>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', color }}>
-            <Icon size={20} />
-          </div>
+        <div style={{ marginBottom: 8 }}>
+          <p style={{ margin: 0, fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, color: C.textMuted }}>{label}</p>
+          <p style={{ margin: '6px 0 0', fontSize: '1.9rem', fontWeight: 700, color, fontFamily: 'Poppins,sans-serif', lineHeight: 1 }}>{value ?? '—'}</p>
+          {subtitle && <p style={{ margin: '4px 0 0', fontSize: '0.7rem', color: C.textMuted }}>{subtitle}</p>}
         </div>
         {trend && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
-            <TrendingUp size={12} color={trend > 0 ? C.success : C.error} />
+          <div style={{ marginTop: 8 }}>
             <span style={{ fontSize: '0.7rem', fontWeight: 600, color: trend > 0 ? C.success : C.error }}>
               {trend > 0 ? '+' : ''}{trend}% from last period
             </span>
@@ -188,17 +181,13 @@ const AttendanceOverviewPage = () => {
       <div style={{ background: C.headerBg, borderRadius: 14, padding: '22px 28px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-              <BarChart3 size={24} color="#14B8A6" />
-              <h1 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: '#E8F0EE' }}>Attendance Analytics</h1>
-            </div>
+            <h1 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: '#E8F0EE' }}>Attendance Analytics</h1>
             <p style={{ margin: '3px 0 0', fontSize: '0.76rem', color: 'rgba(232,240,238,0.6)' }}>
               Comprehensive insights and analytics across all employees
             </p>
           </div>
           {/* Date Range Filter */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(0,0,0,0.2)', borderRadius: 10, padding: 6 }}>
-            <Calendar size={16} color="rgba(232,240,238,0.7)" />
             <span style={{ fontSize: '0.75rem', color: 'rgba(232,240,238,0.7)', marginRight: 4 }}>Period:</span>
             {['7','14','30','90'].map(d => (
               <button key={d} onClick={() => setRange(d)} style={{
@@ -218,7 +207,7 @@ const AttendanceOverviewPage = () => {
 
       {error && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', borderRadius: 10, background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', color: '#DC2626', fontSize: '0.82rem', fontWeight: 500 }}>
-          <AlertCircle size={16} /> {error}
+          {error}
           <button onClick={load} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', fontWeight: 600, fontSize: '0.75rem', textDecoration: 'underline' }}>Retry</button>
         </div>
       )}
@@ -226,7 +215,6 @@ const AttendanceOverviewPage = () => {
       {/* Primary KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
         <StatCard 
-          icon={Users} 
           label="Total Attendance Records" 
           value={summary?.totalRecords?.toLocaleString()} 
           color={C.primary} 
@@ -234,7 +222,6 @@ const AttendanceOverviewPage = () => {
           subtitle={`Last ${range} days`}
         />
         <StatCard 
-          icon={CheckCircle} 
           label="Present" 
           value={summary?.present?.toLocaleString()} 
           color={C.success} 
@@ -242,7 +229,6 @@ const AttendanceOverviewPage = () => {
           subtitle={`${pct(summary?.present, summary?.totalRecords)}% of total`}
         />
         <StatCard 
-          icon={XCircle} 
           label="Absent" 
           value={summary?.absent?.toLocaleString()} 
           color={C.error} 
@@ -250,7 +236,6 @@ const AttendanceOverviewPage = () => {
           subtitle={`${pct(summary?.absent, summary?.totalRecords)}% of total`}
         />
         <StatCard 
-          icon={Clock} 
           label="Late Arrivals" 
           value={summary?.late?.toLocaleString()} 
           color={C.warning} 
@@ -258,7 +243,6 @@ const AttendanceOverviewPage = () => {
           subtitle={`${pct(summary?.late, summary?.totalRecords)}% of total`}
         />
         <StatCard 
-          icon={TrendingUp} 
           label="Overall Attendance Rate" 
           value={summary?.attendanceRate != null ? `${summary.attendanceRate}%` : '—'} 
           color={C.info} 
@@ -282,7 +266,6 @@ const AttendanceOverviewPage = () => {
           </div>
           {loading ? <Skeleton h={260} /> : trend.length === 0 ? (
             <div style={{ textAlign: 'center', color: C.textMuted, padding: '60px 0', fontSize: '0.82rem' }}>
-              <BarChart3 size={32} color={C.textMuted} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
               <p style={{ margin: 0 }}>No trend data available for the selected period</p>
             </div>
           ) : (
@@ -361,7 +344,6 @@ const AttendanceOverviewPage = () => {
         </div>
         {loading ? <Skeleton h={280} /> : deptStats.length === 0 ? (
           <div style={{ textAlign: 'center', color: C.textMuted, padding: '60px 0', fontSize: '0.82rem' }}>
-            <Building2 size={32} color={C.textMuted} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
             <p style={{ margin: 0 }}>No department attendance data available</p>
           </div>
         ) : (
@@ -384,21 +366,16 @@ const AttendanceOverviewPage = () => {
 
         {/* Top employees */}
         <Card style={{ padding: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#F59E0B,#D97706)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Star size={18} color="white" />
-            </div>
-            <div style={{ flex: 1 }}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: C.textMain }}>Top Performers</h3>
-              <p style={{ margin: '2px 0 0', fontSize: '0.7rem', color: C.textMuted }}>Employees with highest attendance</p>
-            </div>
+          <div style={{ marginBottom: 18 }}>
+            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: C.textMain }}>Top Performers</h3>
+            <p style={{ margin: '2px 0 0', fontSize: '0.7rem', color: C.textMuted }}>Employees with highest attendance</p>
           </div>
           {loading ? <Skeleton h={200} /> : topEmps.length === 0 ? (
             <p style={{ textAlign: 'center', color: C.textMuted, padding: '40px 0', fontSize: '0.82rem' }}>No performance data available</p>
           ) : topEmps.map((emp, i) => (
             <div key={emp.employee_uuid || i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 0', borderBottom: i < topEmps.length - 1 ? `1px solid rgba(0,80,60,0.08)` : 'none' }}>
               <div style={{ width: 32, height: 32, borderRadius: '50%', background: i === 0 ? 'linear-gradient(135deg,#F59E0B,#D97706)' : 'linear-gradient(135deg,#14B8A6,#0F766E)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.72rem', fontWeight: 700, color: 'white', flexShrink: 0 }}>
-                {i === 0 ? <Star size={14} /> : (i + 1)}
+                {i + 1}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ margin: 0, fontSize: '0.82rem', fontWeight: 600, color: C.textMain, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -416,14 +393,9 @@ const AttendanceOverviewPage = () => {
 
         {/* Recent corrections */}
         <Card style={{ padding: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <AlertCircle size={18} color={C.warning} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: C.textMain }}>Recent Corrections</h3>
-              <p style={{ margin: '2px 0 0', fontSize: '0.7rem', color: C.textMuted }}>Latest attendance adjustments</p>
-            </div>
+          <div style={{ marginBottom: 18 }}>
+            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: C.textMain }}>Recent Corrections</h3>
+            <p style={{ margin: '2px 0 0', fontSize: '0.7rem', color: C.textMuted }}>Latest attendance adjustments</p>
           </div>
           {loading ? <Skeleton h={200} /> : corrections.length === 0 ? (
             <p style={{ textAlign: 'center', color: C.textMuted, padding: '40px 0', fontSize: '0.82rem' }}>No recent corrections</p>
