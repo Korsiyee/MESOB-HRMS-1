@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, User, Phone, Briefcase, FileText,
   Pencil, Upload, Plus, Trash2, UserCircle, BookOpen,
@@ -77,7 +77,7 @@ const InfoRow = ({ icon, label, value }) => (
   </div>
 );
 
-const SectionCard = ({ title, icon, children, onEdit }) => (
+const SectionCard = ({ title, icon, children, onEdit, isEditMode }) => (
   <div style={{
     background: C.card, borderRadius: 12, border: `1px solid ${C.cardBorder}`,
     boxShadow: C.shadow, padding: "20px 24px", marginBottom: 16,
@@ -87,7 +87,7 @@ const SectionCard = ({ title, icon, children, onEdit }) => (
         <span style={{ color: C.primary }}>{icon}</span>
         <span style={{ fontSize: "0.9rem", fontWeight: 700, color: C.textMain }}>{title}</span>
       </div>
-      {onEdit && (
+      {onEdit && isEditMode && (
         <button onClick={onEdit} style={{
           background: "none", border: "none", cursor: "pointer",
           color: C.textMuted, padding: 4, borderRadius: 6,
@@ -156,6 +156,13 @@ const EditPersonalModal = ({ employee, onClose, onSaved }) => {
   const [error, setError] = useState("");
 
   const save = async () => {
+    // Validate mother_name contains at least 2 name parts
+    const motherNameParts = form.mother_name.trim().split(/\s+/).filter(part => part.length > 0);
+    if (motherNameParts.length < 2) {
+      setError("Please enter the mother's full name (at least first and last name).");
+      return;
+    }
+    
     setSaving(true); setError("");
     try {
       await EmployeeApi.update(employee.uuid, form);
@@ -299,10 +306,10 @@ const EditEmploymentModal = ({ employee, departments, positions, levels, onClose
 };
 
 /* ── Tab panels ── */
-const PersonalTab = ({ emp, onEdit }) => {
+const PersonalTab = ({ emp, onEdit, isEditMode }) => {
   const fmtDate = d => d ? new Date(d).toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "numeric" }) : "—";
   return (
-    <SectionCard title="Personal Information" icon={<User size={16} />} onEdit={onEdit}>
+    <SectionCard title="Personal Information" icon={<User size={16} />} onEdit={onEdit} isEditMode={isEditMode}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
         <InfoRow icon={<User size={13} />} label="Full Name" value={`${emp.title || ""} ${emp.first_name} ${emp.middle_name} ${emp.last_name}`.trim()} />
         <InfoRow icon={<Globe size={13} />} label="Nationality" value={emp.nationality} />
@@ -345,11 +352,11 @@ const ContactTab = ({ emp }) => {
   );
 };
 
-const EmploymentTab = ({ emp, departments, positions, levels, onEdit }) => {
+const EmploymentTab = ({ emp, departments, positions, levels, onEdit, isEditMode }) => {
   const fmtDate = d => d ? new Date(d).toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "numeric" }) : "—";
   return (
     <div>
-      <SectionCard title="Employment Details" icon={<Briefcase size={16} />} onEdit={onEdit}>
+      <SectionCard title="Employment Details" icon={<Briefcase size={16} />} onEdit={onEdit} isEditMode={isEditMode}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <InfoRow icon={<Briefcase size={13} />} label="Department" value={emp.department_name} />
@@ -640,6 +647,7 @@ const TABS = [
 const EmployeeDetailPage = () => {
   const { uuid } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [employee, setEmployee] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -651,6 +659,10 @@ const EmployeeDetailPage = () => {
   const [editPersonal, setEditPersonal] = useState(false);
   const [editEmployment, setEditEmployment] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
+  const [editModeTriggered, setEditModeTriggered] = useState(false);
+
+  // Check if we're in edit mode from URL
+  const isEditMode = searchParams.get('mode') === 'edit';
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -674,6 +686,43 @@ const EmployeeDetailPage = () => {
   }, [uuid]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Auto-open edit modals when in edit mode
+  useEffect(() => {
+    if (isEditMode && !editModeTriggered && !loading && employee) {
+      setEditModeTriggered(true);
+      setActiveTab("personal");
+      // Open personal info modal first
+      setTimeout(() => setEditPersonal(true), 300);
+    }
+  }, [isEditMode, editModeTriggered, loading, employee]);
+
+  // Handle successful save from Personal modal - open Employment modal next
+  const handlePersonalSaved = useCallback(() => {
+    load();
+    setEditPersonal(false);
+    if (isEditMode) {
+      // Auto-open employment modal next
+      setTimeout(() => setEditEmployment(true), 300);
+    }
+  }, [load, isEditMode]);
+
+  // Handle successful save from Employment modal - exit edit mode
+  const handleEmploymentSaved = useCallback(() => {
+    load();
+    setEditEmployment(false);
+    if (isEditMode) {
+      // Exit edit mode by removing query parameter
+      navigate(`/employees/${uuid}`, { replace: true });
+      setEditModeTriggered(false);
+    }
+  }, [load, isEditMode, navigate, uuid]);
+
+  // Manual edit mode toggle
+  const enterEditMode = () => {
+    navigate(`/employees/${uuid}?mode=edit`);
+    setEditModeTriggered(false);
+  };
 
   const reloadDocs = async () => {
     try {
@@ -727,14 +776,23 @@ const EmployeeDetailPage = () => {
         marginBottom: 20, boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
       }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "#E8F0EE" }}>Employee Details</h1>
+          <h1 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "#E8F0EE" }}>
+            {isEditMode ? "Edit Employee Profile" : "Employee Details"}
+            {isEditMode && (
+              <span style={{ marginLeft: 12, fontSize: "0.75rem", fontWeight: 600, color: "#fde047", background: "rgba(253,224,71,0.2)", padding: "4px 10px", borderRadius: 6 }}>
+                EDIT MODE
+              </span>
+            )}
+          </h1>
           <p style={{ margin: "3px 0 0", fontSize: "0.72rem", color: "rgba(232,240,238,0.6)" }}>
-            Viewing details for {fullName}
+            {isEditMode ? `Editing profile for ${fullName}` : `Viewing details for ${fullName}`}
           </p>
         </div>
-        <OutlineBtn onClick={() => navigate("/employees")} style={{ color: "#E8F0EE", borderColor: "rgba(232,240,238,0.4)" }}>
-          <ArrowLeft size={13} /> BACK TO LIST
-        </OutlineBtn>
+        <div style={{ display: "flex", gap: 10 }}>
+          <OutlineBtn onClick={() => navigate("/employees/profile")} style={{ color: "#E8F0EE", borderColor: "rgba(232,240,238,0.4)" }}>
+            <ArrowLeft size={13} /> BACK TO PROFILES
+          </OutlineBtn>
+        </div>
       </div>
 
       {/* ── Employee Hero Card ── */}
@@ -818,11 +876,11 @@ const EmployeeDetailPage = () => {
         {/* Right content */}
         <div>
           {activeTab === "personal" && (
-            <PersonalTab emp={employee} onEdit={() => setEditPersonal(true)} />
+            <PersonalTab emp={employee} onEdit={() => setEditPersonal(true)} isEditMode={isEditMode} />
           )}
           {activeTab === "contact" && <ContactTab emp={employee} />}
           {activeTab === "employment" && (
-            <EmploymentTab emp={employee} departments={departments} positions={positions} levels={levels} onEdit={() => setEditEmployment(true)} />
+            <EmploymentTab emp={employee} departments={departments} positions={positions} levels={levels} onEdit={() => setEditEmployment(true)} isEditMode={isEditMode} />
           )}
           {activeTab === "documents" && (
             <DocumentsTab emp={employee} documents={documents} onDocAdded={reloadDocs} onDocRemoved={reloadDocs} />
@@ -840,10 +898,10 @@ const EmployeeDetailPage = () => {
 
       {/* ── Edit Modals ── */}
       {editPersonal && (
-        <EditPersonalModal employee={employee} onClose={() => setEditPersonal(false)} onSaved={load} />
+        <EditPersonalModal employee={employee} onClose={() => setEditPersonal(false)} onSaved={handlePersonalSaved} />
       )}
       {editEmployment && (
-        <EditEmploymentModal employee={employee} departments={departments} positions={positions} levels={levels} onClose={() => setEditEmployment(false)} onSaved={load} />
+        <EditEmploymentModal employee={employee} departments={departments} positions={positions} levels={levels} onClose={() => setEditEmployment(false)} onSaved={handleEmploymentSaved} />
       )}
     </div>
   );

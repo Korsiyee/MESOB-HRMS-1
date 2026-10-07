@@ -164,6 +164,14 @@ const EmployeeFormModal = ({ employee, onClose, onSaved, departments, positions,
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate mother_name contains at least 2 name parts
+    const motherNameParts = form.mother_name.trim().split(/\s+/).filter(part => part.length > 0);
+    if (motherNameParts.length < 2) {
+      setError("Please enter the mother's full name (at least first and last name).");
+      return;
+    }
+    
     setSaving(true);
     setError("");
     try {
@@ -1002,7 +1010,7 @@ const EmployeesPage = () => {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "#1e3a37" }}>
-                {["Mesob ID", "Employee Name", "Department", "Position", "Level", "Gender", "Join Date", "Status", "Actions"].map(h => (
+                {["Mesob ID", "Employee Name", "Department", "Position", "Level", "Gender", "Join Date", "Status"].map(h => (
                   <th key={h} style={{
                     padding: "11px 14px", textAlign: "left", fontSize: "0.72rem",
                     fontWeight: 700, color: "#E8F0EE", textTransform: "uppercase",
@@ -1035,14 +1043,6 @@ const EmployeesPage = () => {
                   <td style={{ padding: "12px 14px", fontSize: 13, color: C.textSub }}>{emp.gender ? (emp.gender === "MALE" ? "Male" : "Female") : "—"}</td>
                   <td style={{ padding: "12px 14px", fontSize: 13, color: C.textSub }}>{fmtDate(emp.hire_date)}</td>
                   <td style={{ padding: "12px 14px" }}><StatusBadge status={emp.status} /></td>
-                  <td style={{ padding: "12px 14px" }}>
-                    <ActionButtons
-                      employee={emp}
-                      onView={() => navigate(`/employees/${emp.uuid}`)}
-                      onEdit={() => setEditEmployee(emp)}
-                      onStatusChange={() => handleStatusChange(emp)}
-                    />
-                  </td>
                 </tr>
               ))}
             </tbody>

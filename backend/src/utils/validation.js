@@ -6,6 +6,20 @@ function isNonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function isValidFullName(value) {
+  if (typeof value !== "string") {
+    return false;
+  }
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return false;
+  }
+  // Split by one or more spaces and filter out empty strings
+  const parts = trimmed.split(/\s+/).filter(part => part.length > 0);
+  // Must have at least 2 name parts
+  return parts.length >= 2;
+}
+
 function isValidUuid(value) {
   const s = String(value || "").trim();
   // Accept standard UUIDs and legacy seed-format IDs like emp-1003, dept-001, etc.
@@ -25,6 +39,7 @@ function isValidIsoDate(value) {
 
 module.exports = {
   isNonEmptyString,
+  isValidFullName,
   isValidUuid,
   isValidIsoDate,
 };

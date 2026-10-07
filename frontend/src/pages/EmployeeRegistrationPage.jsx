@@ -888,6 +888,12 @@ const EmployeeRegistrationPage = () => {
         setError("Please fill all required fields (marked **).");
         return;
       }
+      // Validate mother_name contains at least 2 name parts
+      const motherNameParts = personal.mother_name.trim().split(/\s+/).filter(part => part.length > 0);
+      if (motherNameParts.length < 2) {
+        setError("Please enter the mother's full name (at least first and last name).");
+        return;
+      }
       if (!photoFile) {
         setError("Profile photo is required. Please upload a photo.");
         return;

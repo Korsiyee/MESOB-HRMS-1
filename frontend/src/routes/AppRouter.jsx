@@ -11,6 +11,7 @@ import NotificationsPage      from '../pages/NotificationsPage';
 import EmployeesPage          from '../pages/EmployeesPage';
 import EmployeeDetailPage     from '../pages/EmployeeDetailPage';
 import EmployeeRegistrationPage from '../pages/EmployeeRegistrationPage';
+import EmployeeProfilePage    from '../pages/EmployeeProfilePage';
 import DepartmentsPage        from '../pages/DepartmentsPage';
 import PositionsPage          from '../pages/PositionsPage';
 import LevelsPage             from '../pages/LevelsPage';
@@ -124,6 +125,8 @@ const AppRouter = () => (
       {/* ── Employee module ── */}
       <Route path="employees" element={<EmployeesPage />} />
       <Route path="employees/all" element={<EmployeesPage />} />
+      <Route path="employees/profile" element={<EmployeeProfilePage />} />
+      <Route path="employees/profile/:employeeId" element={<EmployeeProfilePage />} />
       <Route path="employees/register" element={<EmployeeRegistrationPage />} />
       <Route path="employees/registration" element={<EmployeeRegistrationPage />} />
       <Route path="employees/me" element={<EmployeeMeRedirect />} />

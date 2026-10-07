@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { DepartmentApi } from '../api/departmentApi';
 import { useResponsive } from '../hooks/useResponsive';
 import {
@@ -7,11 +8,9 @@ import {
   CalendarDays, TrendingUp, Layers,
   ChevronDown, ChevronRight as ChevronRightIcon,
 } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useDialog } from '../context/DialogContext';
 import { Can } from '../components/Can';
-import TabSwipe from '../components/ui/TabSwipe';
 
 /* ── Shared palette ── */
 const C = {
@@ -408,7 +407,7 @@ const OrgNode = ({ node, depth = 0 }) => {
    VIEW 1 — DEPARTMENTS OVERVIEW
    Department-focused analytics dashboard
 ══════════════════════════════════════════ */
-const DepartmentsOverview = () => {
+const DepartmentsOverview = ({ activeTab, onTabChange }) => {
   const { isMobile, isTablet, r } = useResponsive();
   const [depts,       setDepts]       = useState([]);
   const [tree,        setTree]        = useState([]);
@@ -483,23 +482,76 @@ const DepartmentsOverview = () => {
     { label: 'Total Employees',   value: totalEmp,    icon: <Users     size={24} />, bg: 'linear-gradient(135deg,#0c1e1c,#1e3a37)', light: 'rgba(15,118,110,0.16)'  },
   ];
 
+  const navTabs = [
+    { key: 'overview', label: 'Overview' },
+    { key: 'add', label: 'Add Department' },
+    { key: 'manage', label: 'Manage' },
+  ];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, fontFamily: 'Poppins,sans-serif' }}>
 
-      {/* Hero header */}
-      <div style={{ background: C.headerBg, borderRadius: 14, padding: '22px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
-        <div>
-          <p style={{ margin: '0 0 4px', fontSize: '0.7rem', color: 'rgba(232,240,238,0.45)', letterSpacing: '0.04em' }}>Departments › Overview</p>
-          <h1 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: '#E8F0EE' }}>Departments Overview</h1>
-          <p style={{ margin: '4px 0 0', fontSize: '0.76rem', color: 'rgba(232,240,238,0.55)' }}>
-            {loading ? 'Loading…' : `${total} departments · ${totalEmp} employees · ${totalPositions} positions · ${totalVacant} vacant`}
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={load}
-            style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid rgba(232,240,238,0.22)', background: 'rgba(232,240,238,0.08)', color: '#E8F0EE', fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontFamily: 'Poppins,sans-serif' }}>
-            ↻ Refresh
-          </button>
+      {/* Hero header with integrated navigation tabs */}
+      <div style={{ background: C.headerBg, borderRadius: 14, padding: '22px 28px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
+        {/* Top row: Breadcrumb, Title, Stats on left | Tabs + Refresh on right */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: isMobile ? 'wrap' : 'nowrap', gap: 16 }}>
+          {/* Left side: Title and stats */}
+          <div style={{ flex: isMobile ? '1 1 100%' : '0 1 auto', minWidth: 0 }}>
+            <p style={{ margin: '0 0 4px', fontSize: '0.7rem', color: 'rgba(232,240,238,0.45)', letterSpacing: '0.04em' }}>Departments › Overview</p>
+            <h1 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: '#E8F0EE' }}>Departments Overview</h1>
+            <p style={{ margin: '4px 0 0', fontSize: '0.76rem', color: 'rgba(232,240,238,0.55)' }}>
+              {loading ? 'Loading…' : `${total} departments · ${totalEmp} employees · ${totalPositions} positions · ${totalVacant} vacant`}
+            </p>
+          </div>
+
+          {/* Right side: Navigation tabs + Refresh button */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: isMobile ? 'wrap' : 'nowrap', flex: isMobile ? '1 1 100%' : '0 0 auto' }}>
+            {/* Navigation Tabs */}
+            <div style={{ display: 'flex', gap: 6, background: 'rgba(0,0,0,0.15)', borderRadius: 10, padding: 4 }}>
+              {navTabs.map(tab => {
+                const isActive = activeTab === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => onTabChange(tab.key)}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: 7,
+                      border: 'none',
+                      background: isActive ? 'rgba(232,240,238,0.95)' : 'transparent',
+                      color: isActive ? C.primary : 'rgba(232,240,238,0.7)',
+                      fontSize: '0.78rem',
+                      fontWeight: isActive ? 700 : 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      whiteSpace: 'nowrap',
+                      fontFamily: 'Poppins,sans-serif',
+                    }}
+                    onMouseEnter={e => {
+                      if (!isActive) {
+                        e.currentTarget.style.background = 'rgba(232,240,238,0.1)';
+                        e.currentTarget.style.color = '#E8F0EE';
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      if (!isActive) {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = 'rgba(232,240,238,0.7)';
+                      }
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Refresh Button */}
+            <button onClick={load}
+              style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid rgba(232,240,238,0.22)', background: 'rgba(232,240,238,0.08)', color: '#E8F0EE', fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontFamily: 'Poppins,sans-serif', whiteSpace: 'nowrap' }}>
+              ↻ Refresh
+            </button>
+          </div>
         </div>
       </div>
 
@@ -666,7 +718,9 @@ const DepartmentsOverview = () => {
 /* ══════════════════════════════════════════
    VIEW 2 — DEPARTMENTS MANAGE
 ══════════════════════════════════════════ */
-const DepartmentsManage = () => {
+const DepartmentsManage = ({ activeTab, onTabChange }) => {
+  const { isMobile, isTablet } = useResponsive();
+  const dialog = useDialog();
   const [depts,    setDepts]    = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [notice,   setNotice]   = useState({ type: '', message: '' });
@@ -719,22 +773,71 @@ const DepartmentsManage = () => {
       )
     : depts;
 
+  const navTabs = [
+    { key: 'overview', label: 'Overview' },
+    { key: 'add', label: 'Add Department' },
+    { key: 'manage', label: 'Manage' },
+  ];
+
   return (
     <div style={{ fontFamily: 'Poppins,sans-serif', display: 'flex', flexDirection: 'column', gap: 20 }}>
       <Notice type={notice.type} message={notice.message} onClose={() => setNotice({ type: '', message: '' })} />
 
-      {/* Header */}
-      <div style={{ background: C.headerBg, borderRadius: 14, padding: '20px 26px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.18)' }}>
-        <div>
-          <p style={{ margin: '0 0 3px', fontSize: '0.7rem', color: 'rgba(232,240,238,0.45)', letterSpacing: '0.04em' }}>Departments › Manage</p>
-          <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#E8F0EE' }}>Manage Departments</h1>
-          <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: 'rgba(232,240,238,0.6)' }}>{depts.length} departments</p>
+      {/* Header with integrated navigation tabs */}
+      <div style={{ background: C.headerBg, borderRadius: 14, padding: '20px 26px', boxShadow: '0 4px 20px rgba(0,0,0,0.18)' }}>
+        {/* Top row */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: isMobile ? 'wrap' : 'nowrap', gap: 16, marginBottom: 12 }}>
+          <div style={{ flex: isMobile ? '1 1 100%' : '0 1 auto', minWidth: 0 }}>
+            <p style={{ margin: '0 0 3px', fontSize: '0.7rem', color: 'rgba(232,240,238,0.45)', letterSpacing: '0.04em' }}>Departments › Manage</p>
+            <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#E8F0EE' }}>Manage Departments</h1>
+            <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: 'rgba(232,240,238,0.6)' }}>{depts.length} departments</p>
+          </div>
+          <Can action="create" resource="departments">
+            <GreenBtn onClick={() => setShowAdd(true)} style={{ background: '#E8F0EE', color: C.primary, flexShrink: 0 }}>
+              <Plus size={15} /> Add Department
+            </GreenBtn>
+          </Can>
         </div>
-        <Can action="create" resource="departments">
-          <GreenBtn onClick={() => setShowAdd(true)} style={{ background: '#E8F0EE', color: C.primary }}>
-            <Plus size={15} /> Add Department
-          </GreenBtn>
-        </Can>
+
+        {/* Navigation Tabs */}
+        <div style={{ display: 'flex', gap: 6, background: 'rgba(0,0,0,0.15)', borderRadius: 10, padding: 4, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+          {navTabs.map(tab => {
+            const isActive = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => onTabChange(tab.key)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 7,
+                  border: 'none',
+                  background: isActive ? 'rgba(232,240,238,0.95)' : 'transparent',
+                  color: isActive ? C.primary : 'rgba(232,240,238,0.7)',
+                  fontSize: '0.78rem',
+                  fontWeight: isActive ? 700 : 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  whiteSpace: 'nowrap',
+                  fontFamily: 'Poppins,sans-serif',
+                }}
+                onMouseEnter={e => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = 'rgba(232,240,238,0.1)';
+                    e.currentTarget.style.color = '#E8F0EE';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.color = 'rgba(232,240,238,0.7)';
+                  }
+                }}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Search + refresh */}
@@ -831,7 +934,8 @@ const DepartmentsManage = () => {
    VIEW 3 — ADD DEPARTMENT
    Quick-add form for new departments
 ══════════════════════════════════════════ */
-const AddDepartmentView = () => {
+const AddDepartmentView = ({ activeTab, onTabChange }) => {
+  const { isMobile, isTablet } = useResponsive();
   const [form, setForm] = useState({
     name: '',
     parent_uuid: '',
@@ -913,15 +1017,66 @@ const AddDepartmentView = () => {
     }
   };
 
+  const navTabs = [
+    { key: 'overview', label: 'Overview' },
+    { key: 'add', label: 'Add Department' },
+    { key: 'manage', label: 'Manage' },
+  ];
+
   return (
     <div style={{ fontFamily: 'Poppins,sans-serif', maxWidth: 700, margin: '0 auto' }}>
       <Notice type={notice.type} message={notice.message} onClose={() => setNotice({ type: '', message: '' })} />
 
-      {/* Header */}
+      {/* Header with integrated navigation tabs */}
       <div style={{ background: C.headerBg, borderRadius: 14, padding: '20px 26px', marginBottom: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.18)' }}>
-        <p style={{ margin: '0 0 3px', fontSize: '0.7rem', color: 'rgba(232,240,238,0.45)', letterSpacing: '0.04em' }}>Departments › Add New</p>
-        <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#E8F0EE' }}>Add New Department</h1>
-        <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: 'rgba(232,240,238,0.6)' }}>Create a new department in your organization</p>
+        {/* Top row */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: isMobile ? 'wrap' : 'nowrap', gap: 16, marginBottom: 12 }}>
+          <div style={{ flex: isMobile ? '1 1 100%' : '0 1 auto', minWidth: 0 }}>
+            <p style={{ margin: '0 0 3px', fontSize: '0.7rem', color: 'rgba(232,240,238,0.45)', letterSpacing: '0.04em' }}>Departments › Add New</p>
+            <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#E8F0EE' }}>Add New Department</h1>
+            <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: 'rgba(232,240,238,0.6)' }}>Create a new department in your organization</p>
+          </div>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div style={{ display: 'flex', gap: 6, background: 'rgba(0,0,0,0.15)', borderRadius: 10, padding: 4, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+          {navTabs.map(tab => {
+            const isActive = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => onTabChange(tab.key)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 7,
+                  border: 'none',
+                  background: isActive ? 'rgba(232,240,238,0.95)' : 'transparent',
+                  color: isActive ? C.primary : 'rgba(232,240,238,0.7)',
+                  fontSize: '0.78rem',
+                  fontWeight: isActive ? 700 : 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  whiteSpace: 'nowrap',
+                  fontFamily: 'Poppins,sans-serif',
+                }}
+                onMouseEnter={e => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = 'rgba(232,240,238,0.1)';
+                    e.currentTarget.style.color = '#E8F0EE';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.color = 'rgba(232,240,238,0.7)';
+                  }
+                }}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Form Card */}
@@ -1021,32 +1176,49 @@ const AddDepartmentView = () => {
    ROOT — DepartmentsPage (Tabbed Interface)
 ══════════════════════════════════════════ */
 const DepartmentsPage = () => {
-  const dialog = useDialog();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const tabs = [
-    {
-      key: 'overview',
-      label: 'Overview',
-      path: '/departments',
-      content: <DepartmentsOverview onManageClick={() => {}} />
-    },
-    {
-      key: 'add',
-      label: 'Add Department',
-      path: '/departments/add',
-      content: <AddDepartmentView />
-    },
-    {
-      key: 'manage',
-      label: 'Manage',
-      path: '/departments/manage',
-      content: <DepartmentsManage onOverviewClick={() => {}} />
-    },
-  ];
+  // Determine active tab from URL
+  const getActiveTab = () => {
+    const path = location.pathname;
+    if (path === '/departments/add') return 'add';
+    if (path === '/departments/manage') return 'manage';
+    return 'overview';
+  };
+
+  const [activeTab, setActiveTab] = useState(getActiveTab());
+
+  // Update active tab when URL changes
+  useEffect(() => {
+    setActiveTab(getActiveTab());
+  }, [location.pathname]);
+
+  // Handle tab change
+  const handleTabChange = (tabKey) => {
+    const paths = {
+      overview: '/departments',
+      add: '/departments/add',
+      manage: '/departments/manage',
+    };
+    navigate(paths[tabKey]);
+  };
+
+  // Render content based on active tab
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'add':
+        return <AddDepartmentView activeTab={activeTab} onTabChange={handleTabChange} />;
+      case 'manage':
+        return <DepartmentsManage activeTab={activeTab} onTabChange={handleTabChange} />;
+      default:
+        return <DepartmentsOverview activeTab={activeTab} onTabChange={handleTabChange} />;
+    }
+  };
 
   return (
     <div style={{ fontFamily: 'Poppins,sans-serif' }}>
-      <TabSwipe tabs={tabs} defaultTab="overview" />
+      {renderContent()}
     </div>
   );
 };

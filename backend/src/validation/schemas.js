@@ -1,5 +1,6 @@
 const {
   isNonEmptyString,
+  isValidFullName,
   isValidIsoDate,
   isValidUuid,
 } = require("../utils/validation");
@@ -76,6 +77,14 @@ function validateEmployeeCreate(payload) {
       missing.push(field);
     }
   });
+
+  // Validate mother_name requires at least 2 name parts
+  if (payload?.mother_name && !isValidFullName(payload.mother_name)) {
+    invalid.push({
+      field: "mother_name",
+      message: "Mother's name must contain at least first and last name (minimum 2 name parts).",
+    });
+  }
 
   if (payload?.gender && !GENDERS.has(String(payload.gender).toUpperCase())) {
     invalid.push({
@@ -166,6 +175,16 @@ function validateEmployeeUpdate(payload) {
       invalid.push({ field, message: `${field} cannot be empty.` });
     }
   });
+
+  // Validate mother_name requires at least 2 name parts when present
+  if (payload?.mother_name !== undefined) {
+    if (!isValidFullName(payload.mother_name)) {
+      invalid.push({
+        field: "mother_name",
+        message: "Mother's name must contain at least first and last name (minimum 2 name parts).",
+      });
+    }
+  }
 
   if (payload?.gender && !GENDERS.has(String(payload.gender).toUpperCase())) {
     invalid.push({

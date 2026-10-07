@@ -7,7 +7,6 @@ import { RefreshCw, Pencil, Trash2, Search, X, CheckCircle, Scan, Download, File
 import PrettyDatePicker from '../components/PrettyDatePicker';
 import { useDialog } from '../context/DialogContext';
 import FaceRecognitionAttendance from '../components/FaceRecognitionAttendance';
-import SelfPunchModal from '../components/SelfPunchModal';
 import AttendanceSummaryReport from '../components/AttendanceSummaryReport';
 
 /* ── Palette ── */
@@ -594,7 +593,6 @@ const AttendancePage = () => {
   const [showPunchMethod, setShowPunchMethod] = useState(false);
   const [showLog,     setShowLog]     = useState(false);
   const [showFaceRec, setShowFaceRec] = useState(false);
-  const [showSelfPunch, setShowSelfPunch] = useState(false);
   const [correctRec,  setCorrectRec]  = useState(null);
   const [deleting,    setDeleting]    = useState('');
 
@@ -790,12 +788,6 @@ const AttendancePage = () => {
             </div>
             Punch
           </button>
-          <button onClick={()=>setShowSelfPunch(true)} style={{ background:'rgba(255,255,255,0.1)', color:'#E8F0EE', border:'1px solid rgba(232,240,238,0.3)', borderRadius:8, padding:'10px 20px', fontSize:'0.82rem', fontWeight:600, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:8, fontFamily:'Poppins,sans-serif', transition:'all 0.15s' }}
-            onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.2)';}}
-            onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,0.1)';}}>
-            <UserCheck size={16}/>
-            Self Punch
-          </button>
         </div>
       </div>
 
@@ -970,7 +962,6 @@ const AttendancePage = () => {
       {showLog    && <LogModal    onClose={()=>setShowLog(false)}    onSaved={()=>{setShowLog(false);load();}}    showMsg={showMsg}/>}
       {correctRec && <CorrectModal record={correctRec} onClose={()=>setCorrectRec(null)} onSaved={()=>{setCorrectRec(null);load();}} showMsg={showMsg}/>}
       {showFaceRec && <FaceRecognitionAttendance onClose={()=>setShowFaceRec(false)} onSuccess={(data)=>{showMsg('success',`Attendance recorded for ${data.employee.firstName} ${data.employee.lastName}`);load();}} />}
-      {showSelfPunch && <SelfPunchModal onClose={()=>setShowSelfPunch(false)} onSuccess={(data)=>{showMsg('success','Attendance recorded successfully!');setShowSelfPunch(false);load();}} />}
     </div>
   );
 };

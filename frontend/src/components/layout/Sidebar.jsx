@@ -46,6 +46,7 @@ const NAV_CONFIG = [
         module: "EMPLOYEES",
         children: [
           { label: "Employee List", to: "/employees" },
+          { label: "Employee Profile", to: "/employees/profile" },
           { label: "Register Employee", to: "/employees/register" },
         ],
       },
@@ -66,7 +67,7 @@ const NAV_CONFIG = [
         to: "/attendance",
         module: "ATTENDANCE",
         children: [
-          { label: "Attendance Records", to: "/attendance" },
+          { label: "Attendance Records", to: "/attendance/manage" },
           { label: "Attendance Analytics", to: "/attendance-overview" },
         ],
       },
