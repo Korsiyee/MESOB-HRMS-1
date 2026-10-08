@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Layers, Plus, Pencil, Trash2, X, Users, Banknote, TrendingUp,
   Calendar, History, ChevronDown, ChevronUp, Award
 } from 'lucide-react';
 import { LevelApi } from '../api/levelApi';
 import { useDialog } from '../context/DialogContext';
-import TabSwipe from '../components/ui/TabSwipe';
+import OrganizationModuleHeader from '../components/ui/OrganizationModuleHeader';
 
 /* ── Palette ── */
 const C = {
@@ -598,7 +599,7 @@ const LevelDetailsModal = ({ level, onClose }) => {
 /* ══════════════════════════════════════════
    OVERVIEW VIEW
 ══════════════════════════════════════════ */
-const LevelsOverview = () => {
+const LevelsOverview = ({ activeTab, onTabChange }) => {
   const [levels, setLevels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -635,18 +636,26 @@ const LevelsOverview = () => {
     return sum + (salary * empCount);
   }, 0);
 
+  const navTabs = [
+    { key: 'overview', label: 'Overview' },
+    { key: 'add', label: 'Add Level' },
+    { key: 'manage', label: 'Manage' },
+  ];
+
+  const subtitle = loading 
+    ? 'Loading…' 
+    : `${totalLevels} levels · ${totalEmployees} employees · ${totalCompensation.toLocaleString()} Br total compensation`;
+
   return (
     <div style={{ fontFamily: 'Poppins,sans-serif' }}>
-      {/* Hero Header */}
-      <div style={{ background: C.headerBg, borderRadius: 14, padding: '22px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', marginBottom: 20 }}>
-        <div>
-          <p style={{ margin: '0 0 4px', fontSize: '0.7rem', color: 'rgba(232,240,238,0.45)', letterSpacing: '0.04em' }}>Levels › Overview</p>
-          <h1 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: '#E8F0EE' }}>Levels Overview</h1>
-          <p style={{ margin: '4px 0 0', fontSize: '0.76rem', color: 'rgba(232,240,238,0.55)' }}>
-            {loading ? 'Loading…' : `${totalLevels} levels · ${totalEmployees} employees · ${totalCompensation.toLocaleString()} Br total compensation`}
-          </p>
-        </div>
-      </div>
+      {/* Shared Module Header */}
+      <OrganizationModuleHeader
+        moduleName="Levels"
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        tabs={navTabs}
+        subtitle={subtitle}
+      />
 
       {/* Stats Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
@@ -746,7 +755,7 @@ const LevelsOverview = () => {
 /* ══════════════════════════════════════════
    ADD LEVEL VIEW
 ══════════════════════════════════════════ */
-const AddLevelView = () => {
+const AddLevelView = ({ activeTab, onTabChange }) => {
   const [form, setForm] = useState({
     name: '',
     description: '',
@@ -828,12 +837,18 @@ const AddLevelView = () => {
     <div style={{ fontFamily: 'Poppins,sans-serif', maxWidth: 700, margin: '0 auto' }}>
       <Notice type={notice.type} message={notice.message} onClose={() => setNotice({ type: '', message: '' })} />
 
-      {/* Header */}
-      <div style={{ background: C.headerBg, borderRadius: 14, padding: '20px 26px', marginBottom: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.18)' }}>
-        <p style={{ margin: '0 0 3px', fontSize: '0.7rem', color: 'rgba(232,240,238,0.45)', letterSpacing: '0.04em' }}>Levels › Add New</p>
-        <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#E8F0EE' }}>Add New Level</h1>
-        <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: 'rgba(232,240,238,0.6)' }}>Create a new organizational level with compensation details</p>
-      </div>
+      {/* Shared Module Header */}
+      <OrganizationModuleHeader
+        moduleName="Levels"
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        tabs={[
+          { key: 'overview', label: 'Overview' },
+          { key: 'add', label: 'Add Level' },
+          { key: 'manage', label: 'Manage' },
+        ]}
+        subtitle="Create a new organizational level with compensation details"
+      />
 
       {/* Form Card */}
       <div style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.border}`, boxShadow: C.shadow, padding: 28 }}>
@@ -928,7 +943,7 @@ const AddLevelView = () => {
 /* ══════════════════════════════════════════
    MANAGE LEVELS VIEW
 ══════════════════════════════════════════ */
-const ManageLevelsView = () => {
+const ManageLevelsView = ({ activeTab, onTabChange }) => {
   const [levels, setLevels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showLevelModal, setShowLevelModal] = useState(false);
@@ -1023,8 +1038,15 @@ const ManageLevelsView = () => {
 
   return (
     <div style={{ fontFamily: 'Poppins,sans-serif' }}>
-      <PageHeader
-        title="Manage Levels"
+      <OrganizationModuleHeader
+        moduleName="Levels"
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        tabs={[
+          { key: 'overview', label: 'Overview' },
+          { key: 'add', label: 'Add Level' },
+          { key: 'manage', label: 'Manage' },
+        ]}
         subtitle="Edit, delete, and create salary revisions for organizational levels"
         action={
           <GreenBtn onClick={handleCreateLevel}>
@@ -1116,33 +1138,52 @@ const ManageLevelsView = () => {
 };
 
 /* ══════════════════════════════════════════
-   MAIN PAGE (Tabbed Interface)
+   MAIN PAGE (Tabbed Interface with URL-based navigation)
 ══════════════════════════════════════════ */
 const LevelsPage = () => {
-  const tabs = [
-    {
-      key: 'overview',
-      label: 'Overview',
-      path: '/levels',
-      content: <LevelsOverview />
-    },
-    {
-      key: 'add',
-      label: 'Add Level',
-      path: '/levels/add',
-      content: <AddLevelView />
-    },
-    {
-      key: 'manage',
-      label: 'Manage',
-      path: '/levels/manage',
-      content: <ManageLevelsView />
-    },
-  ];
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Determine active tab from URL
+  const getActiveTab = () => {
+    const path = location.pathname;
+    if (path === '/levels/add') return 'add';
+    if (path === '/levels/manage') return 'manage';
+    return 'overview';
+  };
+
+  const [activeTab, setActiveTab] = useState(getActiveTab());
+
+  // Update active tab when URL changes
+  useEffect(() => {
+    setActiveTab(getActiveTab());
+  }, [location.pathname]);
+
+  // Handle tab change
+  const handleTabChange = (tabKey) => {
+    const paths = {
+      overview: '/levels',
+      add: '/levels/add',
+      manage: '/levels/manage',
+    };
+    navigate(paths[tabKey]);
+  };
+
+  // Render content based on active tab
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'add':
+        return <AddLevelView activeTab={activeTab} onTabChange={handleTabChange} />;
+      case 'manage':
+        return <ManageLevelsView activeTab={activeTab} onTabChange={handleTabChange} />;
+      default:
+        return <LevelsOverview activeTab={activeTab} onTabChange={handleTabChange} />;
+    }
+  };
 
   return (
     <div style={{ fontFamily: 'Poppins,sans-serif' }}>
-      <TabSwipe tabs={tabs} defaultTab="overview" />
+      {renderContent()}
     </div>
   );
 };

@@ -164,7 +164,7 @@ function buildLeaveRequestQuery(scopeFilter, options = {}) {
       e.first_name,
       e.middle_name,
       e.last_name,
-      e.department_uuid,
+      p.department_uuid,
       e.branch_uuid,
       e.company_uuid
     `;

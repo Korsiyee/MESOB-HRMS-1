@@ -150,10 +150,10 @@ router.post("/", authorize("Holidays.Create"), async (req, res) => {
       name,
       type,
       ethiopian_date,
-      isActive: req.body.isActive,
+      is_active: req.body.is_active,
       description: req.body.description,
       source: "MANUAL",
-      calendarYear: req.body.calendarYear,
+      calendar_year: req.body.calendar_year,
     });
 
     await safeLogEvent({
@@ -184,30 +184,30 @@ router.post("/", authorize("Holidays.Create"), async (req, res) => {
 router.patch("/:date/status", authorize("Holidays.Update"), async (req, res) => {
   try {
     const { date } = req.params;
-    const { isActive } = req.body;
+    const { is_active } = req.body;
 
-    if (typeof isActive !== "boolean") {
+    if (typeof is_active !== "boolean") {
       return sendError(res, {
         status: 400,
-        message: "isActive must be a boolean value",
+        message: "is_active must be a boolean value",
         error: "VALIDATION_ERROR",
       });
     }
 
-    const holiday = await HolidayService.updateHolidayStatus(date, isActive);
+    const holiday = await HolidayService.updateHolidayStatus(date, is_active);
 
     await safeLogEvent({
       actorUuid: req.user.uuid,
       action: "UPDATE_HOLIDAY_STATUS",
       entityType: "HOLIDAY",
       entityUuid: date,
-      diff: { isActive },
+      diff: { is_active },
       ipAddress: req.ip,
     });
 
     return sendSuccess(res, {
       status: 200,
-      message: `Holiday status updated to ${isActive ? "active" : "inactive"}`,
+      message: `Holiday status updated to ${is_active ? "active" : "inactive"}`,
       data: holiday,
     });
   } catch (error) {

@@ -1016,16 +1016,17 @@ async function getAllAttendance(filters = {}) {
   const params = [];
   let query = `
     SELECT a.uuid, a.employee_uuid, a.date, a.status, a.shift_uuid, a.leave_request_uuid, a.corrected_by,
-      e.mesob_id, e.first_name, e.middle_name, e.last_name, e.department_uuid,
+      e.mesob_id, e.first_name, e.middle_name, e.last_name, p.department_uuid,
       d.name AS department_name
     FROM AttendanceSummary a
     INNER JOIN Employees e ON e.uuid = a.employee_uuid
-    LEFT JOIN Departments d ON d.uuid = e.department_uuid
+    LEFT JOIN Positions p ON p.uuid = e.position_uuid
+    LEFT JOIN Departments d ON d.uuid = p.department_uuid
     WHERE 1 = 1
   `;
 
   if (filters.departmentUuid) {
-    query += " AND e.department_uuid = ?";
+    query += " AND p.department_uuid = ?";
     params.push(filters.departmentUuid);
   }
 
@@ -1102,7 +1103,7 @@ async function correctAttendance(summaryUuid, status, correctedByEmployeeUuid) {
 async function getAttendanceSummaryAccess(summaryUuid) {
   const [rows] = await executeQuery(
     `
-      SELECT a.uuid, a.employee_uuid, e.department_uuid
+      SELECT a.uuid, a.employee_uuid, p.department_uuid
       FROM AttendanceSummary a
       INNER JOIN Employees e ON e.uuid = a.employee_uuid
       WHERE a.uuid = ?
@@ -1229,7 +1230,8 @@ async function createAttendanceSummary({ employee_uuid, date, status, shift_uuid
             d.name AS department, s.name AS shift_name
      FROM AttendanceSummary a
      INNER JOIN Employees e ON e.uuid = a.employee_uuid
-     LEFT JOIN Departments d ON d.uuid = e.department_uuid
+     LEFT JOIN Positions p ON p.uuid = e.position_uuid
+     LEFT JOIN Departments d ON d.uuid = p.department_uuid
      LEFT JOIN ShiftDefinitions s ON s.uuid = a.shift_uuid
      WHERE a.employee_uuid = ? AND a.date = ? LIMIT 1`,
     [String(employee_uuid).trim(), date]

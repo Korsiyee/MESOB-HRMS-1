@@ -1,3 +1,4 @@
+import { PermissionGuard } from "../components/PermissionGuard";
 import React, { useState, useEffect, useCallback } from "react";
 import { LogApi } from "../api/logApi";
 import { ScrollText, Activity, User, Calendar, Search, X, ChevronRight, ChevronLeft, RefreshCw } from "lucide-react";
@@ -340,4 +341,11 @@ const LogsPage = () => {
   );
 };
 
-export default LogsPage;
+// Wrap with permission guard to enforce RBAC
+const ProtectedLogsPage = () => (
+  <PermissionGuard permissions="AuditLogs.Read">
+    <LogsPage />
+  </PermissionGuard>
+);
+
+export default ProtectedLogsPage;

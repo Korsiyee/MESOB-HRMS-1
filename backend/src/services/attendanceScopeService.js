@@ -96,7 +96,7 @@ function buildAttendanceWhereClause(scopeFilter, attendanceAlias = 'a', employee
  * @param {Object} scopeFilter - From req.scopeFilter
  * @param {Object} attendance - Attendance record with employee info
  * @param {string} attendance.employee_uuid - Employee UUID
- * @param {string} [attendance.department_uuid] - Department UUID (from join)
+ * @param {string} [attendancp.department_uuid] - Department UUID (from join)
  * @param {string} [attendance.branch_uuid] - Branch UUID (from join)
  * @param {string} [attendance.company_uuid] - Company UUID (from join)
  * @returns {boolean} True if access allowed

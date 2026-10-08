@@ -208,8 +208,8 @@ exports.listAccounts = async (req, res) => {
              d.name as department_name, p.title as position_title
       FROM Users u
       LEFT JOIN Employees e ON e.uuid = u.employee_uuid
-      LEFT JOIN Departments d ON d.uuid = e.department_uuid
       LEFT JOIN Positions p ON p.uuid = e.position_uuid
+      LEFT JOIN Departments d ON d.uuid = p.department_uuid
       WHERE 1=1
     `;
 
@@ -277,8 +277,8 @@ exports.getAccount = async (req, res) => {
               p.uuid as position_uuid, p.title as position_title
        FROM Users u
        LEFT JOIN Employees e ON e.uuid = u.employee_uuid
-       LEFT JOIN Departments d ON d.uuid = e.department_uuid
        LEFT JOIN Positions p ON p.uuid = e.position_uuid
+       LEFT JOIN Departments d ON d.uuid = p.department_uuid
        WHERE u.uuid = ?`,
       [uuid]
     );

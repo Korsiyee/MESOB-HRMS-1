@@ -337,7 +337,7 @@ This implementation plan follows the bugfix workflow to clean up the HRMS codeba
     - _Preservation: Verify rollback capability before making changes_
     - _Requirements: 2.5_
 
-  - [~] 7.2 Remove temporary fix scripts from backend root
+  - [ ] 7.2 Remove temporary fix scripts from backend root
     - Since scripts were already moved in Phase 2 (task 4.2), verify they're gone
     - List backend root: `ls backend/*.js`
     - Should only see `server.js` (and maybe `jest.config.js` if testing configured)
@@ -347,7 +347,7 @@ This implementation plan follows the bugfix workflow to clean up the HRMS codeba
     - _Expected_Behavior: Backend root only contains essential application files_
     - _Requirements: 2.5_
 
-  - [~] 7.3 Remove excessive documentation from project root
+  - [ ] 7.3 Remove excessive documentation from project root
     - Since docs were already moved in Phase 2 (task 4.3), verify they're gone
     - List project root: `ls /home/wty/Downloads/FDRE-Mesob-HRMS-main/Mesob\ HRMS/*.md`
     - Should only see `README.md`
@@ -357,7 +357,7 @@ This implementation plan follows the bugfix workflow to clean up the HRMS codeba
     - _Expected_Behavior: Project root only contains README.md and essential config files_
     - _Requirements: 2.6_
 
-  - [~] 7.4 Remove dead code (if identified in Phase 1)
+  - [ ] 7.4 Remove dead code (if identified in Phase 1)
     - Review findings from Phase 1 analysis (task 1.3)
     - If dead functions were identified:
       - Remove each unused function from its file
@@ -371,7 +371,7 @@ This implementation plan follows the bugfix workflow to clean up the HRMS codeba
     - _Preservation: Application functionality unchanged after dead code removal_
     - _Requirements: 2.3_
 
-  - [~] 7.5 Clean database schema (if needed based on Phase 1)
+  - [ ] 7.5 Clean database schema (if needed based on Phase 1)
     - Review findings from Phase 1 analysis (task 1.1)
     - If unused columns/tables were identified:
       - Create migration script: `backend/scripts/cleanupUnusedSchema.js`
@@ -386,7 +386,7 @@ This implementation plan follows the bugfix workflow to clean up the HRMS codeba
     - _Preservation: Application functionality unchanged after schema cleanup_
     - _Requirements: 2.4_
 
-  - [~] 7.6 Final directory structure verification
+  - [ ] 7.6 Final directory structure verification
     - **Property 1: Expected Behavior** - Clean Directory Structure
     - Verify backend root is clean:
       - `ls /home/wty/Downloads/FDRE-Mesob-HRMS-main/Mesob\ HRMS/backend/*.js`
@@ -404,7 +404,7 @@ This implementation plan follows the bugfix workflow to clean up the HRMS codeba
 
 - [ ] 8. Phase 6: Testing and Validation (Preservation Verification)
 
-  - [~] 8.1 Re-run authentication preservation test
+  - [ ] 8.1 Re-run authentication preservation test
     - **Property 2: Preservation** - Authentication Unchanged
     - **IMPORTANT**: Run the SAME tests from task 2.1 on the cleaned codebase
     - Start backend server: `cd backend && npm start`
@@ -418,7 +418,7 @@ This implementation plan follows the bugfix workflow to clean up the HRMS codeba
     - Stop server
     - _Requirements: 3.1_
 
-  - [~] 8.2 Re-run RBAC preservation test
+  - [ ] 8.2 Re-run RBAC preservation test
     - **Property 2: Preservation** - RBAC Unchanged
     - Start backend server
     - Test SUPER_ADMIN access to all modules (same tests as task 2.2)
@@ -429,7 +429,7 @@ This implementation plan follows the bugfix workflow to clean up the HRMS codeba
     - Document: "RBAC Preservation: PASSED" or note any differences
     - _Requirements: 3.2, 3.3_
 
-  - [~] 8.3 Re-run attendance preservation test
+  - [ ] 8.3 Re-run attendance preservation test
     - **Property 2: Preservation** - Attendance Features Unchanged
     - Test create, view, update attendance records (same tests as task 2.3)
     - **Expected Outcome**: All operations work identically to baseline
@@ -437,7 +437,7 @@ This implementation plan follows the bugfix workflow to clean up the HRMS codeba
     - Document: "Attendance Preservation: PASSED" or note any differences
     - _Requirements: 3.4_
 
-  - [~] 8.4 Re-run permit preservation test
+  - [ ] 8.4 Re-run permit preservation test
     - **Property 2: Preservation** - Permit Features Unchanged
     - Test create, approve, view permits (same tests as task 2.4)
     - **Expected Outcome**: All operations work identically to baseline
@@ -445,7 +445,7 @@ This implementation plan follows the bugfix workflow to clean up the HRMS codeba
     - Document: "Permit Preservation: PASSED" or note any differences
     - _Requirements: 3.5_
 
-  - [~] 8.5 Re-run API endpoints preservation test
+  - [ ] 8.5 Re-run API endpoints preservation test
     - **Property 2: Preservation** - API Endpoints Unchanged
     - Test all major API endpoints (same tests as task 2.5)
     - **Expected Outcome**: All endpoints return same status codes, response structures, data
@@ -453,7 +453,7 @@ This implementation plan follows the bugfix workflow to clean up the HRMS codeba
     - Document: "API Endpoints Preservation: PASSED" or note any differences
     - _Requirements: 3.6_
 
-  - [~] 8.6 Re-run database state preservation test
+  - [ ] 8.6 Re-run database state preservation test
     - **Property 2: Preservation** - Database Integrity Unchanged
     - Query key tables (same queries as task 2.6)
     - **Expected Outcome**: Row counts match baseline, data integrity maintained
@@ -461,14 +461,14 @@ This implementation plan follows the bugfix workflow to clean up the HRMS codeba
     - Document: "Database State Preservation: PASSED" or note any differences
     - _Requirements: 3.7_
 
-  - [~] 8.7 Run automated test suite
+  - [ ] 8.7 Run automated test suite
     - Run all existing tests: `cd backend && npm test`
     - **Expected Outcome**: All tests pass (same pass rate as before cleanup)
     - If any tests fail, investigate and fix issues
     - Document test results in `preservation-tests.md`
     - _Requirements: 3.8_
 
-  - [~] 8.8 Complete application functionality test
+  - [ ] 8.8 Complete application functionality test
     - Start backend server: `npm start`
     - Test complete user workflows:
       - User lifecycle: Create user → Assign role → Login → Access modules → Perform operations
@@ -478,7 +478,7 @@ This implementation plan follows the bugfix workflow to clean up the HRMS codeba
     - Document: "Application Functionality: PASSED" or note any issues
     - _Requirements: 3.9_
 
-  - [~] 8.9 Fresh deployment simulation test
+  - [ ] 8.9 Fresh deployment simulation test
     - **Property 1: Expected Behavior** - Production-Ready Deployment
     - **IMPORTANT**: This test verifies the bug is completely fixed
     - Simulate fresh environment by cloning to new directory (optional but recommended)
@@ -499,7 +499,7 @@ This implementation plan follows the bugfix workflow to clean up the HRMS codeba
 
 - [ ] 9. Phase 7: Git Preparation and Final Validation
 
-  - [~] 9.1 Review all changes with git status
+  - [ ] 9.1 Review all changes with git status
     - Run: `git status`
     - Review all modified, added, and deleted files
     - Verify only intended changes are present
@@ -511,7 +511,7 @@ This implementation plan follows the bugfix workflow to clean up the HRMS codeba
       - `cleanup-backups/` (optional - could keep for one release)
     - _Requirements: 2.9_
 
-  - [~] 9.2 Review git commit history
+  - [ ] 9.2 Review git commit history
     - Run: `git log --oneline -10`
     - Verify commit messages are clear and descriptive:
       - "backup: Move temporary files before cleanup - Phase 2 complete"
@@ -523,25 +523,25 @@ This implementation plan follows the bugfix workflow to clean up the HRMS codeba
     - Verify commits are reversible (can be reverted independently)
     - _Requirements: 2.9_
 
-  - [~] 9.3 Create final summary commit (if needed)
+  - [ ] 9.3 Create final summary commit (if needed)
     - If there are any uncommitted cleanup changes, stage them
     - Create summary commit: `git commit -m "chore: Complete production readiness cleanup - Phase 7"`
     - _Requirements: 2.9_
 
-  - [~] 9.4 Final test suite execution
+  - [ ] 9.4 Final test suite execution
     - Run all tests one final time: `cd backend && npm test`
     - **Expected Outcome**: All tests pass
     - If any failures, investigate and fix before proceeding
     - _Requirements: 3.8_
 
-  - [~] 9.5 Final application startup test
+  - [ ] 9.5 Final application startup test
     - Start backend server: `npm start`
     - Verify server starts without errors
     - Verify can access health endpoint or test login
     - Stop server gracefully
     - _Requirements: 3.10_
 
-  - [~] 9.6 Document push preparation
+  - [ ] 9.6 Document push preparation
     - Create file: `/home/wty/Downloads/FDRE-Mesob-HRMS-main/Mesob HRMS/CLEANUP_COMPLETE.md`
     - Document:
       - Summary of cleanup performed (17 scripts removed, 14 docs consolidated, schema/seed files added)
@@ -553,7 +553,7 @@ This implementation plan follows the bugfix workflow to clean up the HRMS codeba
     - Note: Do NOT push to remote automatically - user should review and decide
     - _Requirements: 2.9_
 
-  - [~] 9.7 Final checklist verification
+  - [ ] 9.7 Final checklist verification
     - Verify all success criteria are met:
       - ✅ All 17 temporary fix scripts removed from `/backend` root
       - ✅ All 14 excessive markdown files removed from project root

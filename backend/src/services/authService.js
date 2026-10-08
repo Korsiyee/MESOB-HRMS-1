@@ -20,7 +20,7 @@ async function findUserByUsername(username) {
         Users.employee_uuid,
         Users.username,
         Users.password_hash,
-        Users.role,
+        Users.role_uuid,
         Users.is_active,
         Users.refresh_token,
         Users.token_version,
@@ -44,7 +44,7 @@ async function findUserByUuid(uuid) {
         Users.employee_uuid,
         Users.username,
         Users.password_hash,
-        Users.role,
+        Users.role_uuid,
         Users.is_active,
         Users.refresh_token,
         Users.token_version,
@@ -156,6 +156,7 @@ async function login(username, password) {
         `SELECT e.first_name, e.middle_name, e.last_name, e.profile_photo_key, e.mesob_id,
                 a.email
          FROM Employees e
+           LEFT JOIN Positions p ON p.uuid = e.position_uuid
          LEFT JOIN EmployeeAddresses a ON e.uuid = a.employee_uuid AND a.address_type = 'CURRENT'
          WHERE e.uuid = ?`,
         [user.employee_uuid]
@@ -201,7 +202,7 @@ async function login(username, password) {
       department_uuid: user.department_uuid || null,
       username: user.username,
       email: employeeData?.email || null,
-      role: user.role,
+      role_uuid: user.role_uuid,
       is_active: Boolean(user.is_active),
       full_name: fullName,
       profile_photo_url: profilePhotoUrl,
@@ -233,7 +234,7 @@ async function refreshToken(oldRefreshToken) {
 
     // Lock the user row for update to prevent concurrent modifications
     const [users] = await connection.execute(
-      `SELECT u.uuid, u.employee_uuid, u.username, u.role, u.is_active, u.refresh_token, u.token_version, e.department_uuid
+      `SELECT u.uuid, u.employee_uuid, u.username, u.role, u.is_active, u.refresh_token, u.token_version, p.department_uuid
        FROM Users u
        LEFT JOIN Employees e ON e.uuid = u.employee_uuid
        WHERE u.uuid = ? 
@@ -341,6 +342,8 @@ async function getUserWithOccupations(userUuid) {
         `SELECT e.first_name, e.middle_name, e.last_name, e.profile_photo_key, e.mesob_id,
                 a.email
          FROM Employees e
+           LEFT JOIN Positions p ON p.uuid = e.position_uuid
+           LEFT JOIN Positions p ON p.uuid = e.position_uuid
          LEFT JOIN EmployeeAddresses a ON e.uuid = a.employee_uuid AND a.address_type = 'CURRENT'
          WHERE e.uuid = ?`,
         [user.employee_uuid]

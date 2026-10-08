@@ -57,24 +57,30 @@ const STATUSES = ['PRESENT','ABSENT','LATE','ON_LEAVE'];
 
 /* ── Export Utilities ── */
 const exportToCSV = (records) => {
+  // Defensive check - ensure records is an array
+  if (!Array.isArray(records) || records.length === 0) {
+    console.error('exportToCSV: Invalid or empty records array');
+    return;
+  }
+  
   const headers = [
     "Date", "Employee Name", "Mesob ID", "Department", "Position", "Status", "Shift", 
     "Check In", "Check Out", "Worked Hours", "Overtime", "Missing Hours", "Late Minutes"
   ];
   const rows = records.map(r => [
-    r.date || '',
-    r.full_name || '',
-    r.mesob_id || '',
-    r.department || '',
-    r.position_title || '',
-    r.status || '',
-    r.shift_name || '',
-    r.check_in ? new Date(r.check_in).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '',
-    r.check_out ? new Date(r.check_out).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '',
-    r.worked_hours !== null && r.worked_hours !== undefined ? `${r.worked_hours}h` : '',
-    r.overtime_hours !== null && r.overtime_hours !== undefined ? `${r.overtime_hours}h` : '',
-    r.missing_hours !== null && r.missing_hours !== undefined ? `${r.missing_hours}h` : '',
-    r.late_minutes !== null && r.late_minutes !== undefined ? `${r.late_minutes}min` : '',
+    r?.date || '',
+    r?.full_name || '',
+    r?.mesob_id || '',
+    r?.department || '',
+    r?.position_title || '',
+    r?.status || '',
+    r?.shift_name || '',
+    r?.check_in ? new Date(r.check_in).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '',
+    r?.check_out ? new Date(r.check_out).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '',
+    r?.worked_hours !== null && r?.worked_hours !== undefined ? `${r.worked_hours}h` : '',
+    r?.overtime_hours !== null && r?.overtime_hours !== undefined ? `${r.overtime_hours}h` : '',
+    r?.missing_hours !== null && r?.missing_hours !== undefined ? `${r.missing_hours}h` : '',
+    r?.late_minutes !== null && r?.late_minutes !== undefined ? `${r.late_minutes}min` : '',
   ]);
   const csv = [headers, ...rows].map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -87,6 +93,12 @@ const exportToCSV = (records) => {
 };
 
 const exportToPDF = (records, filters) => {
+  // Defensive check - ensure records is an array
+  if (!Array.isArray(records) || records.length === 0) {
+    console.error('exportToPDF: Invalid or empty records array');
+    return;
+  }
+  
   // Create a simple HTML table for PDF generation
   const htmlContent = `
     <html>
@@ -611,28 +623,39 @@ const AttendancePage = () => {
           EmployeeApi.listDepartments(),
           EmployeeApi.listPositions()
         ]);
-        setDepartments(deptRes?.data || []);
-        setAllPositions(posRes?.data || []);
-      } catch(e) { console.error('Failed to load filter options:', e); }
+        // Defensive checks to ensure arrays
+        const depts = Array.isArray(deptRes?.data) ? deptRes.data : [];
+        const poss = Array.isArray(posRes?.data) ? posRes.data : [];
+        setDepartments(depts);
+        setAllPositions(poss);
+      } catch(e) { 
+        console.error('Failed to load filter options:', e);
+        // Ensure state is set to empty arrays even on error
+        setDepartments([]);
+        setAllPositions([]);
+      }
     };
     loadFilters();
   }, []);
 
   // Update positions when department changes
   useEffect(() => {
+    // Ensure allPositions is always an array before filtering
+    const positionsArray = Array.isArray(allPositions) ? allPositions : [];
+    
     if (filters.departmentUuid) {
-      const filtered = allPositions.filter(p => p.department_uuid === filters.departmentUuid);
+      const filtered = positionsArray.filter(p => p?.department_uuid === filters.departmentUuid);
       setPositions(filtered);
       // Reset position if it doesn't belong to selected department
-      if (filters.positionUuid && !filtered.find(p => p.uuid === filters.positionUuid)) {
+      if (filters.positionUuid && !filtered.find(p => p?.uuid === filters.positionUuid)) {
         setFilters(prev => ({ ...prev, positionUuid: '' }));
       }
     } else {
-      setPositions(allPositions);
+      setPositions(positionsArray);
     }
-  }, [filters.departmentUuid, allPositions]);
+  }, [filters.departmentUuid, allPositions, filters.positionUuid]);
 
-  const load = useCallback(async () => {
+  const load = async () => {
     setLoading(true);
     try {
       const params = {
@@ -648,13 +671,26 @@ const AttendancePage = () => {
       const res = canManageAll
         ? await AttendanceApi.getAllAttendance(params)
         : await AttendanceApi.getEmployeeAttendance(employeeUuid, params);
-      setRecords(res?.data || []);
-      setMeta({ total: res?.meta?.total || 0, totalPages: res?.meta?.totalPages || 1 });
-    } catch(e) { showMsg('error', e.message||'Failed to load attendance records.'); }
+      
+      // Defensive checks for array data
+      const records = Array.isArray(res?.data) ? res.data : [];
+      setRecords(records);
+      
+      // Handle both meta and pagination response formats
+      const total = res?.meta?.total || res?.pagination?.total || 0;
+      const totalPages = res?.meta?.totalPages || res?.pagination?.totalPages || 1;
+      setMeta({ total, totalPages });
+    } catch(e) { 
+      console.error('Attendance load error:', e);
+      showMsg('error', e.message || 'Failed to load attendance records.');
+      // Ensure records is always an array to prevent crashes
+      setRecords([]);
+      setMeta({ total: 0, totalPages: 1 });
+    }
     finally { setLoading(false); }
-  }, [filters, canManageAll, employeeUuid]);
+  };
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [filters.search, filters.departmentUuid, filters.positionUuid, filters.status, filters.startDate, filters.endDate, filters.page, filters.pageSize, canManageAll, employeeUuid]);
 
   const handleDelete = async (uuid) => {
     dialog.showDeleteConfirm(
@@ -694,8 +730,10 @@ const AttendancePage = () => {
       const res = canManageAll
         ? await AttendanceApi.getAllAttendance(params)
         : await AttendanceApi.getEmployeeAttendance(employeeUuid, params);
-      return res?.data || [];
+      // Defensive check - ensure we return an array
+      return Array.isArray(res?.data) ? res.data : [];
     } catch(e) {
+      console.error('Export fetch error:', e);
       showMsg('error', e.message || 'Failed to fetch data for export.');
       return [];
     }

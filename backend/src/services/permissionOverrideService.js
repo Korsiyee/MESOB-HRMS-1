@@ -515,7 +515,7 @@ async function getUserDelegations(userUuid, direction = 'all') {
     reason: row.reason,
     startsAt: row.starts_at,
     expiresAt: row.expires_at,
-    isActive: row.is_active,
+    is_active: row.is_active,
     isExpired: new Date(row.expires_at) < new Date(),
     createdAt: row.created_at,
     revokedAt: row.revoked_at,

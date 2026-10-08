@@ -504,8 +504,8 @@ async function listUsersForRBAC(req, res) {
         p.title as position_title
        FROM Users u
        LEFT JOIN Employees e ON u.employee_uuid = e.uuid
-       LEFT JOIN Departments d ON e.department_uuid = d.uuid
        LEFT JOIN Positions p ON e.position_uuid = p.uuid
+       LEFT JOIN Departments d ON p.department_uuid = d.uuid
        ${whereClause}
        ORDER BY e.first_name, e.last_name`,
       params
@@ -547,8 +547,8 @@ async function listUsersForRBAC(req, res) {
           p.title as position_title,
           1 as no_account
          FROM Employees e
-         LEFT JOIN Departments d ON e.department_uuid = d.uuid
          LEFT JOIN Positions p ON e.position_uuid = p.uuid
+         LEFT JOIN Departments d ON p.department_uuid = d.uuid
          ${empWhereClause}
          ORDER BY e.first_name, e.last_name`,
         empParams

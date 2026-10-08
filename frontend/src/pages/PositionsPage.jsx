@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Briefcase, Building2, Users, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, History,
   Plus, Pencil, Trash2, X, Calendar, Award,
 } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import { useResponsive } from '../hooks/useResponsive';
 import { useDialog } from '../context/DialogContext';
 import { apiRequest } from '../utils/apiClient';
 import { Can } from '../components/Can';
-import TabSwipe from '../components/ui/TabSwipe';
+import OrganizationModuleHeader from '../components/ui/OrganizationModuleHeader';
 
 /* ── Palette ── */
 const C = {
@@ -408,7 +408,7 @@ const PositionModal = ({ position, deptList, onClose, onSaved, showMsg }) => {
 /* ══════════════════════════════════════════
    POSITIONS OVERVIEW (Cards View)
 ══════════════════════════════════════════ */
-const PositionsOverview = () => {
+const PositionsOverview = ({ activeTab, onTabChange }) => {
   const { isMobile, isTablet, r } = useResponsive();
   const [positions, setPositions] = useState([]);
   const [depts, setDepts] = useState([]);
@@ -460,22 +460,21 @@ const PositionsOverview = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, fontFamily: 'Poppins, sans-serif' }}>
-      {/* Hero header */}
-      <div style={{ background: C.headerBg, borderRadius: 14, padding: '22px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
-        <div>
-          <p style={{ margin: '0 0 4px', fontSize: '0.7rem', color: 'rgba(232,240,238,0.45)', letterSpacing: '0.04em' }}>Positions › Overview</p>
-          <h1 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: '#E8F0EE' }}>Positions Overview</h1>
-          <p style={{ margin: '4px 0 0', fontSize: '0.76rem', color: 'rgba(232,240,238,0.55)' }}>
-            {loading ? 'Loading…' : `${totalPositions} positions · ${totalEmployees} employees assigned across ${totalDepts} departments`}
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={load}
-            style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid rgba(232,240,238,0.22)', background: 'rgba(232,240,238,0.08)', color: '#E8F0EE', fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontFamily: 'Poppins,sans-serif' }}>
-            ↻ Refresh
-          </button>
-        </div>
-      </div>
+      {/* Shared Module Header */}
+      <OrganizationModuleHeader
+        moduleName="Positions"
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        tabs={[
+          { key: 'overview', label: 'Overview' },
+          { key: 'add', label: 'Add Position' },
+          { key: 'manage', label: 'Manage' },
+        ]}
+        subtitle={loading ? 'Loading…' : `${totalPositions} positions · ${totalEmployees} employees assigned across ${totalDepts} departments`}
+        action={
+          <button onClick={load} style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid rgba(232,240,238,0.22)', background: 'rgba(232,240,238,0.08)', color: '#E8F0EE', fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'Poppins,sans-serif' }}>↻ Refresh</button>
+        }
+      />
 
       {error && (
         <div style={{ padding: '12px 16px', borderRadius: 8, background: '#fef2f2', border: '1px solid #fca5a5', color: '#991b1b', fontSize: '0.82rem' }}>{error}</div>
@@ -554,10 +553,10 @@ const PositionsOverview = () => {
 /* ══════════════════════════════════════════
    POSITIONS MANAGEMENT PAGE WITH TABS
 ══════════════════════════════════════════ */
-const PositionsManagementPage = () => {
+const PositionsManagementPage = ({ activeTab, onTabChange }) => {
   const { isMobile, isTablet, r } = useResponsive();
   const dialog = useDialog();
-  const [activeTab, setActiveTab] = useState('manage');
+  const [subView, setSubView] = useState('manage');
   const [positions, setPositions] = useState([]);
   const [deptList, setDeptList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -635,9 +634,16 @@ const PositionsManagementPage = () => {
 
   return (
     <div style={{ fontFamily: 'Poppins,sans-serif' }}>
-      <PageHeader 
-        title="Position Management" 
-        subtitle={`Manage all positions across departments`} 
+      <OrganizationModuleHeader
+        moduleName="Positions"
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        tabs={[
+          { key: 'overview', label: 'Overview' },
+          { key: 'add', label: 'Add Position' },
+          { key: 'manage', label: 'Manage' },
+        ]}
+        subtitle={`Manage all positions across departments`}
       />
 
       {notice.message && <Notice type={notice.type} message={notice.message} onClose={() => setNotice({ type: '', message: '' })} />}
@@ -650,10 +656,10 @@ const PositionsManagementPage = () => {
               { id: 'manage', label: 'Manage Positions', icon: <Briefcase size={14} /> },
               { id: 'create', label: 'Create Position', icon: <Plus size={14} /> },
             ].map(tab => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '16px 20px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, color: activeTab === tab.id ? C.primary : C.textMuted, borderBottom: activeTab === tab.id ? `3px solid ${C.primary}` : '3px solid transparent', transition: 'all 0.15s', fontFamily: 'Poppins,sans-serif' }}
-                onMouseEnter={e => { if (activeTab !== tab.id) e.currentTarget.style.color = C.textSub; }}
-                onMouseLeave={e => { if (activeTab !== tab.id) e.currentTarget.style.color = C.textMuted; }}>
+              <button key={tab.id} onClick={() => setSubView(tab.id)}
+                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '16px 20px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, color: subView === tab.id ? C.primary : C.textMuted, borderBottom: subView === tab.id ? `3px solid ${C.primary}` : '3px solid transparent', transition: 'all 0.15s', fontFamily: 'Poppins,sans-serif' }}
+                onMouseEnter={e => { if (subView !== tab.id) e.currentTarget.style.color = C.textSub; }}
+                onMouseLeave={e => { if (subView !== tab.id) e.currentTarget.style.color = C.textMuted; }}>
                 {tab.icon} {tab.label}
               </button>
             ))}
@@ -662,7 +668,7 @@ const PositionsManagementPage = () => {
       </div>
 
       {/* Manage Positions Tab */}
-      {activeTab === 'manage' && (
+      {subView === 'manage' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Stats Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: r(14, 12, 10) }}>
@@ -752,7 +758,7 @@ const PositionsManagementPage = () => {
               showMsg('success', 'Position created successfully.');
               e.target.reset();
               loadPositions();
-              setActiveTab('manage');
+              setSubView('manage');
             } catch (err) {
               showMsg('error', err.message || 'Failed to create position.');
             }
@@ -779,7 +785,7 @@ const PositionsManagementPage = () => {
                   style={{ width: '100%', padding: '10px 13px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, fontSize: '0.82rem', color: C.textMain, outline: 'none', fontFamily: 'Poppins,sans-serif' }} />
               </div>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
-                <button type="button" onClick={() => setActiveTab('manage')}
+                <button type="button" onClick={() => setSubView('manage')}
                   style={{ padding: '9px 18px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', color: C.textSub, fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'Poppins,sans-serif' }}>
                   Cancel
                 </button>
@@ -807,7 +813,7 @@ const PositionsManagementPage = () => {
 /* ══════════════════════════════════════════
    ADD POSITION VIEW (Quick Add Form)
 ══════════════════════════════════════════ */
-const AddPositionView = () => {
+const AddPositionView = ({ activeTab, onTabChange }) => {
   const [form, setForm] = useState({ title: '', grade: '', department_uuid: '' });
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState({ type: '', message: '' });
@@ -853,12 +859,18 @@ const AddPositionView = () => {
     <div style={{ fontFamily: 'Poppins,sans-serif', maxWidth: 700, margin: '0 auto' }}>
       <Notice type={notice.type} message={notice.message} onClose={() => setNotice({ type: '', message: '' })} />
 
-      {/* Header */}
-      <div style={{ background: C.headerBg, borderRadius: 14, padding: '20px 26px', marginBottom: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.18)' }}>
-        <p style={{ margin: '0 0 3px', fontSize: '0.7rem', color: 'rgba(232,240,238,0.45)', letterSpacing: '0.04em' }}>Positions › Add New</p>
-        <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#E8F0EE' }}>Add New Position</h1>
-        <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: 'rgba(232,240,238,0.6)' }}>Create a new position within a department</p>
-      </div>
+      {/* Shared Module Header */}
+      <OrganizationModuleHeader
+        moduleName="Positions"
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        tabs={[
+          { key: 'overview', label: 'Overview' },
+          { key: 'add', label: 'Add Position' },
+          { key: 'manage', label: 'Manage' },
+        ]}
+        subtitle="Create a new position within a department"
+      />
 
       {/* Form Card */}
       <div style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.border}`, boxShadow: C.shadow, padding: 28 }}>
@@ -922,33 +934,52 @@ const AddPositionView = () => {
 };
 
 /* ══════════════════════════════════════════
-   MAIN POSITIONS PAGE (Tabbed Interface)
+   MAIN POSITIONS PAGE (Tabbed Interface with URL-based navigation)
 ══════════════════════════════════════════ */
 const PositionsPage = () => {
-  const tabs = [
-    {
-      key: 'overview',
-      label: 'Overview',
-      path: '/positions',
-      content: <PositionsOverview />
-    },
-    {
-      key: 'add',
-      label: 'Add Position',
-      path: '/positions/add',
-      content: <AddPositionView />
-    },
-    {
-      key: 'manage',
-      label: 'Manage',
-      path: '/positions/manage',
-      content: <PositionsManagementPage />
-    },
-  ];
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Determine active tab from URL
+  const getActiveTab = () => {
+    const path = location.pathname;
+    if (path === '/positions/add') return 'add';
+    if (path === '/positions/manage') return 'manage';
+    return 'overview';
+  };
+
+  const [activeTab, setActiveTab] = useState(getActiveTab());
+
+  // Update active tab when URL changes
+  useEffect(() => {
+    setActiveTab(getActiveTab());
+  }, [location.pathname]);
+
+  // Handle tab change
+  const handleTabChange = (tabKey) => {
+    const paths = {
+      overview: '/positions',
+      add: '/positions/add',
+      manage: '/positions/manage',
+    };
+    navigate(paths[tabKey]);
+  };
+
+  // Render content based on active tab
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'add':
+        return <AddPositionView activeTab={activeTab} onTabChange={handleTabChange} />;
+      case 'manage':
+        return <PositionsManagementPage activeTab={activeTab} onTabChange={handleTabChange} />;
+      default:
+        return <PositionsOverview activeTab={activeTab} onTabChange={handleTabChange} />;
+    }
+  };
 
   return (
     <div style={{ fontFamily: 'Poppins,sans-serif' }}>
-      <TabSwipe tabs={tabs} defaultTab="overview" />
+      {renderContent()}
     </div>
   );
 };

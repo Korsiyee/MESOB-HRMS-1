@@ -341,7 +341,7 @@ async function getShiftEmployees(shiftUuid) {
         e.first_name,
         e.middle_name,
         e.last_name,
-        e.department_uuid,
+        p.department_uuid,
         es.effective_from,
         es.effective_to
       FROM EmployeeShifts es
@@ -366,7 +366,7 @@ async function detectShiftGaps(employeeUuid = null) {
       e.uuid as employee_uuid,
       e.mesob_id,
       CONCAT(e.first_name, ' ', e.last_name) as employee_name,
-      e.department_uuid,
+      p.department_uuid,
       d.name as department_name,
       es1.shift_uuid as previous_shift_uuid,
       s1.name as previous_shift_name,
@@ -378,7 +378,8 @@ async function detectShiftGaps(employeeUuid = null) {
     FROM Employees e
     INNER JOIN EmployeeShifts es1 ON e.uuid = es1.employee_uuid
     INNER JOIN EmployeeShifts es2 ON e.uuid = es2.employee_uuid
-    LEFT JOIN Departments d ON e.department_uuid = d.uuid
+    LEFT JOIN Positions p ON p.uuid = e.position_uuid
+    LEFT JOIN Departments d ON p.department_uuid = d.uuid
     LEFT JOIN ShiftDefinitions s1 ON es1.shift_uuid = s1.uuid
     LEFT JOIN ShiftDefinitions s2 ON es2.shift_uuid = s2.uuid
     WHERE es1.effective_to IS NOT NULL

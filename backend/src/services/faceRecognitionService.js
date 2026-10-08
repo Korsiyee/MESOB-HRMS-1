@@ -153,10 +153,11 @@ async function getAllEmployeesWithFaces() {
       e.first_name,
       e.middle_name,
       e.last_name,
-      e.department_uuid,
+      p.department_uuid,
       d.name AS department_name
      FROM Employees e
-     LEFT JOIN Departments d ON e.department_uuid = d.uuid
+     LEFT JOIN Positions p ON p.uuid = e.position_uuid
+     LEFT JOIN Departments d ON p.department_uuid = d.uuid
      WHERE e.status = 'ACTIVE' AND e.face_images_registered = TRUE`
   );
 

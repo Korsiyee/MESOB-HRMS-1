@@ -52,7 +52,7 @@ async function insertNotification({
   const uuid = randomUUID();
   await executeQuery(
     `INSERT INTO Notifications
-       (uuid, recipient_uuid, sender_uuid, sender_role, notification_type,
+       (uuid, user_uuid, sender_uuid, sender_role, notification_type,
         title, message, redirect_url, entity_type, entity_uuid, is_read, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NOW())`,
     [
@@ -444,7 +444,7 @@ async function getNotificationsForUser(userUuid, { limit = 50, offset = 0 } = {}
      FROM Notifications n
      LEFT JOIN Users u ON u.uuid = n.sender_uuid
      LEFT JOIN Employees e ON e.uuid = u.employee_uuid
-     WHERE n.recipient_uuid = ?
+     WHERE n.user_uuid = ?
      ORDER BY n.created_at DESC
      LIMIT ${safeLimit} OFFSET ${safeOffset}`,
     [userUuid]
@@ -454,7 +454,7 @@ async function getNotificationsForUser(userUuid, { limit = 50, offset = 0 } = {}
 
 async function getUnreadCount(userUuid) {
   const [rows] = await db.promise().execute(
-    "SELECT COUNT(*) AS cnt FROM Notifications WHERE recipient_uuid = ? AND is_read = 0",
+    "SELECT COUNT(*) AS cnt FROM Notifications WHERE user_uuid = ? AND is_read = 0",
     [userUuid]
   );
   return Number(rows[0]?.cnt || 0);
@@ -462,28 +462,28 @@ async function getUnreadCount(userUuid) {
 
 async function markAsRead(uuid, userUuid) {
   await executeQuery(
-    "UPDATE Notifications SET is_read = 1 WHERE uuid = ? AND recipient_uuid = ?",
+    "UPDATE Notifications SET is_read = 1 WHERE uuid = ? AND user_uuid = ?",
     [uuid, userUuid]
   );
 }
 
 async function markAllAsRead(userUuid) {
   await executeQuery(
-    "UPDATE Notifications SET is_read = 1 WHERE recipient_uuid = ? AND is_read = 0",
+    "UPDATE Notifications SET is_read = 1 WHERE user_uuid = ? AND is_read = 0",
     [userUuid]
   );
 }
 
 async function deleteAllForUser(userUuid) {
   await executeQuery(
-    "DELETE FROM Notifications WHERE recipient_uuid = ?",
+    "DELETE FROM Notifications WHERE user_uuid = ?",
     [userUuid]
   );
 }
 
 async function deleteReadForUser(userUuid) {
   await executeQuery(
-    "DELETE FROM Notifications WHERE recipient_uuid = ? AND is_read = 1",
+    "DELETE FROM Notifications WHERE user_uuid = ? AND is_read = 1",
     [userUuid]
   );
 }

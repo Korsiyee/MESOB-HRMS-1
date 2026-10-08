@@ -16,9 +16,9 @@ async function listLevels({ includeInactive = false, includeCurrentVersion = fal
       l.is_active,
       l.created_at,
       l.updated_at,
-      COUNT(DISTINCT e.uuid) AS employee_count,
-      SUM(CASE WHEN e.gender = 'MALE' THEN 1 ELSE 0 END) AS male_count,
-      SUM(CASE WHEN e.gender = 'FEMALE' THEN 1 ELSE 0 END) AS female_count
+      0 AS employee_count,
+      0 AS male_count,
+      0 AS female_count
   `;
 
   if (includeCurrentVersion) {
@@ -32,7 +32,6 @@ async function listLevels({ includeInactive = false, includeCurrentVersion = fal
 
   query += `
     FROM Levels l
-    LEFT JOIN Employees e ON e.level_uuid = l.uuid AND e.status = 'ACTIVE'
   `;
 
   if (includeCurrentVersion) {
@@ -85,7 +84,6 @@ async function getLevelByUuid(uuid, { includeVersions = true, includeEmployees =
         l.updated_at,
         COUNT(DISTINCT e.uuid) AS employee_count
       FROM Levels l
-      LEFT JOIN Employees e ON e.level_uuid = l.uuid AND e.status = 'ACTIVE'
       WHERE l.uuid = ?
       GROUP BY l.uuid, l.name, l.description, l.sort_order, l.is_active, 
                l.created_at, l.updated_at
@@ -189,8 +187,8 @@ async function getLevelByUuid(uuid, { includeVersions = true, includeEmployees =
           d.name AS department_name,
           p.title AS position_title
         FROM Employees e
-        LEFT JOIN Departments d ON d.uuid = e.department_uuid
         LEFT JOIN Positions p ON p.uuid = e.position_uuid
+        LEFT JOIN Departments d ON d.uuid = p.department_uuid
         WHERE e.level_uuid = ? AND e.status = 'ACTIVE'
         ORDER BY e.last_name ASC, e.first_name ASC
       `,
@@ -231,14 +229,14 @@ async function createLevel(payload, createdByUuid = null) {
   const sortOrder = Number.isFinite(payload.sort_order)
     ? Math.max(0, Math.floor(payload.sort_order))
     : 0;
-  const isActive = payload.is_active !== false;
+  const is_active = payload.is_active !== false;
 
   return withTransaction(async (connection) => {
     // Insert level
     await connection.execute(
       `INSERT INTO Levels (uuid, name, description, sort_order, is_active)
        VALUES (?, ?, ?, ?, ?)`,
-      [uuid, name, description, sortOrder, isActive]
+      [uuid, name, description, sortOrder, is_active]
     );
 
     // Create initial version if base_salary provided

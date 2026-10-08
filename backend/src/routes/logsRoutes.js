@@ -6,16 +6,15 @@ const {
   getEntityTypes,
   exportLogs,
 } = require("../controllers/logController");
-// Use module-level authorization (logs are part of ORGANIZATION module for admins)
-const { requireModule, withScope } = require("../middleware/moduleAuth");
+const { authorize } = require("../middleware/authorize");
 
 const router = express.Router();
 
-// All log operations require ORGANIZATION module with scope filtering
-router.get("/", requireModule('ORGANIZATION'), withScope(), listLogs);
-router.get("/actions", requireModule('ORGANIZATION'), getActions);
-router.get("/entity-types", requireModule('ORGANIZATION'), getEntityTypes);
-router.get("/export", requireModule('ORGANIZATION'), withScope(), exportLogs);
-router.get("/:uuid", requireModule('ORGANIZATION'), getLog);
+// All log operations require AuditLogs permissions with scope enforcement
+router.get("/", authorize({ permissions: 'AuditLogs.View', enforceScope: true }), listLogs);
+router.get("/actions", authorize({ permissions: 'AuditLogs.View' }), getActions);
+router.get("/entity-types", authorize({ permissions: 'AuditLogs.View' }), getEntityTypes);
+router.get("/export", authorize({ permissions: 'AuditLogs.Export', enforceScope: true }), exportLogs);
+router.get("/:uuid", authorize({ permissions: 'AuditLogs.View' }), getLog);
 
 module.exports = router;

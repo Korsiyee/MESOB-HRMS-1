@@ -167,11 +167,11 @@ async function deleteRole(roleUuid, deletedBy) {
 /**
  * Activate/deactivate a role
  * @param {string} roleUuid - Role UUID
- * @param {boolean} isActive - Active status
+ * @param {boolean} is_active - Active status
  * @param {string} updatedBy - Updater user UUID
  * @returns {Promise<Object>} Updated role
  */
-async function setRoleActiveStatus(roleUuid, isActive, updatedBy) {
+async function setRoleActiveStatus(roleUuid, is_active, updatedBy) {
   const role = await rbacService.getRoleByUuid(roleUuid);
   if (!role) {
     throw new Error('Role not found');
@@ -180,13 +180,13 @@ async function setRoleActiveStatus(roleUuid, isActive, updatedBy) {
   await executeQuery(
     `UPDATE Roles SET is_active = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP 
      WHERE uuid = ?`,
-    [isActive, updatedBy, roleUuid]
+    [is_active, updatedBy, roleUuid]
   );
   
   // Log action
   await rbacService.logAuthorizationAction({
     actorUserUuid: updatedBy,
-    actionType: isActive ? 'ROLE_ACTIVATED' : 'ROLE_DEACTIVATED',
+    actionType: is_active ? 'ROLE_ACTIVATED' : 'ROLE_DEACTIVATED',
     resourceType: 'ROLE',
     resourceUuid: roleUuid
   });
@@ -618,7 +618,7 @@ async function getUsersByRole(roleUuid) {
     uuid: row.uuid,
     username: row.username,
     employeeUuid: row.employee_uuid,
-    isActive: row.is_active,
+    is_active: row.is_active,
     fullName: [row.first_name, row.middle_name, row.last_name]
       .filter(Boolean)
       .join(' '),

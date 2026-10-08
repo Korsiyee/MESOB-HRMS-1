@@ -69,7 +69,7 @@ async function getPositionByUuid(uuid) {
             s.name as current_shift_name,
             es.assignment_type
      FROM Employees e
-     LEFT JOIN Departments d ON d.uuid = e.department_uuid
+     LEFT JOIN Departments d ON d.uuid = p.department_uuid
      LEFT JOIN EmployeeShifts es ON es.employee_uuid = e.uuid 
        AND es.effective_from <= CURRENT_DATE()
        AND (es.effective_to IS NULL OR es.effective_to >= CURRENT_DATE())

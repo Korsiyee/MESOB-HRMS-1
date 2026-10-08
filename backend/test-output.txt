@@ -1,0 +1,156 @@
+npm notice run backend@1.0.0 test
+npm notice run jest --verbose
+  console.log
+    [dotenv@17.3.1] injecting env (15) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+
+      at _log (node_modules/dotenv/lib/main.js:139:11)
+
+FAIL __tests__/bugConditionExploration.test.js
+  Bug Condition Exploration - SQL Query Schema Compliance
+    Defect Pattern 1: Missing Positions JOIN
+      ✕ should execute query that references p.department_uuid WITH proper Positions JOIN (27 ms)
+      ✕ should execute correctly when Positions is joined BEFORE Departments (4 ms)
+    Defect Pattern 2: Incorrect JOIN Order
+      ✓ should fail when Departments is joined BEFORE Positions but references p.department_uuid (1 ms)
+      ✓ should execute correctly with proper JOIN order: Positions BEFORE Departments (9 ms)
+    Defect Pattern 3: Wrong Column Name in AuditLogs
+      ✕ should execute query using correct column name old_values_json instead of diff_json (3 ms)
+      ✕ should execute correctly with old_values_json column (1 ms)
+    Defect Pattern 4: CamelCase Timestamp Columns
+      ✕ should execute query using correct snake_case timestamp columns (2 ms)
+      ✕ should execute correctly with snake_case timestamp columns (1 ms)
+    Defect Pattern 5: Multiple Combined Defects
+      ✓ should handle queries with multiple defect patterns (2 ms)
+      ✕ should execute correctly when all defects are fixed
+
+  ● Bug Condition Exploration - SQL Query Schema Compliance › Defect Pattern 1: Missing Positions JOIN › should execute query that references p.department_uuid WITH proper Positions JOIN
+
+    expect(received).rejects.toThrow(expected)
+
+    Expected pattern: /Unknown column 'p\.department_uuid'/
+    Received message: "Unknown column 'u.role' in 'SELECT'"
+
+          60 |       // The proper fix requires Positions JOIN BEFORE referencing p.department_uuid
+          61 |       await expect(async () => {
+        > 62 |         const [rows] = await connection.execute(buggyQuery);
+             |                                         ^
+          63 |         return rows;
+          64 |       }).rejects.toThrow(/Unknown column 'p\.department_uuid'/);
+          65 |
+
+      at PromiseConnection.execute (node_modules/mysql2/lib/promise/connection.js:47:22)
+      at execute (__tests__/bugConditionExploration.test.js:62:41)
+      at Object.toThrow (node_modules/expect/build/index.js:202:58)
+      at Object.toThrow (__tests__/bugConditionExploration.test.js:64:18)
+      at Object.toThrow (node_modules/expect/build/index.js:218:22)
+      at Object.toThrow (__tests__/bugConditionExploration.test.js:64:18)
+
+  ● Bug Condition Exploration - SQL Query Schema Compliance › Defect Pattern 1: Missing Positions JOIN › should execute correctly when Positions is joined BEFORE Departments
+
+    Unknown column 'u.role' in 'SELECT'
+
+      84 |
+      85 |       // This query should execute successfully (correct JOIN order)
+    > 86 |       const [rows] = await connection.execute(correctQuery);
+         |                                       ^
+      87 |       expect(rows).toBeDefined();
+      88 |       expect(Array.isArray(rows)).toBe(true);
+      89 |       // No SQL error expected for correct query
+
+      at PromiseConnection.execute (node_modules/mysql2/lib/promise/connection.js:47:22)
+      at Object.execute (__tests__/bugConditionExploration.test.js:86:39)
+
+  ● Bug Condition Exploration - SQL Query Schema Compliance › Defect Pattern 3: Wrong Column Name in AuditLogs › should execute query using correct column name old_values_json instead of diff_json
+
+    expect(received).rejects.toThrow(expected)
+
+    Expected pattern: /Unknown column 'al\.diff_json'/
+    Received message: "Unknown column 'al.actor_uuid' in 'SELECT'"
+
+          149 |       // Expected behavior: This should fail with "Unknown column 'al.diff_json'"
+          150 |       await expect(async () => {
+        > 151 |         const [rows] = await connection.execute(buggyQuery);
+              |                                         ^
+          152 |         return rows;
+          153 |       }).rejects.toThrow(/Unknown column 'al\.diff_json'/);
+          154 |
+
+      at PromiseConnection.execute (node_modules/mysql2/lib/promise/connection.js:47:22)
+      at execute (__tests__/bugConditionExploration.test.js:151:41)
+      at Object.toThrow (node_modules/expect/build/index.js:202:58)
+      at Object.toThrow (__tests__/bugConditionExploration.test.js:153:18)
+      at Object.toThrow (node_modules/expect/build/index.js:218:22)
+      at Object.toThrow (__tests__/bugConditionExploration.test.js:153:18)
+
+  ● Bug Condition Exploration - SQL Query Schema Compliance › Defect Pattern 3: Wrong Column Name in AuditLogs › should execute correctly with old_values_json column
+
+    Unknown column 'al.actor_uuid' in 'SELECT'
+
+      166 |
+      167 |       // This query should execute successfully (correct column name)
+    > 168 |       const [rows] = await connection.execute(correctQuery);
+          |                                       ^
+      169 |       expect(rows).toBeDefined();
+      170 |       expect(Array.isArray(rows)).toBe(true);
+      171 |       // No SQL error expected for correct query
+
+      at PromiseConnection.execute (node_modules/mysql2/lib/promise/connection.js:47:22)
+      at Object.execute (__tests__/bugConditionExploration.test.js:168:39)
+
+  ● Bug Condition Exploration - SQL Query Schema Compliance › Defect Pattern 4: CamelCase Timestamp Columns › should execute query using correct snake_case timestamp columns
+
+    expect(received).rejects.toThrow(expected)
+
+    Expected pattern: /Unknown column 'e\.(updatedAt|createdAt)'/
+    Received message: "Unknown column 'e.employee_id' in 'SELECT'"
+
+          186 |       // Expected behavior: This should fail with "Unknown column 'e.updatedAt'"
+          187 |       await expect(async () => {
+        > 188 |         const [rows] = await connection.execute(buggyQuery);
+              |                                         ^
+          189 |         return rows;
+          190 |       }).rejects.toThrow(/Unknown column 'e\.(updatedAt|createdAt)'/);
+          191 |
+
+      at PromiseConnection.execute (node_modules/mysql2/lib/promise/connection.js:47:22)
+      at execute (__tests__/bugConditionExploration.test.js:188:41)
+      at Object.toThrow (node_modules/expect/build/index.js:202:58)
+      at Object.toThrow (__tests__/bugConditionExploration.test.js:190:18)
+      at Object.toThrow (node_modules/expect/build/index.js:218:22)
+      at Object.toThrow (__tests__/bugConditionExploration.test.js:190:18)
+
+  ● Bug Condition Exploration - SQL Query Schema Compliance › Defect Pattern 4: CamelCase Timestamp Columns › should execute correctly with snake_case timestamp columns
+
+    Unknown column 'e.employee_id' in 'SELECT'
+
+      203 |
+      204 |       // This query should execute successfully (correct column naming)
+    > 205 |       const [rows] = await connection.execute(correctQuery);
+          |                                       ^
+      206 |       expect(rows).toBeDefined();
+      207 |       expect(Array.isArray(rows)).toBe(true);
+      208 |       // No SQL error expected for correct query
+
+      at PromiseConnection.execute (node_modules/mysql2/lib/promise/connection.js:47:22)
+      at Object.execute (__tests__/bugConditionExploration.test.js:205:39)
+
+  ● Bug Condition Exploration - SQL Query Schema Compliance › Defect Pattern 5: Multiple Combined Defects › should execute correctly when all defects are fixed
+
+    Unknown column 'al.entity_uuid' in 'ON'
+
+      253 |
+      254 |       // This query should execute successfully (all defects fixed)
+    > 255 |       const [rows] = await connection.execute(correctQuery);
+          |                                       ^
+      256 |       expect(rows).toBeDefined();
+      257 |       expect(Array.isArray(rows)).toBe(true);
+      258 |       // No SQL error expected for correct query
+
+      at PromiseConnection.execute (node_modules/mysql2/lib/promise/connection.js:47:22)
+      at Object.execute (__tests__/bugConditionExploration.test.js:255:39)
+
+Test Suites: 1 failed, 1 total
+Tests:       7 failed, 3 passed, 10 total
+Snapshots:   0 total
+Time:        0.467 s, estimated 1 s
+Ran all test suites.

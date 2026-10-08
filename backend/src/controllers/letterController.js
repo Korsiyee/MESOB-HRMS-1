@@ -360,7 +360,7 @@ exports.generateLetter = async (req, res) => {
               p.title AS position_title, d.name AS department_name
        FROM Employees e
        LEFT JOIN Positions p ON p.uuid = e.position_uuid
-       LEFT JOIN Departments d ON d.uuid = e.department_uuid
+       LEFT JOIN Departments d ON d.uuid = p.department_uuid
        WHERE e.uuid = ?`,
       [finalEmployeeUuid]
     );
@@ -615,7 +615,7 @@ exports.requestLetter = async (req, res) => {
               ea.email, ea.phone_primary AS phone
        FROM Employees e
        LEFT JOIN Positions p ON p.uuid = e.position_uuid
-       LEFT JOIN Departments d ON d.uuid = e.department_uuid
+       LEFT JOIN Departments d ON d.uuid = p.department_uuid
        LEFT JOIN EmployeeAddresses ea ON ea.employee_uuid = e.uuid AND ea.address_type = 'CURRENT'
        WHERE e.uuid = ?`,
       [employee_uuid]

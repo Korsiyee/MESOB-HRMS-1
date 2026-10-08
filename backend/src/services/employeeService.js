@@ -11,7 +11,6 @@ const {
 } = require("./employeeStorageService");
 const { ensureDepartmentExists } = require("./departmentService");
 const { getPositionByUuid } = require("./positionService");
-const { ensureLevelExists } = require("./levelService");
 
 const EMPLOYEE_STATUSES = new Set(["ACTIVE", "INACTIVE", "TERMINATED"]);
 
@@ -91,12 +90,6 @@ async function validateReferences(payload) {
       throw new ApiError("Position not found.", 422, "INVALID_POSITION");
     }
   }
-  if (payload.level_uuid) {
-    const level = await ensureLevelExists(payload.level_uuid);
-    if (!level) {
-      throw new ApiError("Level not found.", 422, "INVALID_LEVEL");
-    }
-  }
 }
 
 async function listEmployees(filters = {}) {
@@ -113,20 +106,12 @@ async function listEmployees(filters = {}) {
     }
   }
   if (filters.departmentUuid) {
-    whereClause += " AND e.department_uuid = ?";
+    whereClause += " AND p.department_uuid = ?";
     params.push(filters.departmentUuid);
   }
   if (filters.positionUuid) {
     whereClause += " AND e.position_uuid = ?";
     params.push(filters.positionUuid);
-  }
-  if (filters.levelUuid) {
-    whereClause += " AND e.level_uuid = ?";
-    params.push(filters.levelUuid);
-  }
-  if (filters.occupationUuid) {
-    whereClause += " AND e.occupation_uuid = ?";
-    params.push(filters.occupationUuid);
   }
   if (filters.search) {
     whereClause +=
@@ -137,8 +122,8 @@ async function listEmployees(filters = {}) {
 
   const [countRows] = await executeQuery(
     `SELECT COUNT(*) AS total FROM Employees e
-     LEFT JOIN Departments d ON d.uuid = e.department_uuid
      LEFT JOIN Positions   p ON p.uuid = e.position_uuid
+     LEFT JOIN Departments d ON d.uuid = p.department_uuid
      ${whereClause}`,
     params,
   );
@@ -146,18 +131,14 @@ async function listEmployees(filters = {}) {
   let query = `
     SELECT e.uuid, e.mesob_id, e.title, e.first_name, e.middle_name, e.last_name,
       e.mother_name, e.gender, e.date_of_birth, e.nationality, e.hire_date,
-      e.prior_gov_service, e.status, e.attendance_exempt, e.department_uuid,
-      e.position_uuid, e.level_uuid, e.occupation_uuid, e.profile_photo_key, e.created_at,
+      e.prior_gov_service_years, e.status, e.attendance_exempt, p.department_uuid,
+      e.position_uuid, e.profile_photo_key, e.created_at,
       e.updated_at,
       d.name  AS department_name,
-      p.title AS position_title,
-      l.name  AS level_name,
-      o.name  AS occupation_name
+      p.title AS position_title
     FROM Employees e
-    LEFT JOIN Departments d ON d.uuid = e.department_uuid
     LEFT JOIN Positions   p ON p.uuid = e.position_uuid
-    LEFT JOIN Levels      l ON l.uuid = e.level_uuid
-    LEFT JOIN Occupations o ON o.uuid = e.occupation_uuid
+    LEFT JOIN Departments d ON d.uuid = p.department_uuid
     ${whereClause}
     ORDER BY e.created_at DESC
   `;
@@ -264,8 +245,8 @@ async function createEmployee(payload) {
           mother_name, gender, date_of_birth, nationality, profile_photo_key,
           tin_number, pension_code, bank_name, bank_account_number,
           hire_date, prior_gov_service, status, attendance_exempt,
-          department_uuid, position_uuid, level_uuid, occupation_uuid
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          department_uuid, position_uuid
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         employeeUuid,
@@ -288,9 +269,6 @@ async function createEmployee(payload) {
         status,
         payload.attendance_exempt ? 1 : 0,
         payload.department_uuid || null,
-        payload.position_uuid || null,
-        payload.level_uuid || null,
-        payload.occupation_uuid || null,
       ],
     );
 
@@ -340,7 +318,7 @@ async function createEmployee(payload) {
       uuid: createdEmployee.uuid,
       full_name: buildEmployeeFullName(createdEmployee),
       hire_date: createdEmployee.hire_date,
-      prior_gov_service: Number(createdEmployee.prior_gov_service || 0),
+      prior_gov_service: Number(createdEmployee.prior_gov_service_years || 0),
       status: createdEmployee.status,
     });
   } catch (syncErr) {
@@ -373,17 +351,13 @@ async function getEmployeeByUuid(employeeUuid, options = {}) {
       SELECT e.uuid, e.mesob_id, e.title, e.first_name, e.middle_name, e.last_name, e.mother_name,
         e.gender, e.date_of_birth, e.nationality, e.profile_photo_key, e.tin_number,
         e.pension_code, e.bank_name, e.bank_account_number, e.hire_date,
-        e.prior_gov_service, e.status, e.attendance_exempt, e.department_uuid,
-        e.position_uuid, e.level_uuid, e.occupation_uuid, e.created_at, e.updated_at,
+        e.prior_gov_service_years, e.status, e.attendance_exempt, p.department_uuid,
+        e.position_uuid, e.created_at, e.updated_at,
         d.name AS department_name,
-        p.title AS position_title,
-        l.name AS level_name,
-        o.name AS occupation_name
+        p.title AS position_title
       FROM Employees e
-      LEFT JOIN Departments d ON d.uuid = e.department_uuid
       LEFT JOIN Positions p ON p.uuid = e.position_uuid
-      LEFT JOIN Levels l ON l.uuid = e.level_uuid
-      LEFT JOIN Occupations o ON o.uuid = e.occupation_uuid
+      LEFT JOIN Departments d ON d.uuid = p.department_uuid
       WHERE e.uuid = ?
       LIMIT 1
     `,
@@ -458,8 +432,6 @@ async function updateEmployee(employeeUuid, payload) {
       "attendance_exempt",
       "department_uuid",
       "position_uuid",
-      "level_uuid",
-      "occupation_uuid",
     ];
 
     for (const field of allowedFields) {
@@ -471,9 +443,9 @@ async function updateEmployee(employeeUuid, payload) {
           values.push(payload[field] ? 1 : 0);
         } else if (
           field === "department_uuid" ||
-          field === "position_uuid" ||
-          field === "level_uuid" ||
-          field === "occupation_uuid"
+          field === "position_uuid"
+          
+          
         ) {
           values.push(payload[field] || null);
         } else if (field === "gender" && payload[field]) {
@@ -553,7 +525,7 @@ async function updateEmployee(employeeUuid, payload) {
       uuid: updatedEmployee.uuid,
       full_name: buildEmployeeFullName(updatedEmployee),
       hire_date: updatedEmployee.hire_date,
-      prior_gov_service: Number(updatedEmployee.prior_gov_service || 0),
+      prior_gov_service: Number(updatedEmployee.prior_gov_service_years || 0),
       status: updatedEmployee.status,
     });
   } catch (syncErr) {
@@ -601,7 +573,7 @@ async function updateEmployeeStatus(employeeUuid, status) {
       uuid: updatedEmployee.uuid,
       full_name: buildEmployeeFullName(updatedEmployee),
       hire_date: updatedEmployee.hire_date,
-      prior_gov_service: Number(updatedEmployee.prior_gov_service || 0),
+      prior_gov_service: Number(updatedEmployee.prior_gov_service_years || 0),
       status: updatedEmployee.status,
     });
   } catch (syncErr) {
