@@ -1,9 +1,28 @@
-version: '3.8'
-
 services:
+  # MariaDB Database
+  mariadb:
+    image: mariadb:latest
+    container_name: mesob-mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword123
+      MYSQL_DATABASE: mesob_db
+      MYSQL_USER: mesob_user
+      MYSQL_PASSWORD: mesob_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./database/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   # MinIO Object Storage
   minio:
-    image: minio/minio:latest
+    image: bitnami/minio:latest
     container_name: mesob-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -23,4 +42,6 @@ services:
 
 volumes:
   minio_data:
+    driver: local
+  mariadb_data:
     driver: local
