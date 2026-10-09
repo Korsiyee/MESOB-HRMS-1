@@ -138,24 +138,24 @@ exports.deleteRole = asyncHandler(async (req, res) => {
  */
 exports.setRoleStatus = asyncHandler(async (req, res) => {
   const { roleUuid } = req.params;
-  const { isActive } = req.body;
+  const { is_active } = req.body;
   
-  if (typeof isActive !== 'boolean') {
+  if (typeof is_active !== 'boolean') {
     return sendError(res, {
       status: 400,
-      message: "isActive must be a boolean",
+      message: "is_active must be a boolean",
       error: "INVALID_INPUT"
     });
   }
   
   const role = await roleManagementService.setRoleActiveStatus(
     roleUuid,
-    isActive,
+    is_active,
     req.user.uuid
   );
   
   sendSuccess(res, {
-    message: `Role ${isActive ? 'activated' : 'deactivated'} successfully`,
+    message: `Role ${is_active ? 'activated' : 'deactivated'} successfully`,
     data: { role }
   });
 });

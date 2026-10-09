@@ -151,6 +151,7 @@ const AppRouter = () => (
       <Route path="attendance" element={<AttendanceRouter />} />
       <Route path="attendance/my" element={<MyAttendanceRouter />} />
       <Route path="attendance/manage" element={<AttendancePage />} />
+      <Route path="attendance/network-settings" element={<NetworkSettingsPage />} />
       {/* Legacy route kept for backward compat */}
       <Route path="attendance-overview" element={<AttendanceOverviewPage />} />
       
@@ -159,8 +160,11 @@ const AppRouter = () => (
       <Route path="shifts/add" element={<ShiftsPage />} />
       <Route path="shifts/assignments" element={<ShiftsPage />} />
       
-      {/* ── Letters module ── Role-based routing */}
+      {/* ── Letters module ── Tab-based routing with permission check */}
       <Route path="letters" element={<LettersRouter />} />
+      <Route path="letters/templates" element={<LettersRouter />} />
+      <Route path="letters/generate" element={<LettersRouter />} />
+      <Route path="letters/requests" element={<LettersRouter />} />
       <Route path="letters/manage" element={<LettersPage />} />
       <Route path="letters/my" element={<MyLettersPage />} />
       

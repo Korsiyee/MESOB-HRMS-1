@@ -3,6 +3,7 @@ import { AccountApi } from "../api/accountApi";
 import { Users, UserPlus, Shield, UserX, UserCheck, Key, X, Eye, EyeOff } from "lucide-react";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import { Can } from "../components/Can";
+import { PermissionGuard } from "../components/PermissionGuard";
 import axios from 'axios';
 
 const C = {
@@ -558,4 +559,11 @@ const AccountsPage = () => {
   );
 };
 
-export default AccountsPage;
+// Wrap with permission guard to enforce RBAC
+const ProtectedAccountsPage = () => (
+  <PermissionGuard permissions="Accounts.View">
+    <AccountsPage />
+  </PermissionGuard>
+);
+
+export default ProtectedAccountsPage;

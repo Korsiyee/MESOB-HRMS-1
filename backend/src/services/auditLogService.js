@@ -16,11 +16,11 @@ async function logEvent({
     `
       INSERT INTO AuditLogs (
         uuid,
-        actor_uuid,
-        action,
-        entity_type,
-        entity_uuid,
-        diff_json,
+        actor_user_uuid,
+        action_type,
+        resource_type,
+        resource_uuid,
+        old_values_json,
         ip_address
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `,

@@ -3,14 +3,14 @@ const { sendSuccess, sendError } = require("../utils/response");
 
 /**
  * List audit logs with filtering and pagination
- * GET /api/logs?actor_uuid=xxx&action=CREATE&entity_type=USER&start_date=2024-01-01&end_date=2024-12-31&page=1&limit=50
+ * GET /api/logs?actor_uuid=xxx&action_type=CREATE&resource_type=USER&start_date=2024-01-01&end_date=2024-12-31&page=1&limit=50
  */
 exports.listLogs = async (req, res) => {
   try {
     const {
       actor_uuid,
-      action,
-      entity_type,
+      action_type,
+      resource_type,
       entity_uuid,
       start_date,
       end_date,
@@ -38,11 +38,11 @@ exports.listLogs = async (req, res) => {
     let query = `
       SELECT
         al.uuid,
-        al.actor_uuid,
-        al.action,
-        al.entity_type,
-        al.entity_uuid,
-        al.diff_json,
+        al.actor_user_uuid,
+        al.action_type,
+        al.resource_type,
+        al.resource_uuid,
+        al.old_values_json,
         al.ip_address,
         al.created_at,
         u.username as actor_username,
@@ -56,27 +56,27 @@ exports.listLogs = async (req, res) => {
           en_dept.entity_label,
           en_pos.entity_label,
           en_lr.entity_label,
-          al.entity_uuid
+          al.resource_uuid
         ) as entity_name
       FROM AuditLogs al
-      LEFT JOIN Users u ON u.uuid = al.actor_uuid
+      LEFT JOIN Users u ON u.uuid = al.actor_user_uuid
       LEFT JOIN Employees e ON e.uuid = u.employee_uuid
       LEFT JOIN (
         SELECT uuid, CONCAT_WS(' ', first_name, middle_name, last_name) AS entity_label
         FROM Employees
-      ) en_emp ON al.entity_type = 'EMPLOYEE' AND en_emp.uuid = al.entity_uuid
+      ) en_emp ON al.resource_type = 'EMPLOYEE' AND en_emp.uuid = al.resource_uuid
       LEFT JOIN (
         SELECT uuid, username AS entity_label FROM Users
-      ) en_usr ON al.entity_type = 'USER' AND en_usr.uuid = al.entity_uuid
+      ) en_usr ON al.resource_type = 'USER' AND en_usr.uuid = al.resource_uuid
       LEFT JOIN (
         SELECT uuid, name AS entity_label FROM Departments
-      ) en_dept ON al.entity_type = 'DEPARTMENT' AND en_dept.uuid = al.entity_uuid
+      ) en_dept ON al.resource_type = 'DEPARTMENT' AND en_dept.uuid = al.resource_uuid
       LEFT JOIN (
         SELECT uuid, title AS entity_label FROM Positions
-      ) en_pos ON al.entity_type = 'POSITION' AND en_pos.uuid = al.entity_uuid
+      ) en_pos ON al.resource_type = 'POSITION' AND en_pos.uuid = al.resource_uuid
       LEFT JOIN (
         SELECT uuid, leaveType AS entity_label FROM leaveRequests
-      ) en_lr ON al.entity_type = 'LEAVE_REQUEST' AND en_lr.uuid = al.entity_uuid
+      ) en_lr ON al.resource_type = 'LEAVE_REQUEST' AND en_lr.uuid = al.resource_uuid
       WHERE 1=1
     `;
 
@@ -84,25 +84,25 @@ exports.listLogs = async (req, res) => {
 
     // Filter by actor
     if (actor_uuid) {
-      query += " AND al.actor_uuid = ?";
+      query += " AND al.actor_user_uuid = ?";
       params.push(actor_uuid);
     }
 
-    // Filter by action
-    if (action) {
-      query += " AND al.action = ?";
-      params.push(action);
+    // Filter by action_type
+    if (action_type) {
+      query += " AND al.action_type = ?";
+      params.push(action_type);
     }
 
     // Filter by entity type
-    if (entity_type) {
-      query += " AND al.entity_type = ?";
-      params.push(entity_type);
+    if (resource_type) {
+      query += " AND al.resource_type = ?";
+      params.push(resource_type);
     }
 
     // Filter by entity UUID
     if (entity_uuid) {
-      query += " AND al.entity_uuid = ?";
+      query += " AND al.resource_uuid = ?";
       params.push(entity_uuid);
     }
 
@@ -120,9 +120,9 @@ exports.listLogs = async (req, res) => {
     // Search across multiple fields including mesob_id and full name
     if (search && search.trim()) {
       query += ` AND (
-        al.action LIKE ? OR
-        al.entity_type LIKE ? OR
-        al.entity_uuid LIKE ? OR
+        al.action_type LIKE ? OR
+        al.resource_type LIKE ? OR
+        al.resource_uuid LIKE ? OR
         u.username LIKE ? OR
         e.first_name LIKE ? OR
         e.last_name LIKE ? OR
@@ -190,11 +190,11 @@ exports.getLog = async (req, res) => {
     const [logs] = await pool.execute(
       `SELECT 
         al.uuid,
-        al.actor_uuid,
-        al.action,
-        al.entity_type,
-        al.entity_uuid,
-        al.diff_json,
+        al.actor_user_uuid,
+        al.action_type,
+        al.resource_type,
+        al.resource_uuid,
+        al.old_values_json,
         al.ip_address,
         al.created_at,
         u.uuid as actor_user_uuid,
@@ -206,27 +206,27 @@ exports.getLog = async (req, res) => {
         e.last_name as actor_last_name,
         e.mesob_id as actor_mesob_id,
         CASE
-          WHEN al.entity_type = 'EMPLOYEE' THEN (
+          WHEN al.resource_type = 'EMPLOYEE' THEN (
             SELECT CONCAT_WS(' ', first_name, middle_name, last_name)
-            FROM Employees WHERE uuid = al.entity_uuid LIMIT 1
+            FROM Employees WHERE uuid = al.resource_uuid LIMIT 1
           )
-          WHEN al.entity_type = 'USER' THEN (
-            SELECT username FROM Users WHERE uuid = al.entity_uuid LIMIT 1
+          WHEN al.resource_type = 'USER' THEN (
+            SELECT username FROM Users WHERE uuid = al.resource_uuid LIMIT 1
           )
-          WHEN al.entity_type = 'DEPARTMENT' THEN (
-            SELECT name FROM Departments WHERE uuid = al.entity_uuid LIMIT 1
+          WHEN al.resource_type = 'DEPARTMENT' THEN (
+            SELECT name FROM Departments WHERE uuid = al.resource_uuid LIMIT 1
           )
-          WHEN al.entity_type = 'POSITION' THEN (
-            SELECT title FROM Positions WHERE uuid = al.entity_uuid LIMIT 1
+          WHEN al.resource_type = 'POSITION' THEN (
+            SELECT title FROM Positions WHERE uuid = al.resource_uuid LIMIT 1
           )
-          WHEN al.entity_type = 'LEAVE_REQUEST' THEN (
+          WHEN al.resource_type = 'LEAVE_REQUEST' THEN (
             SELECT CONCAT('Leave Request - ', leaveType)
-            FROM leaveRequests WHERE uuid = al.entity_uuid LIMIT 1
+            FROM leaveRequests WHERE uuid = al.resource_uuid LIMIT 1
           )
-          ELSE al.entity_uuid
+          ELSE al.resource_uuid
         END as entity_name
       FROM AuditLogs al
-      LEFT JOIN Users u ON u.uuid = al.actor_uuid
+      LEFT JOIN Users u ON u.uuid = al.actor_user_uuid
       LEFT JOIN Employees e ON e.uuid = u.employee_uuid
       WHERE al.uuid = ?`,
       [uuid]
@@ -267,30 +267,30 @@ exports.getLog = async (req, res) => {
 };
 
 /**
- * Get available action types
- * GET /api/logs/actions
+ * Get available action_type types
+ * GET /api/logs/action_types
  */
 exports.getActions = async (req, res) => {
   try {
     const pool = db.promise();
 
-    const [actions] = await pool.execute(
-      `SELECT DISTINCT action 
+    const [action_types] = await pool.execute(
+      `SELECT DISTINCT action_type 
        FROM AuditLogs 
-       WHERE action IS NOT NULL 
-       ORDER BY action ASC`
+       WHERE action_type IS NOT NULL 
+       ORDER BY action_type ASC`
     );
 
     return sendSuccess(res, {
       status: 200,
       message: "Action types retrieved successfully.",
-      data: actions.map((row) => row.action),
+      data: action_types.map((row) => row.action_type),
     });
   } catch (error) {
     console.error("getActions error:", error);
     return sendError(res, {
       status: 500,
-      message: "Failed to retrieve action types.",
+      message: "Failed to retrieve action_type types.",
       error: "GET_ACTIONS_ERROR",
     });
   }
@@ -305,16 +305,16 @@ exports.getEntityTypes = async (req, res) => {
     const pool = db.promise();
 
     const [entityTypes] = await pool.execute(
-      `SELECT DISTINCT entity_type 
+      `SELECT DISTINCT resource_type 
        FROM AuditLogs 
-       WHERE entity_type IS NOT NULL 
-       ORDER BY entity_type ASC`
+       WHERE resource_type IS NOT NULL 
+       ORDER BY resource_type ASC`
     );
 
     return sendSuccess(res, {
       status: 200,
       message: "Entity types retrieved successfully.",
-      data: entityTypes.map((row) => row.entity_type),
+      data: entityTypes.map((row) => row.resource_type),
     });
   } catch (error) {
     console.error("getEntityTypes error:", error);
@@ -334,8 +334,8 @@ exports.exportLogs = async (req, res) => {
   try {
     const {
       actor_uuid,
-      action,
-      entity_type,
+      action_type,
+      resource_type,
       entity_uuid,
       start_date,
       end_date,
@@ -357,36 +357,36 @@ exports.exportLogs = async (req, res) => {
       SELECT 
         al.uuid,
         al.created_at,
-        al.action,
-        al.entity_type,
-        al.entity_uuid,
+        al.action_type,
+        al.resource_type,
+        al.resource_uuid,
         al.ip_address,
         u.username as actor_username,
         CONCAT_WS(' ', e.first_name, e.middle_name, e.last_name) as actor_name,
         e.mesob_id as actor_mesob_id,
-        al.diff_json,
+        al.old_values_json,
         CASE
-          WHEN al.entity_type = 'EMPLOYEE' THEN (
+          WHEN al.resource_type = 'EMPLOYEE' THEN (
             SELECT CONCAT_WS(' ', first_name, middle_name, last_name)
-            FROM Employees WHERE uuid = al.entity_uuid LIMIT 1
+            FROM Employees WHERE uuid = al.resource_uuid LIMIT 1
           )
-          WHEN al.entity_type = 'USER' THEN (
-            SELECT username FROM Users WHERE uuid = al.entity_uuid LIMIT 1
+          WHEN al.resource_type = 'USER' THEN (
+            SELECT username FROM Users WHERE uuid = al.resource_uuid LIMIT 1
           )
-          WHEN al.entity_type = 'DEPARTMENT' THEN (
-            SELECT name FROM Departments WHERE uuid = al.entity_uuid LIMIT 1
+          WHEN al.resource_type = 'DEPARTMENT' THEN (
+            SELECT name FROM Departments WHERE uuid = al.resource_uuid LIMIT 1
           )
-          WHEN al.entity_type = 'POSITION' THEN (
-            SELECT title FROM Positions WHERE uuid = al.entity_uuid LIMIT 1
+          WHEN al.resource_type = 'POSITION' THEN (
+            SELECT title FROM Positions WHERE uuid = al.resource_uuid LIMIT 1
           )
-          WHEN al.entity_type = 'LEAVE_REQUEST' THEN (
+          WHEN al.resource_type = 'LEAVE_REQUEST' THEN (
             SELECT CONCAT('Leave Request - ', leaveType)
-            FROM leaveRequests WHERE uuid = al.entity_uuid LIMIT 1
+            FROM leaveRequests WHERE uuid = al.resource_uuid LIMIT 1
           )
-          ELSE al.entity_uuid
+          ELSE al.resource_uuid
         END as entity_name
       FROM AuditLogs al
-      LEFT JOIN Users u ON u.uuid = al.actor_uuid
+      LEFT JOIN Users u ON u.uuid = al.actor_user_uuid
       LEFT JOIN Employees e ON e.uuid = u.employee_uuid
       WHERE 1=1
     `;
@@ -395,19 +395,19 @@ exports.exportLogs = async (req, res) => {
 
     // Apply same filters as listLogs
     if (actor_uuid) {
-      query += " AND al.actor_uuid = ?";
+      query += " AND al.actor_user_uuid = ?";
       params.push(actor_uuid);
     }
-    if (action) {
-      query += " AND al.action = ?";
-      params.push(action);
+    if (action_type) {
+      query += " AND al.action_type = ?";
+      params.push(action_type);
     }
-    if (entity_type) {
-      query += " AND al.entity_type = ?";
-      params.push(entity_type);
+    if (resource_type) {
+      query += " AND al.resource_type = ?";
+      params.push(resource_type);
     }
     if (entity_uuid) {
-      query += " AND al.entity_uuid = ?";
+      query += " AND al.resource_uuid = ?";
       params.push(entity_uuid);
     }
     if (start_date) {
@@ -420,9 +420,9 @@ exports.exportLogs = async (req, res) => {
     }
     if (search && search.trim()) {
       query += ` AND (
-        al.action LIKE ? OR
-        al.entity_type LIKE ? OR
-        al.entity_uuid LIKE ? OR
+        al.action_type LIKE ? OR
+        al.resource_type LIKE ? OR
+        al.resource_uuid LIKE ? OR
         u.username LIKE ? OR
         e.first_name LIKE ? OR
         e.last_name LIKE ? OR
@@ -461,8 +461,8 @@ exports.exportLogs = async (req, res) => {
         : "";
       csvRows.push([
         log.created_at,
-        log.action || "",
-        log.entity_type || "",
+        log.action_type || "",
+        log.resource_type || "",
         log.entity_name || "",
         log.entity_uuid || "",
         log.actor_username || "",

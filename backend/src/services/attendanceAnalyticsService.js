@@ -94,7 +94,7 @@ async function getDepartmentStats({ startDate, endDate } = {}) {
        SUM(a.status IN ('PRESENT','LATE','HALF_DAY')) AS present_count
      FROM AttendanceSummary a
      INNER JOIN Employees e ON e.uuid = a.employee_uuid
-     INNER JOIN Departments d ON d.uuid = e.department_uuid
+     INNER JOIN Departments d ON d.uuid = p.department_uuid
      WHERE a.date BETWEEN ? AND ?
      GROUP BY d.uuid, d.name
      ORDER BY present_count DESC
@@ -128,7 +128,8 @@ async function getTopEmployees({ startDate, endDate, limit = 10 } = {}) {
        SUM(a.status IN ('PRESENT','LATE','HALF_DAY')) AS present_days
      FROM AttendanceSummary a
      INNER JOIN Employees e ON e.uuid = a.employee_uuid
-     LEFT JOIN Departments d ON d.uuid = e.department_uuid
+     LEFT JOIN Positions p ON p.uuid = e.position_uuid
+     LEFT JOIN Departments d ON d.uuid = p.department_uuid
      WHERE a.date BETWEEN ? AND ?
      GROUP BY e.uuid, e.mesob_id, full_name, d.name
      ORDER BY present_days DESC
@@ -158,8 +159,8 @@ async function getRecentCorrections({ limit = 10 } = {}) {
        a.updated_at
      FROM AttendanceSummary a
      INNER JOIN Employees e ON e.uuid = a.employee_uuid
-     LEFT JOIN Employees c ON c.uuid = a.corrected_by
-     WHERE a.corrected_by IS NOT NULL
+     LEFT JOIN Employees c ON c.uuid = a.corrected_by_uuid
+     WHERE a.corrected_by_uuid IS NOT NULL
      ORDER BY a.updated_at DESC
      LIMIT ${safeLimit}`,
     []
@@ -190,7 +191,7 @@ async function getAttendanceRecords({
   const params = [sd, ed];
   let where = "WHERE a.date BETWEEN ? AND ?";
 
-  if (departmentUuid) { where += " AND e.department_uuid = ?"; params.push(departmentUuid); }
+  if (departmentUuid) { where += " AND p.department_uuid = ?"; params.push(departmentUuid); }
   if (positionUuid) { where += " AND e.position_uuid = ?"; params.push(positionUuid); }
   if (status) { where += " AND a.status = ?"; params.push(status); }
   if (search) {
@@ -207,8 +208,8 @@ async function getAttendanceRecords({
     `SELECT COUNT(*) AS total
      FROM AttendanceSummary a
      INNER JOIN Employees e ON e.uuid = a.employee_uuid
-     LEFT JOIN Departments d ON d.uuid = e.department_uuid
      LEFT JOIN Positions p ON p.uuid = e.position_uuid
+     LEFT JOIN Departments d ON d.uuid = p.department_uuid
      ${where}`,
     params
   );
@@ -228,11 +229,11 @@ async function getAttendanceRecords({
        a.updated_at AS corrected_at
      FROM AttendanceSummary a
      INNER JOIN Employees e ON e.uuid = a.employee_uuid
-     LEFT JOIN Departments d ON d.uuid = e.department_uuid
      LEFT JOIN Positions p ON p.uuid = e.position_uuid
+     LEFT JOIN Departments d ON d.uuid = p.department_uuid
      LEFT JOIN ShiftDefinitions s ON s.uuid = a.shift_uuid
      LEFT JOIN AttendanceLogs l ON l.employee_uuid = a.employee_uuid AND l.date = a.date
-     LEFT JOIN Employees c ON c.uuid = a.corrected_by
+     LEFT JOIN Employees c ON c.uuid = a.corrected_by_uuid
      ${where}
      ORDER BY a.date DESC, e.last_name ASC
      LIMIT ${safePageSize} OFFSET ${offset}`,

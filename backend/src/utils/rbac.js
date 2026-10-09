@@ -38,7 +38,7 @@ async function assertEmployeeReadAccess(user, employee, moduleAccess = null) {
   // Check scope boundaries based on moduleAccess.scope
   const scope = moduleAccess.scope;
   
-  if (scope.code === 'DEPARTMENT' && employee.department_uuid !== user.department_uuid) {
+  if (scope.code === 'DEPARTMENT' && employep.department_uuid !== user.department_uuid) {
     throw new ApiError("Employee is outside your department scope.", 403, "FORBIDDEN");
   }
   

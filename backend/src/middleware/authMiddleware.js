@@ -134,9 +134,10 @@ async function authenticateJwt(req, res, next) {
       try {
         const [employees] = await executeQuery(
           `SELECT e.first_name, e.middle_name, e.last_name, e.profile_photo_key, e.mesob_id,
-                  e.department_uuid,
+                  p.department_uuid,
                   a.email
            FROM Employees e
+           LEFT JOIN Positions p ON p.uuid = e.position_uuid
            LEFT JOIN EmployeeAddresses a ON e.uuid = a.employee_uuid AND a.address_type = 'CURRENT'
            WHERE e.uuid = ?`,
           [user.employee_uuid]

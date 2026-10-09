@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { NetworkSettingsApi } from '../api/networkSettingsApi';
 import { RefreshCw, Plus, Pencil, Trash2, X, Wifi, Shield, AlertCircle } from 'lucide-react';
 import { useDialog } from '../context/DialogContext';
+import { PermissionGuard } from '../components/PermissionGuard';
 
 /* ── Palette ── */
 const C = {
@@ -503,4 +504,11 @@ const NetworkSettingsPage = () => {
   );
 };
 
-export default NetworkSettingsPage;
+// Wrap with permission guard to enforce RBAC
+const ProtectedNetworkSettingsPage = () => (
+  <PermissionGuard permissions="NetworkSettings.View">
+    <NetworkSettingsPage />
+  </PermissionGuard>
+);
+
+export default ProtectedNetworkSettingsPage;

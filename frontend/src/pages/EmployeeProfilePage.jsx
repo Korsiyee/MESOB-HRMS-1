@@ -178,26 +178,23 @@ export default function EmployeeProfilePage() {
       }}
     >
       {/* Header */}
-      <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
-        <div
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: 12,
-            background: "linear-gradient(135deg, #0F766E, #14B8A6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#fff",
-          }}
-        >
-          <Users size={24} />
-        </div>
+      <div style={{ 
+        background: 'linear-gradient(135deg, #0c1e1c 0%, #1e3a37 100%)', 
+        borderRadius: 14, 
+        padding: isMobile ? '16px 20px' : '20px 24px', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between', 
+        marginBottom: 20, 
+        boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
+        flexWrap: 'wrap',
+        gap: 8
+      }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: C.textMain }}>
+          <h1 style={{ margin: 0, fontSize: isMobile ? '1rem' : '1.2rem', fontWeight: 700, color: '#E8F0EE' }}>
             Employee Profile
           </h1>
-          <p style={{ margin: "4px 0 0", fontSize: 14, color: C.textMuted }}>
+          <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: 'rgba(232,240,238,0.6)' }}>
             View and manage all employee profiles
           </p>
         </div>

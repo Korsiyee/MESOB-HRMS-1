@@ -471,6 +471,7 @@ const createRequest = async (req, res) => {
                 d.name AS department_name, e.department_uuid,
                 lr.department_head_id
          FROM Employees e
+           LEFT JOIN Positions p ON p.uuid = e.position_uuid
          LEFT JOIN Departments d ON d.uuid = e.department_uuid
          LEFT JOIN leaveRequests lr ON lr.uuid = ?
          WHERE e.uuid = ?`,
@@ -1128,7 +1129,7 @@ const departmentApproveRejectRequest = async (req, res) => {
         `SELECT
            CONCAT(e.first_name,' ',COALESCE(e.middle_name,''),' ',e.last_name) AS employee_full_name,
            e.uuid AS employee_uuid_emp,
-           lr.leaveType, lr.startDate, lr.endDate, lr.total_days,
+           lr.leaveType, lr.startDate, lr.endDate, lr.totalDays,
            lr.department_head_id, lr.rejectionReason AS rejection_reason_stored,
            CONCAT(dh_e.first_name,' ',COALESCE(dh_e.middle_name,''),' ',dh_e.last_name) AS dept_head_name,
            CONCAT(actor_e.first_name,' ',COALESCE(actor_e.middle_name,''),' ',actor_e.last_name) AS actor_name
@@ -1256,9 +1257,9 @@ const getRequestById = async (req, res) => {
         lr.leaveType,
         lr.startDate,
         lr.endDate,
-        lr.total_days,
+        lr.totalDays,
         lr.dayPattern,
-        lr.dailyPlanJson,
+        lr.dailyPlan,
         lr.reason,
         lr.rejectionReason,
         lr.supportingDocument,
@@ -1280,8 +1281,8 @@ const getRequestById = async (req, res) => {
         hr_emp.last_name as hr_last_name
       FROM leaveRequests lr
       LEFT JOIN Employees e ON e.uuid = lr.employee_uuid
-      LEFT JOIN Departments d ON d.uuid = e.department_uuid
       LEFT JOIN Positions p ON p.uuid = e.position_uuid
+      LEFT JOIN Departments d ON d.uuid = e.department_uuid
       LEFT JOIN Employees dh_emp ON dh_emp.uuid = (SELECT employee_uuid FROM Users WHERE uuid = lr.department_head_id)
       LEFT JOIN Employees hr_emp ON hr_emp.uuid = (SELECT employee_uuid FROM Users WHERE uuid = lr.hr_supervisor_id)
       WHERE lr.uuid = ?`,

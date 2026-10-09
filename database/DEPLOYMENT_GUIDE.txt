@@ -1,0 +1,132 @@
+================================================================================
+MESOB HRMS - DATABASE DEPLOYMENT GUIDE
+================================================================================
+
+Step 1: Drop and Recreate Database
+-----------------------------------
+mariadb -u mesob -pmesob_password -e "DROP DATABASE IF EXISTS mesob_hrms;"
+mariadb -u mesob -pmesob_password -e "CREATE DATABASE mesob_hrms CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+Step 2: Load Clean Schema
+-------------------------
+mariadb -u mesob -pmesob_password mesob_hrms < database/schema_clean.sql
+
+Step 3: Load Seed Data
+----------------------
+mariadb -u mesob -pmesob_password mesob_hrms < database/seed_data_with_passwords.sql
+
+Step 4: Verify Installation
+---------------------------
+mariadb -u mesob -pmesob_password mesob_hrms -e "
+SELECT 'Schema Check:' AS Test;
+SELECT COUNT(*) AS total_tables FROM information_schema.TABLES 
+WHERE TABLE_SCHEMA = 'mesob_hrms';
+
+SELECT 'RBAC Check:' AS Test;
+SELECT COUNT(*) AS modules FROM Modules;
+SELECT COUNT(*) AS scopes FROM Scopes;
+SELECT COUNT(*) AS roles FROM Roles;
+SELECT COUNT(*) AS role_modules FROM RoleModules;
+
+SELECT 'Data Check:' AS Test;
+SELECT COUNT(*) AS departments FROM Departments;
+SELECT COUNT(*) AS positions FROM Positions;
+SELECT COUNT(*) AS employees FROM Employees;
+SELECT COUNT(*) AS users FROM Users;
+"
+
+Step 5: Test Login
+------------------
+Use these credentials to test:
+
+Super Admin:
+  Username: abebe.tadesse
+  Password: mesob2024
+  Access: ALL modules
+
+HR Admin:
+  Username: tigist.bekele
+  Password: mesob2024
+  Access: All except ADMIN module
+
+Department Head:
+  Username: dawit.girma (or) mulugeta.kebede
+  Password: mesob2024
+  Access: EMPLOYEES, ATTENDANCE, SHIFTS, LEAVE (Department scope)
+
+HR Officer:
+  Username: marta.mulugeta (or) berhanu.wolde (or) birtukan.fikre
+  Password: mesob2024
+  Access: EMPLOYEES, LETTERS, LEAVE
+
+Employee:
+  Username: yohannes.solomon (or) selamawit.hagos (or) helen.desta
+  Password: mesob2024
+  Access: HOME only (Personal scope)
+
+================================================================================
+SEED DATA SUMMARY
+================================================================================
+
+Departments (10):
+  - Ministry of Innovation and Technology
+  - Ministry of Finance
+  - Ministry of Human Resources
+  - Ministry of Health
+  - Ministry of Education
+  - Ministry of Trade and Industry
+  - Ministry of Transport and Logistics
+  - Ministry of Agriculture
+  - Ministry of Water and Energy
+  - Ministry of Labor and Social Affairs
+
+Positions (5):
+  - Minister (Grade 1)
+  - Director General (Grade 2)
+  - Department Head (Grade 3)
+  - Senior Specialist (Grade 4)
+  - Officer (Grade 5)
+
+Employees (10):
+  1. Abebe Kebede Tadesse (Minister)
+  2. Tigist Alemayehu Bekele (Director General)
+  3. Dawit Tesfaye Girma (Department Head)
+  4. Marta Assefa Mulugeta (Senior Specialist)
+  5. Yohannes Mekonnen Solomon (Officer)
+  6. Selamawit Getachew Hagos (Officer)
+  7. Berhanu Tadesse Wolde (Senior Specialist)
+  8. Helen Abera Desta (Officer)
+  9. Mulugeta Worku Kebede (Department Head)
+  10. Birtukan Negash Fikre (Senior Specialist)
+
+Role Distribution:
+  - 1 Super Admin
+  - 1 HR Admin
+  - 2 Department Heads
+  - 3 HR Officers
+  - 3 Regular Employees
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Q: Schema creation fails with foreign key errors
+A: Make sure you're using MariaDB/MySQL 5.7+ and run with FOREIGN_KEY_CHECKS=0
+
+Q: Users can't login
+A: Check that permissions_version is 1 and role_uuid is correctly set
+
+Q: Permission checks fail
+A: Verify RoleModules table has entries. Run:
+   SELECT r.name, m.code, s.code FROM RoleModules rm 
+   JOIN Roles r ON rm.role_uuid = r.uuid 
+   JOIN Modules m ON rm.module_uuid = m.uuid 
+   JOIN Scopes s ON rm.scope_uuid = s.uuid;
+
+Q: Need to reset a user password
+A: Run this (password will be 'mesob2024'):
+   UPDATE Users 
+   SET password_hash = '$2b$10$vI8aWBnW3fID.Zj7.lfIlOJ.1vLoOYsNjzQyX.NjqiIy/1F7L8YxC'
+   WHERE username = 'username.here';
+
+================================================================================

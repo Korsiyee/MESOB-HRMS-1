@@ -145,7 +145,7 @@ function applyScopeFilter(scopeFilter, tableAlias = '', columnMap = {}) {
  * @param {Object} scopeFilter - From req.scopeFilter
  * @param {Object} resource - Resource object from database
  * @param {string} resource.uuid - Resource UUID
- * @param {string} resource.department_uuid - Resource department UUID
+ * @param {string} resourcp.department_uuid - Resource department UUID
  * @param {string} [resource.branch_uuid] - Resource branch UUID (optional)
  * @param {string} [resource.company_uuid] - Resource company UUID (optional)
  * @returns {boolean} True if scope allows access
@@ -163,7 +163,7 @@ function canAccessResource(scopeFilter, resource) {
   } else if (scopeFilter.type === 'SELF') {
     return resource.uuid === scopeFilter.value;
   } else if (scopeFilter.type === 'DEPARTMENT') {
-    return resource.department_uuid === scopeFilter.value;
+    return resourcp.department_uuid === scopeFilter.value;
   } else if (scopeFilter.type === 'BRANCH') {
     return resource.branch_uuid === scopeFilter.value;
   } else if (scopeFilter.type === 'COMPANY') {

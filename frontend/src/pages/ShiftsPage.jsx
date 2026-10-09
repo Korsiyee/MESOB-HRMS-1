@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ShiftApi } from '../api/shiftApi';
 import { EmployeeApi } from '../api/employeeApi';
 import { Layers, Plus, Pencil, Trash2, X, Users, Calendar, AlertTriangle, CheckCircle, Clock, Briefcase, Search } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { Can } from '../components/Can';
-import TabSwipe from '../components/ui/TabSwipe';
+import OrganizationModuleHeader from '../components/ui/OrganizationModuleHeader';
 
 const C = { card:'#EEF1F0', border:'rgba(0,80,60,0.09)', shadow:'0 2px 12px rgba(0,60,45,0.07)', primary:'#0F766E', primaryHov:'#14B8A6', textMain:'#1A2E2B', textSub:'#1E4A42', textMuted:'#2E6058', headerBg:'linear-gradient(135deg,#0c1e1c,#1e3a37)' };
 const field = { width:'100%', padding:'9px 13px', borderRadius:8, border:`1px solid ${C.border}`, background:C.card, fontSize:'0.82rem', color:C.textMain, outline:'none', fontFamily:'Poppins,sans-serif', boxSizing:'border-box' };
@@ -342,7 +342,7 @@ const AssignShiftToPositionModal = ({ onClose, onSaved, showMsg, shifts }) => {
 /* ══════════════════════════════════════════
    SHIFTS OVERVIEW VIEW
 ══════════════════════════════════════════ */
-const ShiftsOverview = () => {
+const ShiftsOverview = ({ activeTab, onTabChange }) => {
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewingShift, setViewingShift] = useState(null);
@@ -392,15 +392,18 @@ const ShiftsOverview = () => {
       <Notice type={notice.type} message={notice.message} onClose={() => setNotice({ type: '', message: '' })} />
 
       {/* Hero Header */}
-      <div style={{ background: C.headerBg, borderRadius: 14, padding: '22px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', marginBottom: 20 }}>
-        <div>
-          <p style={{ margin: '0 0 4px', fontSize: '0.7rem', color: 'rgba(232,240,238,0.45)', letterSpacing: '0.04em' }}>Shifts › Overview</p>
-          <h1 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: '#E8F0EE' }}>Shifts Overview</h1>
-          <p style={{ margin: '4px 0 0', fontSize: '0.76rem', color: 'rgba(232,240,238,0.55)' }}>
-            {loading ? 'Loading…' : `${shifts.length} shift definitions · ${totalEmployees} employees assigned`}
-          </p>
-        </div>
-      </div>
+      {/* Shared Module Header */}
+      <OrganizationModuleHeader
+        moduleName="Shifts"
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        tabs={[
+          { key: 'overview', label: 'Overview' },
+          { key: 'add', label: 'Add Shift' },
+          { key: 'assignments', label: 'Manage Assignments' },
+        ]}
+        subtitle={loading ? 'Loading…' : `${shifts.length} shift definitions · ${totalEmployees} employees assigned`}
+      />
 
       {/* Stats Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
@@ -492,7 +495,7 @@ const ShiftsOverview = () => {
 /* ══════════════════════════════════════════
    ADD SHIFT VIEW
 ══════════════════════════════════════════ */
-const AddShiftView = () => {
+const AddShiftView = ({ activeTab, onTabChange }) => {
   const [form, setForm] = useState({
     name: '',
     start_time: '08:00',
@@ -543,12 +546,18 @@ const AddShiftView = () => {
     <div style={{ fontFamily: 'Poppins,sans-serif', maxWidth: 700, margin: '0 auto' }}>
       <Notice type={notice.type} message={notice.message} onClose={() => setNotice({ type: '', message: '' })} />
 
-      {/* Header */}
-      <div style={{ background: C.headerBg, borderRadius: 14, padding: '20px 26px', marginBottom: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.18)' }}>
-        <p style={{ margin: '0 0 3px', fontSize: '0.7rem', color: 'rgba(232,240,238,0.45)', letterSpacing: '0.04em' }}>Shifts › Add New</p>
-        <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#E8F0EE' }}>Add New Shift</h1>
-        <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: 'rgba(232,240,238,0.6)' }}>Create a new shift schedule with working days and times</p>
-      </div>
+      {/* Shared Module Header */}
+      <OrganizationModuleHeader
+        moduleName="Shifts"
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        tabs={[
+          { key: 'overview', label: 'Overview' },
+          { key: 'add', label: 'Add Shift' },
+          { key: 'assignments', label: 'Manage Assignments' },
+        ]}
+        subtitle="Create a new shift schedule with working days and times"
+      />
 
       {/* Form Card */}
       <div style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.border}`, boxShadow: C.shadow, padding: 28 }}>
@@ -599,7 +608,7 @@ const AddShiftView = () => {
 /* ══════════════════════════════════════════
    MANAGE ASSIGNMENTS VIEW
 ══════════════════════════════════════════ */
-const ManageAssignmentsView = () => {
+const ManageAssignmentsView = ({ activeTab, onTabChange }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [shifts, setShifts] = useState([]);
@@ -671,12 +680,18 @@ const ManageAssignmentsView = () => {
     <div style={{ fontFamily: 'Poppins,sans-serif', display: 'flex', flexDirection: 'column', gap: 20 }}>
       <Notice type={notice.type} message={notice.message} onClose={() => setNotice({ type: '', message: '' })} />
 
-      <div style={{ background: C.headerBg, borderRadius: 14, padding: '20px 26px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.18)' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#E8F0EE' }}>Manage Shift Assignments</h1>
-          <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: 'rgba(232,240,238,0.6)' }}>Assign shifts to employees and positions</p>
-        </div>
-      </div>
+      {/* Shared Module Header */}
+      <OrganizationModuleHeader
+        moduleName="Shifts"
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        tabs={[
+          { key: 'overview', label: 'Overview' },
+          { key: 'add', label: 'Add Shift' },
+          { key: 'assignments', label: 'Manage Assignments' },
+        ]}
+        subtitle="Assign shifts to employees and positions"
+      />
 
       {/* Action Buttons */}
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
@@ -824,33 +839,52 @@ const ManageAssignmentsView = () => {
 };
 
 /* ══════════════════════════════════════════
-   MAIN PAGE (Tabbed Interface)
+   MAIN PAGE (Tabbed Interface with URL-based navigation)
 ══════════════════════════════════════════ */
 const ShiftsPage = () => {
-  const tabs = [
-    {
-      key: 'overview',
-      label: 'Overview',
-      path: '/shifts',
-      content: <ShiftsOverview />
-    },
-    {
-      key: 'add',
-      label: 'Add Shift',
-      path: '/shifts/add',
-      content: <AddShiftView />
-    },
-    {
-      key: 'assignments',
-      label: 'Manage Assignments',
-      path: '/shifts/assignments',
-      content: <ManageAssignmentsView />
-    },
-  ];
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Determine active tab from URL
+  const getActiveTab = () => {
+    const path = location.pathname;
+    if (path === '/shifts/add') return 'add';
+    if (path === '/shifts/assignments') return 'assignments';
+    return 'overview';
+  };
+
+  const [activeTab, setActiveTab] = useState(getActiveTab());
+
+  // Update active tab when URL changes
+  useEffect(() => {
+    setActiveTab(getActiveTab());
+  }, [location.pathname]);
+
+  // Handle tab change
+  const handleTabChange = (tabKey) => {
+    const paths = {
+      overview: '/shifts',
+      add: '/shifts/add',
+      assignments: '/shifts/assignments',
+    };
+    navigate(paths[tabKey]);
+  };
+
+  // Render content based on active tab
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'add':
+        return <AddShiftView activeTab={activeTab} onTabChange={handleTabChange} />;
+      case 'assignments':
+        return <ManageAssignmentsView activeTab={activeTab} onTabChange={handleTabChange} />;
+      default:
+        return <ShiftsOverview activeTab={activeTab} onTabChange={handleTabChange} />;
+    }
+  };
 
   return (
     <div style={{ fontFamily: 'Poppins,sans-serif' }}>
-      <TabSwipe tabs={tabs} defaultTab="overview" />
+      {renderContent()}
     </div>
   );
 };

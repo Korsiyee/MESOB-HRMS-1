@@ -11,6 +11,7 @@ import {
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useDialog } from '../context/DialogContext';
 import { Can } from '../components/Can';
+import OrganizationModuleHeader from '../components/ui/OrganizationModuleHeader';
 
 /* ── Shared palette ── */
 const C = {
@@ -66,10 +67,9 @@ const Notice = ({ type, message, onClose }) => message ? (
 ) : null;
 
 /* ══════════════════════════════════════════
-   DEPT MODAL — shared Add / Edit
+   EDIT DEPT MODAL — for editing only (used in Manage tab)
 ══════════════════════════════════════════ */
-const DeptModal = ({ dept, onClose, onSaved, showMsg }) => {
-  const editing = !!dept?.uuid;
+const EditDeptModal = ({ dept, onClose, onSaved, showMsg }) => {
   const [form, setForm] = useState({
     name: dept?.name || '',
     parent_uuid: dept?.parent_uuid || '',
@@ -97,9 +97,8 @@ const DeptModal = ({ dept, onClose, onSaved, showMsg }) => {
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     const h = { Authorization: `Bearer ${token}` };
-    // When editing: only load employees that belong to THIS department (Rule 6)
-    // When creating: load all active employees (department doesn't exist yet)
-    const empUrl = editing && dept?.uuid
+    // Only load employees that belong to THIS department for editing
+    const empUrl = dept?.uuid
       ? `/api/employees?status=ACTIVE&department_uuid=${encodeURIComponent(dept.uuid)}&limit=300`
       : '/api/employees?status=ACTIVE&limit=300';
     Promise.all([
@@ -109,9 +108,7 @@ const DeptModal = ({ dept, onClose, onSaved, showMsg }) => {
       setEmployees(eRes?.data || []);
       setAllDepts((dRes?.data || []).filter(d => d.uuid !== dept?.uuid));
     }).catch(() => {});
-  }, [dept?.uuid, editing]);
-
-  const [empDropdownOpen, setEmpDropdownOpen] = useState(false);
+  }, [dept?.uuid]);
 
   const filteredEmps = empSearch
     ? employees.filter(e => `${e.first_name} ${e.middle_name || ''} ${e.last_name} ${e.mesob_id}`.toLowerCase().includes(empSearch.toLowerCase()))
@@ -133,8 +130,8 @@ const DeptModal = ({ dept, onClose, onSaved, showMsg }) => {
         ...(form.parent_uuid        ? { parent_uuid:        form.parent_uuid        } : { parent_uuid:        null }),
         ...(form.head_employee_uuid ? { head_employee_uuid: form.head_employee_uuid } : { head_employee_uuid: null }),
       };
-      if (editing) { await DepartmentApi.update(dept.uuid, body); showMsg('success', 'Department updated.'); }
-      else         { await DepartmentApi.create(body);             showMsg('success', 'Department created.'); }
+      await DepartmentApi.update(dept.uuid, body);
+      showMsg('success', 'Department updated.');
       onSaved();
     } catch (err) { showMsg('error', err.message || 'Failed.'); }
     finally { setSaving(false); }
@@ -144,7 +141,7 @@ const DeptModal = ({ dept, onClose, onSaved, showMsg }) => {
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: C.card, borderRadius: 14, width: '100%', maxWidth: 520, padding: 28, boxShadow: '0 25px 50px rgba(0,0,0,0.3)', border: `1px solid ${C.border}`, maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: C.textMain }}>{editing ? 'Edit Department' : 'Add Department'}</h2>
+          <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: C.textMain }}>Edit Department</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted, display: 'flex' }}><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit}>
@@ -183,7 +180,7 @@ const DeptModal = ({ dept, onClose, onSaved, showMsg }) => {
                 value={empSearch}
                 onChange={e => { setEmpSearch(e.target.value); setDropOpen(true); }}
                 onFocus={() => setDropOpen(true)}
-                placeholder={selectedEmp ? 'Search to change…' : editing ? 'Search employees in this department…' : 'Search by name or ID…'}
+                placeholder={selectedEmp ? 'Search to change…' : 'Search employees in this department…'}
                 style={{ ...field }}
               />
               {dropOpen && empSearch && (
@@ -213,7 +210,7 @@ const DeptModal = ({ dept, onClose, onSaved, showMsg }) => {
           </div>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button type="button" onClick={onClose} style={{ padding: '9px 18px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', color: C.textSub, fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'Poppins,sans-serif' }}>Cancel</button>
-            <GreenBtn type="submit" disabled={saving}>{saving ? 'Saving…' : editing ? 'Update' : 'Create'}</GreenBtn>
+            <GreenBtn type="submit" disabled={saving}>{saving ? 'Saving…' : 'Update'}</GreenBtn>
           </div>
         </form>
       </div>
@@ -488,72 +485,27 @@ const DepartmentsOverview = ({ activeTab, onTabChange }) => {
     { key: 'manage', label: 'Manage' },
   ];
 
+  const subtitle = loading 
+    ? 'Loading…' 
+    : `${total} departments · ${totalEmp} employees · ${totalPositions} positions · ${totalVacant} vacant`;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, fontFamily: 'Poppins,sans-serif' }}>
 
-      {/* Hero header with integrated navigation tabs */}
-      <div style={{ background: C.headerBg, borderRadius: 14, padding: '22px 28px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
-        {/* Top row: Breadcrumb, Title, Stats on left | Tabs + Refresh on right */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: isMobile ? 'wrap' : 'nowrap', gap: 16 }}>
-          {/* Left side: Title and stats */}
-          <div style={{ flex: isMobile ? '1 1 100%' : '0 1 auto', minWidth: 0 }}>
-            <p style={{ margin: '0 0 4px', fontSize: '0.7rem', color: 'rgba(232,240,238,0.45)', letterSpacing: '0.04em' }}>Departments › Overview</p>
-            <h1 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: '#E8F0EE' }}>Departments Overview</h1>
-            <p style={{ margin: '4px 0 0', fontSize: '0.76rem', color: 'rgba(232,240,238,0.55)' }}>
-              {loading ? 'Loading…' : `${total} departments · ${totalEmp} employees · ${totalPositions} positions · ${totalVacant} vacant`}
-            </p>
-          </div>
-
-          {/* Right side: Navigation tabs + Refresh button */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: isMobile ? 'wrap' : 'nowrap', flex: isMobile ? '1 1 100%' : '0 0 auto' }}>
-            {/* Navigation Tabs */}
-            <div style={{ display: 'flex', gap: 6, background: 'rgba(0,0,0,0.15)', borderRadius: 10, padding: 4 }}>
-              {navTabs.map(tab => {
-                const isActive = activeTab === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    onClick={() => onTabChange(tab.key)}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: 7,
-                      border: 'none',
-                      background: isActive ? 'rgba(232,240,238,0.95)' : 'transparent',
-                      color: isActive ? C.primary : 'rgba(232,240,238,0.7)',
-                      fontSize: '0.78rem',
-                      fontWeight: isActive ? 700 : 600,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      whiteSpace: 'nowrap',
-                      fontFamily: 'Poppins,sans-serif',
-                    }}
-                    onMouseEnter={e => {
-                      if (!isActive) {
-                        e.currentTarget.style.background = 'rgba(232,240,238,0.1)';
-                        e.currentTarget.style.color = '#E8F0EE';
-                      }
-                    }}
-                    onMouseLeave={e => {
-                      if (!isActive) {
-                        e.currentTarget.style.background = 'transparent';
-                        e.currentTarget.style.color = 'rgba(232,240,238,0.7)';
-                      }
-                    }}
-                  >
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Refresh Button */}
-            <button onClick={load}
-              style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid rgba(232,240,238,0.22)', background: 'rgba(232,240,238,0.08)', color: '#E8F0EE', fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontFamily: 'Poppins,sans-serif', whiteSpace: 'nowrap' }}>
-              ↻ Refresh
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* Shared Module Header */}
+      <OrganizationModuleHeader
+        moduleName="Departments"
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        tabs={navTabs}
+        subtitle={subtitle}
+        action={
+          <button onClick={load}
+            style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid rgba(232,240,238,0.22)', background: 'rgba(232,240,238,0.08)', color: '#E8F0EE', fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontFamily: 'Poppins,sans-serif', whiteSpace: 'nowrap' }}>
+            ↻ Refresh
+          </button>
+        }
+      />
 
       {error && (
         <div style={{ padding: '12px 16px', borderRadius: 8, background: '#fef2f2', border: '1px solid #fca5a5', color: '#991b1b', fontSize: '0.82rem' }}>{error}</div>
@@ -725,7 +677,6 @@ const DepartmentsManage = ({ activeTab, onTabChange }) => {
   const [loading,  setLoading]  = useState(true);
   const [notice,   setNotice]   = useState({ type: '', message: '' });
   const [editDept, setEditDept] = useState(null);
-  const [showAdd,  setShowAdd]  = useState(false);
   const [deleting, setDeleting] = useState('');
   const [search,   setSearch]   = useState('');
 
@@ -783,62 +734,14 @@ const DepartmentsManage = ({ activeTab, onTabChange }) => {
     <div style={{ fontFamily: 'Poppins,sans-serif', display: 'flex', flexDirection: 'column', gap: 20 }}>
       <Notice type={notice.type} message={notice.message} onClose={() => setNotice({ type: '', message: '' })} />
 
-      {/* Header with integrated navigation tabs */}
-      <div style={{ background: C.headerBg, borderRadius: 14, padding: '20px 26px', boxShadow: '0 4px 20px rgba(0,0,0,0.18)' }}>
-        {/* Top row */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: isMobile ? 'wrap' : 'nowrap', gap: 16, marginBottom: 12 }}>
-          <div style={{ flex: isMobile ? '1 1 100%' : '0 1 auto', minWidth: 0 }}>
-            <p style={{ margin: '0 0 3px', fontSize: '0.7rem', color: 'rgba(232,240,238,0.45)', letterSpacing: '0.04em' }}>Departments › Manage</p>
-            <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#E8F0EE' }}>Manage Departments</h1>
-            <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: 'rgba(232,240,238,0.6)' }}>{depts.length} departments</p>
-          </div>
-          <Can action="create" resource="departments">
-            <GreenBtn onClick={() => setShowAdd(true)} style={{ background: '#E8F0EE', color: C.primary, flexShrink: 0 }}>
-              <Plus size={15} /> Add Department
-            </GreenBtn>
-          </Can>
-        </div>
-
-        {/* Navigation Tabs */}
-        <div style={{ display: 'flex', gap: 6, background: 'rgba(0,0,0,0.15)', borderRadius: 10, padding: 4, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
-          {navTabs.map(tab => {
-            const isActive = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => onTabChange(tab.key)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: 7,
-                  border: 'none',
-                  background: isActive ? 'rgba(232,240,238,0.95)' : 'transparent',
-                  color: isActive ? C.primary : 'rgba(232,240,238,0.7)',
-                  fontSize: '0.78rem',
-                  fontWeight: isActive ? 700 : 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  whiteSpace: 'nowrap',
-                  fontFamily: 'Poppins,sans-serif',
-                }}
-                onMouseEnter={e => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = 'rgba(232,240,238,0.1)';
-                    e.currentTarget.style.color = '#E8F0EE';
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.color = 'rgba(232,240,238,0.7)';
-                  }
-                }}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {/* Shared Module Header */}
+      <OrganizationModuleHeader
+        moduleName="Departments"
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        tabs={navTabs}
+        subtitle={`${depts.length} departments`}
+      />
 
       {/* Search + refresh */}
       <div style={{ display: 'flex', gap: 12 }}>
@@ -924,8 +827,7 @@ const DepartmentsManage = ({ activeTab, onTabChange }) => {
         </p>
       )}
 
-      {showAdd  && <DeptModal dept={null}     onClose={() => setShowAdd(false)}  onSaved={() => { setShowAdd(false);  load(); }} showMsg={showMsg} />}
-      {editDept && <DeptModal dept={editDept} onClose={() => setEditDept(null)} onSaved={() => { setEditDept(null); load(); }} showMsg={showMsg} />}
+      {editDept && <EditDeptModal dept={editDept} onClose={() => setEditDept(null)} onSaved={() => { setEditDept(null); load(); }} showMsg={showMsg} />}
     </div>
   );
 };
@@ -1027,57 +929,14 @@ const AddDepartmentView = ({ activeTab, onTabChange }) => {
     <div style={{ fontFamily: 'Poppins,sans-serif', maxWidth: 700, margin: '0 auto' }}>
       <Notice type={notice.type} message={notice.message} onClose={() => setNotice({ type: '', message: '' })} />
 
-      {/* Header with integrated navigation tabs */}
-      <div style={{ background: C.headerBg, borderRadius: 14, padding: '20px 26px', marginBottom: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.18)' }}>
-        {/* Top row */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: isMobile ? 'wrap' : 'nowrap', gap: 16, marginBottom: 12 }}>
-          <div style={{ flex: isMobile ? '1 1 100%' : '0 1 auto', minWidth: 0 }}>
-            <p style={{ margin: '0 0 3px', fontSize: '0.7rem', color: 'rgba(232,240,238,0.45)', letterSpacing: '0.04em' }}>Departments › Add New</p>
-            <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#E8F0EE' }}>Add New Department</h1>
-            <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: 'rgba(232,240,238,0.6)' }}>Create a new department in your organization</p>
-          </div>
-        </div>
-
-        {/* Navigation Tabs */}
-        <div style={{ display: 'flex', gap: 6, background: 'rgba(0,0,0,0.15)', borderRadius: 10, padding: 4, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
-          {navTabs.map(tab => {
-            const isActive = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => onTabChange(tab.key)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: 7,
-                  border: 'none',
-                  background: isActive ? 'rgba(232,240,238,0.95)' : 'transparent',
-                  color: isActive ? C.primary : 'rgba(232,240,238,0.7)',
-                  fontSize: '0.78rem',
-                  fontWeight: isActive ? 700 : 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  whiteSpace: 'nowrap',
-                  fontFamily: 'Poppins,sans-serif',
-                }}
-                onMouseEnter={e => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = 'rgba(232,240,238,0.1)';
-                    e.currentTarget.style.color = '#E8F0EE';
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.color = 'rgba(232,240,238,0.7)';
-                  }
-                }}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {/* Shared Module Header */}
+      <OrganizationModuleHeader
+        moduleName="Departments"
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        tabs={navTabs}
+        subtitle="Create a new department in your organization"
+      />
 
       {/* Form Card */}
       <div style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.border}`, boxShadow: C.shadow, padding: 28 }}>

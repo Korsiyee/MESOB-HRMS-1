@@ -7,17 +7,16 @@ const {
   changeAccountStatus,
   resetAccountPassword,
 } = require("../controllers/accountController");
-// Use module-level authorization (accounts are part of ORGANIZATION module)
-const { requireModule } = require("../middleware/moduleAuth");
+const { authorize } = require("../middleware/authorize");
 
 const router = express.Router();
 
-// All account management operations require ORGANIZATION module
-router.post("/", requireModule('ORGANIZATION'), createAccount);
-router.get("/", requireModule('ORGANIZATION'), listAccounts);
-router.get("/:uuid", requireModule('ORGANIZATION'), getAccount);
-router.patch("/:uuid/role", requireModule('ORGANIZATION'), changeAccountRole);
-router.patch("/:uuid/status", requireModule('ORGANIZATION'), changeAccountStatus);
-router.patch("/:uuid/reset-password", requireModule('ORGANIZATION'), resetAccountPassword);
+// All account management operations require Accounts permissions
+router.post("/", authorize({ permissions: 'Accounts.Create' }), createAccount);
+router.get("/", authorize({ permissions: 'Accounts.View' }), listAccounts);
+router.get("/:uuid", authorize({ permissions: 'Accounts.View' }), getAccount);
+router.patch("/:uuid/role", authorize({ permissions: 'Accounts.Update' }), changeAccountRole);
+router.patch("/:uuid/status", authorize({ permissions: 'Accounts.Update' }), changeAccountStatus);
+router.patch("/:uuid/reset-password", authorize({ permissions: 'Accounts.Update' }), resetAccountPassword);
 
 module.exports = router;

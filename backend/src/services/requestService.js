@@ -106,7 +106,7 @@ class RequestService {
         // If status is PENDING_DEPARTMENT and no dept head assigned, find the employee's dept head
         if (status === 'PENDING_DEPARTMENT' && !deptHeadId) {
           const [empDeptRows] = await connection.execute(
-            `SELECT e.department_uuid 
+            `SELECT p.department_uuid 
              FROM Employees e 
              WHERE e.uuid = ?`,
             [employee_uuid]
@@ -120,7 +120,7 @@ class RequestService {
               `SELECT u.uuid 
                FROM Users u
                JOIN Employees e ON e.uuid = u.employee_uuid
-               WHERE e.department_uuid = ? AND u.role = 'DEPARTMENT_HEAD'
+               WHERE p.department_uuid = ? AND u.role = 'DEPARTMENT_HEAD'
                LIMIT 1`,
               [deptUuid]
             );
@@ -365,7 +365,7 @@ class RequestService {
       // Role-based filtering for status
       if (departmentUuid) {
         // Department Head: Only see PENDING_DEPARTMENT for their department
-        statusFilter = "AND lr.status = 'PENDING_DEPARTMENT' AND e.department_uuid = ?";
+        statusFilter = "AND lr.status = 'PENDING_DEPARTMENT' AND p.department_uuid = ?";
         params.push(departmentUuid);
       } else {
         // HR roles: Only see PENDING_HR (not PENDING_DEPARTMENT)
@@ -376,10 +376,10 @@ class RequestService {
         SELECT lr.uuid, lr.employee_uuid, lr.leaveType,
                DATE_FORMAT(lr.startDate, '%Y-%m-%d') AS startDate,
                DATE_FORMAT(lr.endDate, '%Y-%m-%d') AS endDate,
-           lr.total_days, lr.reason, lr.status, lr.rejectionReason,
-           lr.dayPattern, lr.dailyPlanJson,
+           lr.totalDays, lr.reason, lr.status, lr.rejectionReason,
+           lr.dayPattern, lr.dailyPlan,
                e.first_name, e.middle_name, e.last_name, e.hire_date,
-               e.department_uuid
+               p.department_uuid
         FROM leaveRequests lr
         ${deptJoin}
         WHERE 1=1
@@ -422,8 +422,8 @@ class RequestService {
         SELECT lr.uuid, lr.employee_uuid, lr.leaveType,
                DATE_FORMAT(lr.startDate, '%Y-%m-%d') AS startDate,
                DATE_FORMAT(lr.endDate, '%Y-%m-%d') AS endDate,
-           lr.total_days, lr.reason, lr.status, lr.rejectionReason,
-           lr.dayPattern, lr.dailyPlanJson,
+           lr.totalDays, lr.reason, lr.status, lr.rejectionReason,
+           lr.dayPattern, lr.dailyPlan,
                e.first_name, e.middle_name, e.last_name, e.hire_date
         FROM leaveRequests lr
         LEFT JOIN Employees e ON lr.employee_uuid = e.uuid
@@ -1357,7 +1357,7 @@ class RequestService {
       const [requestRows] = await connection.execute(
         `SELECT lr.uuid, lr.employee_uuid,
                 DATE_FORMAT(lr.startDate, '%Y-%m-%d') AS startDate,
-                lr.status, lr.total_days
+                lr.status, lr.totalDays
          FROM leaveRequests lr
          WHERE lr.uuid = ?
          FOR UPDATE`,

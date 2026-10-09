@@ -168,7 +168,7 @@ async function upsertCurrentYearBalance(conn, employeeUuid, currentBudgetYear) {
   }
 
   const completedYears = getCompletedYears(hireDate, fiscalYearStartDate);
-  const priorGovService = normalizeDays(employee.prior_gov_service);
+  const priorGovService = normalizeDays(employee.prior_gov_service_years);
   const yearsOfService = completedYears + priorGovService;
 
   const entitledDays = calculateEntitledDays(annualPolicy, yearsOfService);
@@ -211,7 +211,7 @@ async function upsertCurrentYearBalance(conn, employeeUuid, currentBudgetYear) {
           usedDays,
           remainingDays,
           status,
-          updatedAt
+          updated_at
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', CURRENT_DATE)
       `,
@@ -241,7 +241,7 @@ async function upsertCurrentYearBalance(conn, employeeUuid, currentBudgetYear) {
             carriedForwardDays = ?,
             remainingDays = ?,
             status = 'ACTIVE',
-            updatedAt = CURRENT_DATE
+            updated_at = CURRENT_DATE
         WHERE uuid = ?
       `,
       [entitledDays, carriedForwardDays, remainingDays, existing.uuid],
@@ -266,7 +266,7 @@ async function fetchBalance(employeeUuid, budgetYear = null) {
       usedDays,
       remainingDays,
       budgetYear,
-      DATE_FORMAT(updatedAt, '%Y-%m-%d') AS asOfDate
+      DATE_FORMAT(updated_at, '%Y-%m-%d') AS asOfDate
     FROM employeeLeaveBalances
     WHERE employee_uuid = ? ${budgetYearClause} AND status = 'ACTIVE'
     ORDER BY budgetYear DESC

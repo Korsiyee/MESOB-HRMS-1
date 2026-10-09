@@ -305,14 +305,14 @@ exports.getEmployeeDashboard = asyncHandler(async (req, res) => {
        e.gender, e.date_of_birth, e.nationality,
        e.tin_number, e.pension_code,
        e.bank_name, e.bank_account_number,
-       e.hire_date, e.prior_gov_service, e.status,
+       e.hire_date, e.prior_gov_service_years, e.status,
        e.profile_photo_key,
        e.department_uuid, e.position_uuid,
        d.name  AS department_name,
        p.title AS position_title
      FROM Employees e
-     LEFT JOIN Departments d ON d.uuid = e.department_uuid
      LEFT JOIN Positions   p ON p.uuid = e.position_uuid
+     LEFT JOIN Departments d ON d.uuid = e.department_uuid
      WHERE e.uuid = ?
      LIMIT 1`,
     [String(uuid).trim()]
@@ -483,7 +483,8 @@ exports.searchEmployeesForAttendance = asyncHandler(async (req, res) => {
       e.attendance_exempt,
       d.name as department_name
      FROM Employees e
-     LEFT JOIN Departments d ON e.department_uuid = d.uuid
+     LEFT JOIN Positions p ON p.uuid = e.position_uuid
+     LEFT JOIN Departments d ON d.uuid = p.department_uuid
      WHERE e.status = 'ACTIVE'
        AND e.attendance_exempt = FALSE
        AND (

@@ -69,6 +69,7 @@ const NAV_CONFIG = [
         children: [
           { label: "Attendance Records", to: "/attendance/manage" },
           { label: "Attendance Analytics", to: "/attendance-overview" },
+          { label: "Network Settings", to: "/attendance/network-settings" },
         ],
       },
       {
@@ -82,6 +83,11 @@ const NAV_CONFIG = [
         icon: FileText,
         to: "/letters",
         module: "LETTERS",
+        children: [
+          { label: "Letter Templates", to: "/letters/templates" },
+          { label: "Generate Letter", to: "/letters/generate" },
+          { label: "Letter Requests", to: "/letters/requests" },
+        ],
       },
       {
         label: "Leave",

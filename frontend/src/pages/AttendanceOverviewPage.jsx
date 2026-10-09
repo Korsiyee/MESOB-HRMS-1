@@ -161,7 +161,7 @@ const AttendanceOverviewPage = () => {
     finally { setLoading(false); }
   }, [range]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [range]);
 
   const pct = (n, d) => d > 0 ? Math.round((n / d) * 100) : 0;
 

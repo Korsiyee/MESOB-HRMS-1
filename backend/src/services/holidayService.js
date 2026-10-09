@@ -47,12 +47,12 @@ function asBoolean(value, defaultValue = true) {
 function mapHolidayRow(row) {
   return {
     uuid: row.uuid,
-    name: row.holidayName,
-    gregorianDate: formatDate(row.holidayDate),
-    type: String(row.calendarType || "PUBLIC").toUpperCase(),
-    ethiopian_date: row.calendarYear ? `${row.calendarYear}-01-01` : null,
-    calendarYear: row.calendarYear,
-    is_active: asBoolean(row.isActive, true),
+    name: row.holiday_name,
+    gregorianDate: formatDate(row.holiday_date),
+    type: String(row.calendar_type || "PUBLIC").toUpperCase(),
+    ethiopian_date: row.calendar_year ? `${row.calendar_year}-01-01` : null,
+    calendar_year: row.calendar_year,
+    is_active: asBoolean(row.is_active, true),
     source: row.source || "MANUAL",
     description: row.description || "",
   };
@@ -77,7 +77,7 @@ class HolidayService {
     const pool = db.promise();
     const [rows] = await pool.execute(
       `
-      SELECT uuid, holidayDate, holidayName, calendarYear, calendarType, isActive, source, description
+      SELECT uuid, holiday_date, holiday_name, calendar_year, calendar_type, is_active, source, description
       FROM Holidays
       WHERE uuid = ?
       LIMIT 1
@@ -109,12 +109,12 @@ class HolidayService {
     const dateStr = normalizeDate(date);
     const pool = db.promise();
 
-    const whereStatus = activeOnly ? "AND isActive = 1" : "";
+    const whereStatus = activeOnly ? "AND is_active = 1" : "";
     const [rows] = await pool.execute(
       `
-      SELECT uuid, holidayDate, holidayName, calendarYear, calendarType, isActive, source, description
+      SELECT uuid, holiday_date, holiday_name, calendar_year, calendar_type, is_active, source, description
       FROM Holidays
-      WHERE holidayDate = ? ${whereStatus}
+      WHERE holiday_date = ? ${whereStatus}
       LIMIT 1
       `,
       [dateStr],
@@ -137,14 +137,14 @@ class HolidayService {
     }
 
     const pool = db.promise();
-    const whereStatus = activeOnly ? "AND isActive = 1" : "";
+    const whereStatus = activeOnly ? "AND is_active = 1" : "";
 
     const [rows] = await pool.execute(
       `
-      SELECT uuid, holidayDate, holidayName, calendarYear, calendarType, isActive, source, description
+      SELECT uuid, holiday_date, holiday_name, calendar_year, calendar_type, is_active, source, description
       FROM Holidays
-      WHERE holidayDate BETWEEN ? AND ? ${whereStatus}
-      ORDER BY holidayDate ASC
+      WHERE holiday_date BETWEEN ? AND ? ${whereStatus}
+      ORDER BY holiday_date ASC
       `,
       [startDateStr, endDateStr],
     );
@@ -171,7 +171,7 @@ class HolidayService {
       .trim()
       .toUpperCase();
     const description = String(payload.description || "").trim() || null;
-    const isActive = asBoolean(payload.isActive, true);
+    const is_active = asBoolean(payload.is_active, true);
     const source = String(payload.source || "MANUAL")
       .trim()
       .toUpperCase();
@@ -180,20 +180,20 @@ class HolidayService {
       throw new Error("Holiday name is required.");
     }
 
-    const calendarYear = payload.calendarYear
-      ? String(payload.calendarYear).trim()
+    const calendar_year = payload.calendar_year
+      ? String(payload.calendar_year).trim()
       : await convertToEthiopianYear(date);
 
     const pool = db.promise();
     await pool.execute(
       `
-      INSERT INTO Holidays (uuid, holidayDate, holidayName, calendarYear, calendarType, isActive, source, description)
+      INSERT INTO Holidays (uuid, holiday_date, holiday_name, calendar_year, calendar_type, is_active, source, description)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
-        holidayName = VALUES(holidayName),
-        calendarYear = VALUES(calendarYear),
-        calendarType = VALUES(calendarType),
-        isActive = VALUES(isActive),
+        holiday_name = VALUES(holiday_name),
+        calendar_year = VALUES(calendar_year),
+        calendar_type = VALUES(calendar_type),
+        is_active = VALUES(is_active),
         source = VALUES(source),
         description = VALUES(description)
       `,
@@ -201,9 +201,9 @@ class HolidayService {
         uuidv4(),
         date,
         name,
-        calendarYear,
+        calendar_year,
         type,
-        isActive ? 1 : 0,
+        is_active ? 1 : 0,
         source,
         description,
       ],
@@ -237,17 +237,17 @@ class HolidayService {
     )
       ? String(payload.description || "").trim() || null
       : existing.description || null;
-    const isActive = Object.prototype.hasOwnProperty.call(payload, "isActive")
-      ? asBoolean(payload.isActive, true)
+    const is_active = Object.prototype.hasOwnProperty.call(payload, "is_active")
+      ? asBoolean(payload.is_active, true)
       : asBoolean(existing.is_active, true);
     const source = payload.source
       ? String(payload.source).trim().toUpperCase()
       : String(existing.source || "MANUAL")
           .trim()
           .toUpperCase();
-    const calendarYear = payload.calendarYear
-      ? String(payload.calendarYear).trim()
-      : existing.calendarYear || (await convertToEthiopianYear(date));
+    const calendar_year = payload.calendar_year
+      ? String(payload.calendar_year).trim()
+      : existing.calendar_year || (await convertToEthiopianYear(date));
 
     if (!name) {
       throw new Error("Holiday name is required.");
@@ -257,11 +257,11 @@ class HolidayService {
     await pool.execute(
       `
       UPDATE Holidays
-      SET holidayDate = ?,
-          holidayName = ?,
-          calendarYear = ?,
-          calendarType = ?,
-          isActive = ?,
+      SET holiday_date = ?,
+          holiday_name = ?,
+          calendar_year = ?,
+          calendar_type = ?,
+          is_active = ?,
           source = ?,
           description = ?
       WHERE uuid = ?
@@ -269,9 +269,9 @@ class HolidayService {
       [
         date,
         name,
-        calendarYear,
+        calendar_year,
         type,
-        isActive ? 1 : 0,
+        is_active ? 1 : 0,
         source,
         description,
         holidayUuid,
@@ -304,17 +304,17 @@ class HolidayService {
     return { deleted: true, uuid: holidayUuid };
   }
 
-  static async updateHolidayStatus(date, isActive) {
+  static async updateHolidayStatus(date, is_active) {
     await this.ensureHolidaySchema();
     const dateStr = normalizeDate(date);
-    const status = asBoolean(isActive, true);
+    const status = asBoolean(is_active, true);
     const pool = db.promise();
 
     const [result] = await pool.execute(
       `
       UPDATE Holidays
-      SET isActive = ?
-      WHERE holidayDate = ?
+      SET is_active = ?
+      WHERE holiday_date = ?
       `,
       [status ? 1 : 0, dateStr],
     );
@@ -355,28 +355,28 @@ class HolidayService {
           continue;
         }
 
-        const holidayDate = rawDate;
-        const holidayName = String(holiday.name || "Unnamed Holiday").trim();
-        const calendarType = String(holiday.type || "PUBLIC").toUpperCase();
-        const calendarYear = await convertToEthiopianYear(holidayDate);
+        const holiday_date = rawDate;
+        const holiday_name = String(holiday.name || "Unnamed Holiday").trim();
+        const calendar_type = String(holiday.type || "PUBLIC").toUpperCase();
+        const calendar_year = await convertToEthiopianYear(holiday_date);
 
         const [result] = await pool.execute(
           `
-          INSERT INTO Holidays (uuid, holidayDate, holidayName, calendarYear, calendarType, isActive, source, description)
+          INSERT INTO Holidays (uuid, holiday_date, holiday_name, calendar_year, calendar_type, is_active, source, description)
           VALUES (?, ?, ?, ?, ?, 1, 'LIBRARY', NULL)
           ON DUPLICATE KEY UPDATE
-            holidayName = IF(source = 'MANUAL' AND ? = 0, holidayName, VALUES(holidayName)),
-            calendarYear = IF(source = 'MANUAL' AND ? = 0, calendarYear, VALUES(calendarYear)),
-            calendarType = IF(source = 'MANUAL' AND ? = 0, calendarType, VALUES(calendarType)),
-            isActive = IF(source = 'MANUAL' AND ? = 0, isActive, 1),
+            holiday_name = IF(source = 'MANUAL' AND ? = 0, holiday_name, VALUES(holiday_name)),
+            calendar_year = IF(source = 'MANUAL' AND ? = 0, calendar_year, VALUES(calendar_year)),
+            calendar_type = IF(source = 'MANUAL' AND ? = 0, calendar_type, VALUES(calendar_type)),
+            is_active = IF(source = 'MANUAL' AND ? = 0, is_active, 1),
             source = IF(source = 'MANUAL' AND ? = 0, source, 'LIBRARY')
           `,
           [
             uuidv4(),
-            holidayDate,
-            holidayName,
-            calendarYear,
-            calendarType,
+            holiday_date,
+            holiday_name,
+            calendar_year,
+            calendar_type,
             overwriteManual ? 1 : 0,
             overwriteManual ? 1 : 0,
             overwriteManual ? 1 : 0,
@@ -451,7 +451,7 @@ class HolidayService {
       `
       SELECT COUNT(*) AS total
       FROM Holidays
-      WHERE holidayDate BETWEEN ? AND ?
+      WHERE holiday_date BETWEEN ? AND ?
       `,
       [startDate, endDate],
     );
@@ -483,12 +483,12 @@ class HolidayService {
       `
       SELECT
         COUNT(*) AS total_holidays,
-        SUM(CASE WHEN UPPER(calendarType) = 'PUBLIC' THEN 1 ELSE 0 END) AS public_holidays,
-        SUM(CASE WHEN UPPER(calendarType) = 'RELIGIOUS' THEN 1 ELSE 0 END) AS religious_holidays,
-        SUM(CASE WHEN UPPER(calendarType) = 'SPECIAL' THEN 1 ELSE 0 END) AS special_holidays,
-        SUM(CASE WHEN isActive = 1 THEN 1 ELSE 0 END) AS active_holidays
+        SUM(CASE WHEN UPPER(calendar_type) = 'PUBLIC' THEN 1 ELSE 0 END) AS public_holidays,
+        SUM(CASE WHEN UPPER(calendar_type) = 'RELIGIOUS' THEN 1 ELSE 0 END) AS religious_holidays,
+        SUM(CASE WHEN UPPER(calendar_type) = 'SPECIAL' THEN 1 ELSE 0 END) AS special_holidays,
+        SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS active_holidays
       FROM Holidays
-      WHERE holidayDate BETWEEN ? AND ?
+      WHERE holiday_date BETWEEN ? AND ?
       `,
       [`${currentYear}-01-01`, `${currentYear}-12-31`],
     );

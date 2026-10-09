@@ -774,10 +774,18 @@ const EmployeeRegistrationPage = () => {
       LevelApi.list().catch(() => ({ data: [] })),
       RbacApi.listOccupations().catch(() => ({ data: [] })),
     ]).then(([d, p, l, o]) => {
-      setDepartments(d?.data || []);
-      setPositions(p?.data || []);
-      setLevels(l?.data || []);
-      setOccupations(o?.data || []);
+      // Defensive array checks to prevent .map() crashes
+      setDepartments(Array.isArray(d?.data) ? d.data : []);
+      setPositions(Array.isArray(p?.data) ? p.data : []);
+      setLevels(Array.isArray(l?.data) ? l.data : []);
+      setOccupations(Array.isArray(o?.data) ? o.data : []);
+    }).catch(err => {
+      console.error('Failed to load dropdown data:', err);
+      // Ensure all are arrays even on complete failure
+      setDepartments([]);
+      setPositions([]);
+      setLevels([]);
+      setOccupations([]);
     });
 
     // Restore draft from backend

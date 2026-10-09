@@ -42,7 +42,7 @@ class LetterGenerationService {
         ea.email, ea.phone_primary
       FROM Employees e
       LEFT JOIN Positions p ON p.uuid = e.position_uuid
-      LEFT JOIN Departments d ON d.uuid = e.department_uuid
+      LEFT JOIN Departments d ON d.uuid = p.department_uuid
       LEFT JOIN EmployeeAddresses ea ON ea.employee_uuid = e.uuid AND ea.address_type = 'CURRENT'
       WHERE e.uuid = ?`,
       [employeeUuid]
