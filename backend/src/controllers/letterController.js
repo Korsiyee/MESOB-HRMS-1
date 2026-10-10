@@ -162,16 +162,24 @@ exports.createLetterTemplate = async (req, res) => {
     }
     
     // Store template with both body_template (for backward compat) and text_content (for PDF overlay)
+    const codeVal = `TPL_${Date.now().toString().slice(-6)}`;
+    const bodyVal = content || text_content || null;
     await pool.execute(
       `INSERT INTO LetterTemplates 
-       (uuid, title, type, body_template, text_content, pdf_template_key, original_filename, file_size, mime_type, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (uuid, template_code, template_name, title, type, category, letter_type, body_template, main_body, text_content, subject_template, pdf_template_key, original_filename, file_size, mime_type, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
+        codeVal,
+        name.trim(),
         name.trim(),
         type || "Employment Verification",
-        content || null, // body_template for text-only templates
-        text_content || content || null, // text_content for PDF overlay
+        type || "Employment Verification",
+        type || "Employment Verification",
+        bodyVal,
+        bodyVal,
+        text_content || content || null,
+        name.trim(),
         pdf_template_key,
         original_filename,
         file_size,
@@ -233,9 +241,9 @@ exports.updateLetterTemplate = async (req, res) => {
 
     const updates = [];
     const values = [];
-    if (name !== undefined) { updates.push("title = ?"); values.push(name.trim()); }
-    if (type !== undefined) { updates.push("type = ?"); values.push(type); }
-    if (content !== undefined) { updates.push("body_template = ?"); values.push(content); }
+    if (name !== undefined) { updates.push("title = ?", "template_name = ?"); values.push(name.trim(), name.trim()); }
+    if (type !== undefined) { updates.push("type = ?", "category = ?", "letter_type = ?"); values.push(type, type, type); }
+    if (content !== undefined) { updates.push("body_template = ?", "main_body = ?", "text_content = ?"); values.push(content, content, content); }
 
     if (updates.length) {
       values.push(uuid);
@@ -372,18 +380,22 @@ exports.generateLetter = async (req, res) => {
     const generatedContent = renderTemplate(template.body_template || "", employee);
     const issuedId = uuidv4();
 
+    const letterNumber = `LTR-${Date.now().toString().slice(-6)}`;
     await pool.execute(
       `INSERT INTO IssuedLetters
-         (uuid, employee_uuid, template_uuid, issued_by, name, type, generated_content)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         (uuid, employee_uuid, template_uuid, issued_by, issued_by_uuid, name, type, generated_content, content_html, letter_number, issued_date, file_key, file_size)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), 'generated', 0)`,
       [
         issuedId,
         finalEmployeeUuid,
         template_uuid,
         req.user?.employee_uuid || null,
-        template.title,
-        template.type,
+        req.user?.employee_uuid || null,
+        template.title || "Letter",
+        template.type || "—",
         generatedContent,
+        generatedContent,
+        letterNumber,
       ]
     );
 
@@ -674,9 +686,9 @@ exports.requestLetter = async (req, res) => {
 
     await pool.execute(
       `INSERT INTO LetterRequests
-         (uuid, employee_uuid, template_uuid, generated_content, generated_pdf_key, status)
-       VALUES (?, ?, ?, ?, ?, 'PENDING')`,
-      [requestId, employee_uuid, template_uuid, generatedContent, pdfKey]
+         (uuid, employee_uuid, template_uuid, generated_content, body_content, generated_pdf_key, status, letter_type, subject, requested_by_uuid)
+       VALUES (?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?)`,
+      [requestId, employee_uuid, template_uuid, generatedContent, generatedContent, pdfKey, template.type || template.title || 'GENERAL', template.title || 'Letter Request', req.user?.uuid || null]
     );
 
     await safeLogEvent({
@@ -870,18 +882,24 @@ exports.approveLetterRequest = async (req, res) => {
       [request.template_uuid]
     );
 
+    const contentVal = request.generated_content || request.body_content || "";
+    const letterNumber = `LTR-${Date.now().toString().slice(-6)}`;
     await pool.execute(
       `INSERT INTO IssuedLetters
-         (uuid, employee_uuid, template_uuid, issued_by, name, type, generated_content)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         (uuid, employee_uuid, template_uuid, issued_by, issued_by_uuid, name, type, generated_content, content_html, letter_number, issued_date, file_key, file_size)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), ?, 0)`,
       [
         issuedId,
         request.employee_uuid,
         request.template_uuid,
         reviewer_uuid,
+        reviewer_uuid,
         templates[0]?.title || "Letter",
         templates[0]?.type || "—",
-        request.generated_content,
+        contentVal,
+        contentVal,
+        letterNumber,
+        request.generated_pdf_key || "generated",
       ]
     );
 

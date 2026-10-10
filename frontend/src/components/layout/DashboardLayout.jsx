@@ -35,7 +35,6 @@ const PAGE_TITLES = {
   '/letters/my':             'My Letters',
   '/accounts':               'Accounts',
   '/logs':                   'Audit Logs',
-  '/admin/roles':            'Roles & Permissions',
   '/policies':               'Leave Policies',
   '/holidays':               'Days Off',
   '/my-account':             'My Account',

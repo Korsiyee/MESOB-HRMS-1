@@ -13,29 +13,17 @@ const upload = multer({
 });
 
 /* ─── Organization Configuration ─────────────────────────────── */
-
-// Get organization configuration (all authenticated users)
 router.get("/organization", authenticateJwt, letterConfigController.getOrganizationConfig);
-
-// Update organization configuration
-
-// Upload organization logo
+router.put("/organization", authenticateJwt, letterConfigController.updateOrganizationConfig);
+router.post("/organization/logo", authenticateJwt, upload.single("logo"), letterConfigController.uploadOrganizationLogo);
 
 /* ─── Letter Layout Configuration ─────────────────────────────── */
-
-// Get all letter layouts
-
-// Get active letter layout (all authenticated users)
+router.get("/layouts", authenticateJwt, letterConfigController.getLetterLayouts);
 router.get("/layouts/active", authenticateJwt, letterConfigController.getActiveLetterLayout);
-
-// Activate a specific letter layout
+router.post("/layouts/:id/activate", authenticateJwt, letterConfigController.activateLetterLayout);
 
 /* ─── Placeholders & Categories ─────────────────────────────── */
-
-// Get available placeholders (all authenticated users)
 router.get("/placeholders", authenticateJwt, letterConfigController.getAvailablePlaceholders);
-
-// Get letter categories (all authenticated users)
 router.get("/categories", authenticateJwt, letterConfigController.getLetterCategories);
 
 module.exports = router;

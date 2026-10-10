@@ -12,7 +12,6 @@ import {
   ChevronRight,
   UserCircle,
   ChevronDown,
-  Shield,
   ScrollText,
 } from "lucide-react";
 import logo from "../../../assets/Logo.png";
@@ -89,11 +88,6 @@ const NAV_CONFIG = [
         icon: FileText,
         to: "/letters",
         module: "LETTERS",
-        children: [
-          { label: "Letter Templates", to: "/letters/templates", module: "LETTERS" },
-          { label: "Generate Letter", to: "/letters/generate", module: "LETTERS" },
-          { label: "Letter Requests", to: "/letters/requests", module: "LETTERS" },
-        ],
       },
       {
         label: "Leave",
@@ -113,7 +107,6 @@ const NAV_CONFIG = [
     group: "ADMINISTRATION",
     items: [
       { label: "Accounts", icon: Users, to: "/accounts", module: "ACCOUNTS" },
-      { label: "Roles & Permissions", icon: Shield, to: "/admin/roles", module: "ACCOUNTS" },
       { label: "Audit Log", icon: ScrollText, to: "/logs", module: "AUDIT_LOGS" },
     ],
   },
@@ -233,6 +226,7 @@ const Sidebar = ({ collapsed, onToggle, pendingCount = 0, mobileOpen = false, is
       background: 'linear-gradient(180deg, #1e3a37 0%, #162e2b 100%)',
       borderRight: '1px solid rgba(255,255,255,0.05)', overflowX: 'hidden',
       fontFamily: 'Poppins, sans-serif', boxShadow: '4px 0 24px rgba(0,0,0,0.15)',
+      borderRadius: isMobile ? '0' : '0 12px 12px 0',
     }}>
       <div style={{
         padding: collapsed && !isMobile ? '20px 0 16px' : '24px 16px 20px',

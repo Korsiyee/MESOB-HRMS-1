@@ -51,6 +51,57 @@ const StatusBadge = ({ status }) => {
   );
 };
 
+const EmployeeAvatar = ({ employee, size = 80 }) => {
+  const [imgError, setImgError] = useState(false);
+  const photoSrc = !imgError && (employee?.profile_photo_url || (employee?.uuid ? `/api/employees/${employee.uuid}/photo` : null));
+  const initials = `${employee?.first_name?.[0] || ""}${employee?.last_name?.[0] || ""}`.toUpperCase() || "—";
+
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        position: "relative",
+        overflow: "hidden",
+        border: "3px solid #fff",
+        boxShadow: "0 4px 14px rgba(15,118,110,0.2)",
+        background: "linear-gradient(135deg, #0F766E 0%, #14B8A6 100%)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+      }}
+    >
+      {photoSrc ? (
+        <img
+          src={photoSrc}
+          alt={`${employee?.first_name || ""} ${employee?.last_name || ""}`}
+          onError={() => setImgError(true)}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+          }}
+        />
+      ) : (
+        <span
+          style={{
+            color: "#fff",
+            fontSize: size * 0.35,
+            fontWeight: 700,
+            letterSpacing: 1,
+            userSelect: "none",
+          }}
+        >
+          {initials}
+        </span>
+      )}
+    </div>
+  );
+};
+
 export default function EmployeeProfilePage() {
   const navigate = useNavigate();
   const { isMobile, isTablet } = useResponsive();
@@ -364,33 +415,7 @@ export default function EmployeeProfilePage() {
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "center" }}>
-                  <div
-                    style={{
-                      width: 80,
-                      height: 80,
-                      borderRadius: "50%",
-                      background: employee.profile_photo_url
-                        ? `url(${employee.profile_photo_url})`
-                        : "linear-gradient(135deg, #0F766E, #14B8A6)",
-                      backgroundSize: "cover",
-                      backgroundPosition: "center",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#fff",
-                      fontSize: 28,
-                      fontWeight: 700,
-                      border: "3px solid #fff",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                    }}
-                  >
-                    {!employee.profile_photo_url && (
-                      <>
-                        {employee.first_name?.[0]}
-                        {employee.last_name?.[0]}
-                      </>
-                    )}
-                  </div>
+                  <EmployeeAvatar employee={employee} size={84} />
                 </div>
 
                 <div style={{ textAlign: "center" }}>
@@ -510,9 +535,9 @@ export default function EmployeeProfilePage() {
                         width: "100%",
                         padding: "10px",
                         borderRadius: 8,
-                        border: "none",
-                        background: isActive ? "#dc2626" : "#16a34a",
-                        color: "#fff",
+                        border: isActive ? "1.5px solid #94a3b8" : "1.5px solid #16a34a",
+                        background: isActive ? "#f1f5f9" : "#dcfce7",
+                        color: isActive ? "#64748b" : "#166534",
                         fontSize: "0.82rem",
                         fontWeight: 600,
                         cursor: "pointer",
@@ -523,10 +548,12 @@ export default function EmployeeProfilePage() {
                         transition: "all 0.15s",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = isActive ? "#b91c1c" : "#15803d";
+                        e.currentTarget.style.background = isActive ? "#e2e8f0" : "#bbf7d0";
+                        e.currentTarget.style.borderColor = isActive ? "#64748b" : "#15803d";
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.background = isActive ? "#dc2626" : "#16a34a";
+                        e.currentTarget.style.background = isActive ? "#f1f5f9" : "#dcfce7";
+                        e.currentTarget.style.borderColor = isActive ? "#94a3b8" : "#16a34a";
                       }}
                     >
                       {isActive ? <UserX size={14} /> : <UserCheck size={14} />}

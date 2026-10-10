@@ -655,7 +655,7 @@ const AttendancePage = () => {
     }
   }, [filters.departmentUuid, allPositions, filters.positionUuid]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const params = {
@@ -688,9 +688,9 @@ const AttendancePage = () => {
       setMeta({ total: 0, totalPages: 1 });
     }
     finally { setLoading(false); }
-  };
+  }, [filters.search, filters.departmentUuid, filters.positionUuid, filters.status, filters.startDate, filters.endDate, filters.page, filters.pageSize, canManageAll, employeeUuid]);
 
-  useEffect(() => { load(); }, [filters.search, filters.departmentUuid, filters.positionUuid, filters.status, filters.startDate, filters.endDate, filters.page, filters.pageSize, canManageAll, employeeUuid]);
+  useEffect(() => { load(); }, [load]);
 
   const handleDelete = async (uuid) => {
     dialog.showDeleteConfirm(

@@ -296,7 +296,7 @@ const Step2 = ({ data, onChange }) => (
 );
 
 /* ── Step 3: Financial Information ── */
-const Step3 = ({ data, onChange, departments, positions, levels, occupations, roles }) => (
+const Step3 = ({ data, onChange, departments, positions, levels, roles }) => (
   <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
     <div>
       <h3 style={{ margin: "0 0 14px", fontSize: "0.9rem", fontWeight: 700, color: C.textMain, borderBottom: `1px solid ${C.border}`, paddingBottom: 8 }}>Bank Information</h3>
@@ -341,19 +341,18 @@ const Step3 = ({ data, onChange, departments, positions, levels, occupations, ro
             {levels.map(l => <option key={l.uuid} value={l.uuid}>{l.name}</option>)}
           </select>
         </Field>
-        <Field label="Occupation">
-          <select value={data.occupation_uuid} onChange={e => onChange("occupation_uuid", e.target.value)} style={fld}>
-            <option value="">Select Occupation</option>
-            {occupations.map(o => <option key={o.uuid} value={o.uuid}>{o.name}</option>)}
-          </select>
-        </Field>
         <Field label="User Role">
           <select value={data.role_uuid} onChange={e => onChange("role_uuid", e.target.value)} style={fld}>
             <option value="">Select Role (Optional)</option>
-            {roles.map(r => <option key={r.uuid} value={r.uuid}>{r.name}</option>)}
+            {(roles || []).length === 0 ? (
+              <option value="" disabled>Loading roles or no permission...</option>
+            ) : (
+              (roles || []).map(r => <option key={r.uuid} value={r.uuid}>{r.name}</option>)
+            )}
           </select>
           <p style={{ fontSize: "0.7rem", color: C.textMuted, margin: "4px 0 0", fontStyle: "italic" }}>
             Assigns system access role to this employee's account
+            {roles && roles.length === 0 && " (Requires HR Admin or Super Admin permission to assign roles)"}
           </p>
         </Field>
         <Field label="Hire Date" required>
@@ -758,7 +757,7 @@ const EmployeeRegistrationPage = () => {
   const [address, setAddress] = useState({ PERMANENT: {}, CURRENT: {} });
   const [financial, setFinancial] = useState({
     bank_name: "", bank_account_number: "", tin_number: "", pension_code: "",
-    department_uuid: "", position_uuid: "", level_uuid: "", occupation_uuid: "",
+    department_uuid: "", position_uuid: "", level_uuid: "",
     hire_date: "", prior_gov_service: 0, role_uuid: "",  // Added role_uuid
   });
   const [extraInfo, setExtraInfo] = useState({
@@ -774,7 +773,6 @@ const EmployeeRegistrationPage = () => {
   const [departments, setDepartments] = useState([]);
   const [positions, setPositions] = useState([]);
   const [levels, setLevels] = useState([]);
-  const [occupations, setOccupations] = useState([]);
   const [roles, setRoles] = useState([]);  // Added roles
 
   /* ── Load dropdown data and restore draft on mount ── */
@@ -783,23 +781,32 @@ const EmployeeRegistrationPage = () => {
       EmployeeApi.listDepartments().catch(() => ({ data: [] })),
       EmployeeApi.listPositions().catch(() => ({ data: [] })),
       LevelApi.list().catch(() => ({ data: [] })),
-      RbacApi.listOccupations().catch(() => ({ data: [] })),
-      getAllRoles().catch(() => ({ data: { roles: [] } })),  // Added role loading
-    ]).then(([d, p, l, o, r]) => {
+      getAllRoles().catch((err) => {
+        console.error('Failed to load roles:', err);
+        return { data: { roles: [] } };
+      }),
+    ]).then(([d, p, l, r]) => {
       // Defensive array checks to prevent .map() crashes
       setDepartments(Array.isArray(d?.data) ? d.data : []);
       setPositions(Array.isArray(p?.data) ? p.data : []);
       setLevels(Array.isArray(l?.data) ? l.data : []);
-      setOccupations(Array.isArray(o?.data) ? o.data : []);
-      setRoles(Array.isArray(r?.data?.roles) ? r.data.roles : []);  // Added roles
+      
+      // Extra defensive check for roles
+      const rolesData = r?.data?.roles;
+      if (Array.isArray(rolesData)) {
+        console.log('Roles loaded successfully:', rolesData.length, 'roles');
+        setRoles(rolesData);
+      } else {
+        console.warn('Roles data format unexpected:', r);
+        setRoles([]);
+      }
     }).catch(err => {
       console.error('Failed to load dropdown data:', err);
       // Ensure all are arrays even on complete failure
       setDepartments([]);
       setPositions([]);
       setLevels([]);
-      setOccupations([]);
-      setRoles([]);  // Added roles
+      setRoles([]);
     });
 
     // Restore draft from backend
@@ -1006,7 +1013,6 @@ const EmployeeRegistrationPage = () => {
         ...(orNull(financial.department_uuid)  && { department_uuid:  financial.department_uuid }),
         ...(orNull(financial.position_uuid)    && { position_uuid:    financial.position_uuid }),
         ...(orNull(financial.level_uuid)       && { level_uuid:       financial.level_uuid }),
-        ...(orNull(financial.occupation_uuid)  && { occupation_uuid:  financial.occupation_uuid }),
         ...(orNull(financial.role_uuid)        && { role_uuid:        financial.role_uuid }),  // Added role_uuid
         ...(bankName && bankAccount ? { bank_name: bankName, bank_account_number: bankAccount } : {}),
         ...(orNull(financial.tin_number)   && { tin_number:   financial.tin_number.trim() }),
@@ -1194,7 +1200,6 @@ const EmployeeRegistrationPage = () => {
             departments={departments}
             positions={positions}
             levels={levels}
-            occupations={occupations}
             roles={roles}
           />
         )}

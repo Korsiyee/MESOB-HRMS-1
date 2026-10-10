@@ -133,9 +133,28 @@ exports.listEmployees = asyncHandler(async (req, res) => {
   // ALL scope: no additional filters
 
   const result = await EmployeeService.listEmployees(filters);
+  
+  // Generate signed URLs for profile photos
+  const { getSignedUrl } = require("../services/employeeStorageService");
+  const itemsWithPhotos = await Promise.all(
+    result.items.map(async (employee) => {
+      if (employee.profile_photo_key) {
+        try {
+          employee.profile_photo_url = await getSignedUrl(employee.profile_photo_key);
+        } catch (error) {
+          console.warn(`Failed to generate signed URL for employee ${employee.uuid}:`, error.message);
+          employee.profile_photo_url = null;
+        }
+      } else {
+        employee.profile_photo_url = null;
+      }
+      return employee;
+    })
+  );
+  
   return sendSuccess(res, {
     status: 200,
-    data: result.items,
+    data: itemsWithPhotos,
     meta: {
       total: result.total,
       page: pagination.page,
@@ -164,14 +183,30 @@ exports.updateEmployee = asyncHandler(async (req, res) => {
 
   const { uuid } = req.params;
   const payload = req.body || {};
+  
+  // Extract role_uuid if provided (optional during update)
+  const roleUuid = payload.role_uuid;
+  delete payload.role_uuid; // Remove from employee data
+  
   const employee = await EmployeeService.updateEmployee(uuid, payload);
+  
+  // If role_uuid provided, update role assignment
+  if (roleUuid && employee.user_uuid) {
+    const rbacService = require("../services/rbacService");
+    try {
+      await rbacService.assignRoleToUser(employee.user_uuid, roleUuid);
+    } catch (roleError) {
+      console.error("Role assignment failed during update:", roleError);
+      // Continue - employee update succeeded even if role assignment failed
+    }
+  }
 
   await safeLogEvent({
     actorUuid: req.user?.uuid || null,
     action: AUDIT_ACTIONS.EMPLOYEE_UPDATE,
     entityType: AUDIT_ENTITY_TYPES.EMPLOYEE,
     entityUuid: employee.uuid,
-    diff: { fields: Object.keys(payload || {}) },
+    diff: { fields: Object.keys(payload || {}), role_uuid: roleUuid },
     ipAddress: getClientIp(req),
   });
 
@@ -603,3 +638,18 @@ exports.updateEmployeeRole = asyncHandler(async (req, res) => {
     data: { employee_uuid: uuid, user_uuid: employee.user_uuid }
   });
 });
+
+exports.getEmployeePhoto = asyncHandler(async (req, res) => {
+  const { uuid } = req.params;
+  const employee = await EmployeeService.getEmployeeByUuid(uuid);
+  if (!employee || !employee.profile_photo_key) {
+    return res.status(404).json({ error: "Photo not found" });
+  }
+  const { getSignedUrl } = require("../services/employeeStorageService");
+  const signedUrl = await getSignedUrl(employee.profile_photo_key);
+  if (!signedUrl) {
+    return res.status(404).json({ error: "Photo not found" });
+  }
+  return res.redirect(signedUrl);
+});
+

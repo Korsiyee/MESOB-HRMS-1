@@ -12,6 +12,7 @@ const {
   updateEmployeeStatus,
   updateEmployeeRole,
   uploadEmployeePhoto,
+  getEmployeePhoto,
   listEmployeeDocuments,
   addEmployeeDocument,
   removeEmployeeDocument,
@@ -58,7 +59,8 @@ router.patch("/:uuid/status", requireModule('EMPLOYEE_PROFILE'), updateEmployeeS
 // Update employee role (HR Admin/Super Admin only)
 router.patch("/:uuid/role", requireModule('ACCOUNTS'), updateEmployeeRole);
 
-// Photo upload
+// Photo upload & view
+router.get("/:uuid/photo", getEmployeePhoto);
 router.post("/:uuid/photo", requireModule('EMPLOYEE_PROFILE'), uploadPhoto, uploadEmployeePhoto);
 
 // Documents (self-access OR has EMPLOYEES module)

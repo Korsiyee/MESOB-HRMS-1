@@ -31,10 +31,6 @@ import NetworkSettingsPage    from '../pages/NetworkSettingsPage';
 import MyAccountPage          from '../pages/MyAccountPage';
 import PlaceholderPage        from '../pages/PlaceholderPage';
 import Login                  from '../components/Login';
-import PermissionsManagementPage from '../pages/rbac/PermissionsManagementPage';
-import RoleManagementPage from '../pages/RoleManagementPage';
-import RoleDetailPage from '../pages/RoleDetailPage';
-import RoleEditPage from '../pages/RoleEditPage';
 
 /* Redirects /employees/me → /employees/:employee_uuid of the logged-in user.
    Falls back to the All Employees list if no employee_uuid is found. */
@@ -183,14 +179,7 @@ const AppRouter = () => (
       <Route path="holidays" element={<HolidaysPage />} />
       <Route path="network-settings" element={<NetworkSettingsPage />} />
       
-      {/* ── RBAC Management ── */}
-      <Route path="rbac/permissions" element={<PermissionsManagementPage />} />
-      
-      {/* ── Role Management Routes ── */}
-      <Route path="admin/roles" element={<RoleManagementPage />} />
-      <Route path="admin/roles/new" element={<RoleEditPage />} />
-      <Route path="admin/roles/:roleUuid" element={<RoleDetailPage />} />
-      <Route path="admin/roles/:roleUuid/edit" element={<RoleEditPage />} />
+
       
       {/* ── My Account - Everyone can access ── */}
       <Route path="my-account" element={<MyAccountPage />} />

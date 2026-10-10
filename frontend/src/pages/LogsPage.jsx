@@ -1,4 +1,3 @@
-import { PermissionGuard } from "../components/PermissionGuard";
 import React, { useState, useEffect, useCallback } from "react";
 import { LogApi } from "../api/logApi";
 import { ScrollText, Activity, User, Calendar, Search, X, ChevronRight, ChevronLeft, RefreshCw } from "lucide-react";
@@ -84,9 +83,7 @@ const LogsPage = () => {
 
   /* fetch distinct action types from backend */
   useEffect(() => {
-    const token = localStorage.getItem('authToken');
-    fetch('/api/logs/actions', { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : null)
+    LogApi.getActions()
       .then(payload => { if (Array.isArray(payload?.data)) setActionTypes(payload.data); })
       .catch(() => {});
   }, []);
@@ -341,11 +338,4 @@ const LogsPage = () => {
   );
 };
 
-// Wrap with permission guard to enforce RBAC
-const ProtectedLogsPage = () => (
-  <PermissionGuard permissions="AuditLogs.View">
-    <LogsPage />
-  </PermissionGuard>
-);
-
-export default ProtectedLogsPage;
+export default LogsPage;

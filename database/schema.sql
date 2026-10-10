@@ -1,4 +1,15 @@
+-- ============================================================================
+-- FDRE MESOB HRMS - Database Schema
+-- ============================================================================
+-- Complete database schema for the Ethiopian Federal Democratic Republic
+-- Human Resource Management System
+-- ============================================================================
+
 SET FOREIGN_KEY_CHECKS=0;
+
+-- ============================================================================
+-- RBAC TABLES (Static Role-Based Access Control)
+-- ============================================================================
 
 DROP TABLE IF EXISTS Modules;
 CREATE TABLE Modules (
@@ -66,6 +77,10 @@ CREATE TABLE RoleModules (
   CONSTRAINT fk_rolemodules_module FOREIGN KEY (module_uuid) REFERENCES Modules (uuid) ON DELETE CASCADE,
   CONSTRAINT fk_rolemodules_scope FOREIGN KEY (scope_uuid) REFERENCES Scopes (uuid) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- ORGANIZATION STRUCTURE
+-- ============================================================================
 
 DROP TABLE IF EXISTS Departments;
 CREATE TABLE Departments (
@@ -141,6 +156,46 @@ CREATE TABLE DepartmentLeadership (
   CONSTRAINT chk_deptlead_dates CHECK (effective_to IS NULL OR effective_to >= effective_from)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS Levels;
+CREATE TABLE Levels (
+  uuid VARCHAR(36) NOT NULL,
+  level_code VARCHAR(50) NOT NULL,
+  name VARCHAR(200) NOT NULL,
+  description TEXT DEFAULT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (uuid),
+  UNIQUE KEY uk_levels_code (level_code),
+  KEY idx_levels_sort (sort_order),
+  KEY idx_levels_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS LevelVersions;
+CREATE TABLE LevelVersions (
+  uuid VARCHAR(36) NOT NULL,
+  level_uuid VARCHAR(36) NOT NULL,
+  base_salary DECIMAL(10,2) NOT NULL,
+  allowances_json JSON DEFAULT NULL,
+  effective_from DATE NOT NULL,
+  effective_to DATE DEFAULT NULL,
+  version_number INT NOT NULL,
+  notes TEXT DEFAULT NULL,
+  created_by_uuid VARCHAR(36) DEFAULT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (uuid),
+  UNIQUE KEY uk_levelver_level_version (level_uuid, version_number),
+  KEY idx_levelver_level (level_uuid),
+  KEY idx_levelver_dates (level_uuid, effective_from, effective_to),
+  CONSTRAINT fk_levelver_level FOREIGN KEY (level_uuid) REFERENCES Levels (uuid) ON DELETE CASCADE,
+  CONSTRAINT chk_levelver_dates CHECK (effective_to IS NULL OR effective_to >= effective_from)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- USERS & EMPLOYEES
+-- ============================================================================
+
 DROP TABLE IF EXISTS Users;
 CREATE TABLE Users (
   uuid VARCHAR(36) NOT NULL,
@@ -187,7 +242,6 @@ CREATE TABLE Employees (
   hire_date DATE NOT NULL,
   prior_gov_service_years DECIMAL(5,2) NOT NULL DEFAULT 0.00,
   status ENUM('ACTIVE','INACTIVE','TERMINATED') NOT NULL DEFAULT 'ACTIVE',
-  attendance_exempt TINYINT(1) NOT NULL DEFAULT 0,
   face_images_registered TINYINT(1) NOT NULL DEFAULT 0,
   position_uuid VARCHAR(36) NOT NULL,
   department_uuid VARCHAR(36) DEFAULT NULL,
@@ -279,52 +333,6 @@ CREATE TABLE EmployeeShifts (
   CONSTRAINT chk_empshift_dates CHECK (effective_to IS NULL OR effective_to >= effective_from)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-DROP TABLE IF EXISTS EmployeeRegistrationDrafts;
-CREATE TABLE EmployeeRegistrationDrafts (
-  uuid VARCHAR(36) NOT NULL,
-  step_completed INT NOT NULL DEFAULT 0,
-  draft_json JSON NOT NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (uuid)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-DROP TABLE IF EXISTS Levels;
-CREATE TABLE Levels (
-  uuid VARCHAR(36) NOT NULL,
-  level_code VARCHAR(50) NOT NULL,
-  name VARCHAR(200) NOT NULL,
-  description TEXT DEFAULT NULL,
-  sort_order INT NOT NULL DEFAULT 0,
-  is_active TINYINT(1) NOT NULL DEFAULT 1,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (uuid),
-  UNIQUE KEY uk_levels_code (level_code),
-  KEY idx_levels_sort (sort_order),
-  KEY idx_levels_active (is_active)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-DROP TABLE IF EXISTS LevelVersions;
-CREATE TABLE LevelVersions (
-  uuid VARCHAR(36) NOT NULL,
-  level_uuid VARCHAR(36) NOT NULL,
-  base_salary DECIMAL(10,2) NOT NULL,
-  allowances_json JSON DEFAULT NULL,
-  effective_from DATE NOT NULL,
-  effective_to DATE DEFAULT NULL,
-  version_number INT NOT NULL,
-  notes TEXT DEFAULT NULL,
-  created_by_uuid VARCHAR(36) DEFAULT NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (uuid),
-  UNIQUE KEY uk_levelver_level_version (level_uuid, version_number),
-  KEY idx_levelver_level (level_uuid),
-  KEY idx_levelver_dates (level_uuid, effective_from, effective_to),
-  CONSTRAINT fk_levelver_level FOREIGN KEY (level_uuid) REFERENCES Levels (uuid) ON DELETE CASCADE,
-  CONSTRAINT chk_levelver_dates CHECK (effective_to IS NULL OR effective_to >= effective_from)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 DROP TABLE IF EXISTS EmployeeLevelHistory;
 CREATE TABLE EmployeeLevelHistory (
   uuid VARCHAR(36) NOT NULL,
@@ -346,6 +354,20 @@ CREATE TABLE EmployeeLevelHistory (
   CONSTRAINT fk_emplevel_version FOREIGN KEY (level_version_uuid) REFERENCES LevelVersions (uuid) ON DELETE RESTRICT,
   CONSTRAINT chk_emplevel_dates CHECK (effective_to IS NULL OR effective_to >= effective_from)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS EmployeeRegistrationDrafts;
+CREATE TABLE EmployeeRegistrationDrafts (
+  uuid VARCHAR(36) NOT NULL,
+  step_completed INT NOT NULL DEFAULT 0,
+  draft_json JSON NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (uuid)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- ATTENDANCE
+-- ============================================================================
 
 DROP TABLE IF EXISTS Holidays;
 CREATE TABLE Holidays (
@@ -426,6 +448,10 @@ CREATE TABLE NetworkSettings (
   UNIQUE KEY uk_netset_ip (ip_address),
   KEY idx_netset_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- LEAVE MANAGEMENT
+-- ============================================================================
 
 DROP TABLE IF EXISTS leaveTypes;
 CREATE TABLE leaveTypes (
@@ -565,6 +591,10 @@ CREATE TABLE leaveRequestDocuments (
   CONSTRAINT fk_leavereqdoc_employee FOREIGN KEY (employee_uuid) REFERENCES Employees (uuid) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ============================================================================
+-- LETTER MANAGEMENT
+-- ============================================================================
+
 DROP TABLE IF EXISTS LetterLayoutConfig;
 CREATE TABLE LetterLayoutConfig (
   uuid VARCHAR(36) NOT NULL,
@@ -703,6 +733,10 @@ CREATE TABLE IssuedLetters (
   CONSTRAINT fk_issued_request FOREIGN KEY (letter_request_uuid) REFERENCES LetterRequests (uuid) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ============================================================================
+-- SYSTEM TABLES
+-- ============================================================================
+
 DROP TABLE IF EXISTS AuditLogs;
 CREATE TABLE AuditLogs (
   uuid VARCHAR(36) NOT NULL,
@@ -784,47 +818,9 @@ CREATE TABLE OrganizationConfig (
 
 SET FOREIGN_KEY_CHECKS=1;
 
-INSERT INTO Modules (uuid, code, name, description, icon, display_order, is_active) VALUES
-(UUID(), 'HOME', 'Home', 'Dashboard and overview', 'LayoutDashboard', 0, 1),
-(UUID(), 'EMPLOYEES', 'Employees', 'Employee management', 'Users', 10, 1),
-(UUID(), 'ORGANIZATION', 'Organization', 'Departments, positions, levels', 'Building2', 20, 1),
-(UUID(), 'ATTENDANCE', 'Attendance', 'Attendance tracking and analytics', 'Clock', 30, 1),
-(UUID(), 'SHIFTS', 'Shifts', 'Shift definitions and assignments', 'Layers', 40, 1),
-(UUID(), 'LETTERS', 'Letters', 'Letter generation and templates', 'FileText', 50, 1),
-(UUID(), 'LEAVE', 'Leave', 'Leave requests and management', 'CalendarDays', 60, 1),
-(UUID(), 'ADMIN', 'Administration', 'System administration', 'Shield', 70, 1);
-
-INSERT INTO Scopes (uuid, code, name, description, level) VALUES
-(UUID(), 'ORGANIZATION', 'Organization', 'Access to all data across organization', 100),
-(UUID(), 'DEPARTMENT', 'Department', 'Access to own department data only', 50),
-(UUID(), 'PERSONAL', 'Personal', 'Access to own data only', 10);
-
-INSERT INTO Roles (uuid, code, name, description, default_scope_uuid, hierarchy_level, is_system_role, is_active) VALUES
-(UUID(), 'SUPER_ADMIN', 'Super Administrator', 'Full system access', (SELECT uuid FROM Scopes WHERE code = 'ORGANIZATION'), 100, 1, 1),
-(UUID(), 'HR_ADMIN', 'HR Administrator', 'HR management with organization scope', (SELECT uuid FROM Scopes WHERE code = 'ORGANIZATION'), 90, 1, 1),
-(UUID(), 'DEPARTMENT_HEAD', 'Department Head', 'Department-level management', (SELECT uuid FROM Scopes WHERE code = 'DEPARTMENT'), 70, 1, 1),
-(UUID(), 'HR_OFFICER', 'HR Officer', 'HR operations staff', (SELECT uuid FROM Scopes WHERE code = 'ORGANIZATION'), 60, 1, 1),
-(UUID(), 'EMPLOYEE', 'Employee', 'Regular employee', (SELECT uuid FROM Scopes WHERE code = 'PERSONAL'), 10, 1, 1);
-
-INSERT INTO RoleModules (uuid, role_uuid, module_uuid, scope_uuid)
-SELECT UUID(), (SELECT uuid FROM Roles WHERE code = 'SUPER_ADMIN'), m.uuid, (SELECT uuid FROM Scopes WHERE code = 'ORGANIZATION')
-FROM Modules m;
-
-INSERT INTO RoleModules (uuid, role_uuid, module_uuid, scope_uuid)
-SELECT UUID(), (SELECT uuid FROM Roles WHERE code = 'HR_ADMIN'), m.uuid, (SELECT uuid FROM Scopes WHERE code = 'ORGANIZATION')
-FROM Modules m WHERE m.code != 'ADMIN';
-
-INSERT INTO RoleModules (uuid, role_uuid, module_uuid, scope_uuid)
-SELECT UUID(), (SELECT uuid FROM Roles WHERE code = 'DEPARTMENT_HEAD'), m.uuid, (SELECT uuid FROM Scopes WHERE code = 'DEPARTMENT')
-FROM Modules m WHERE m.code IN ('EMPLOYEES', 'ATTENDANCE', 'SHIFTS', 'LEAVE');
-
-INSERT INTO RoleModules (uuid, role_uuid, module_uuid, scope_uuid)
-SELECT UUID(), (SELECT uuid FROM Roles WHERE code = 'HR_OFFICER'), m.uuid, (SELECT uuid FROM Scopes WHERE code = 'ORGANIZATION')
-FROM Modules m WHERE m.code IN ('EMPLOYEES', 'LETTERS', 'LEAVE');
-
-INSERT INTO RoleModules (uuid, role_uuid, module_uuid, scope_uuid)
-SELECT UUID(), (SELECT uuid FROM Roles WHERE code = 'EMPLOYEE'), m.uuid, (SELECT uuid FROM Scopes WHERE code = 'PERSONAL')
-FROM Modules m WHERE m.code = 'HOME';
+-- ============================================================================
+-- Initialize Sequences
+-- ============================================================================
 
 INSERT INTO MesobIdSequence (last_value) VALUES (0);
 INSERT INTO LetterReferenceSequence (last_value) VALUES (0);

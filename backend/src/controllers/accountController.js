@@ -28,6 +28,7 @@ exports.createAccount = async (req, res) => {
       username,
       password,
       role_uuid,
+      role,
       is_active = true,
       must_change_password = false,
     } = req.body;
@@ -45,6 +46,17 @@ exports.createAccount = async (req, res) => {
 
     // Determine target role UUID
     let targetRoleUuid = role_uuid;
+    if (!targetRoleUuid && role) {
+      const normalizedRole = role.toUpperCase();
+      const [roleByCode] = await pool.execute(
+        "SELECT uuid FROM Roles WHERE (code = ? OR code = ?) AND is_active = 1 LIMIT 1",
+        [normalizedRole, normalizedRole === 'DEPARTMENT_HEAD' ? 'DEPT_HEAD' : normalizedRole]
+      );
+      if (roleByCode.length) {
+        targetRoleUuid = roleByCode[0].uuid;
+      }
+    }
+
     if (!targetRoleUuid) {
       // Default to EMPLOYEE role
       const [defaultRole] = await pool.execute(
@@ -296,7 +308,7 @@ exports.getAccount = async (req, res) => {
 exports.changeAccountRole = async (req, res) => {
   try {
     const { uuid } = req.params;
-    const { role_uuid: newRoleUuid } = req.body;
+    let { role_uuid: newRoleUuid, role } = req.body;
     
     // Prevent self-modification
     if (uuid === req.user.uuid) {
@@ -307,15 +319,26 @@ exports.changeAccountRole = async (req, res) => {
       });
     }
 
+    const pool = db.promise();
+
+    if (!newRoleUuid && role) {
+      const normalizedRole = role.toUpperCase();
+      const [roleByCode] = await pool.execute(
+        "SELECT uuid FROM Roles WHERE (code = ? OR code = ?) AND is_active = 1 LIMIT 1",
+        [normalizedRole, normalizedRole === 'DEPARTMENT_HEAD' ? 'DEPT_HEAD' : normalizedRole]
+      );
+      if (roleByCode.length) {
+        newRoleUuid = roleByCode[0].uuid;
+      }
+    }
+
     if (!newRoleUuid) {
       return sendError(res, {
         status: 400,
-        message: "role_uuid is required.",
+        message: "role_uuid or role is required.",
         error: "VALIDATION_ERROR",
       });
     }
-
-    const pool = db.promise();
 
     // Check if account exists and get current role
     const [existing] = await pool.execute(

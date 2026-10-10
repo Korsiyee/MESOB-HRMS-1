@@ -20,7 +20,7 @@ const { requireRole } = require('../middleware/moduleAuth');
 
 /**
  * Get all roles
- * Only HR_ADMIN and SUPER_ADMIN can view roles
+ * HR_ADMIN and SUPER_ADMIN can view all roles for assignment
  */
 router.get(
   '/roles',

@@ -64,19 +64,25 @@ class HtmlToPdfService {
       ...options,
     };
 
-    switch (this.strategy) {
-      case 'puppeteer':
+    if (this.strategy === 'puppeteer') {
+      try {
         return await this.convertWithPuppeteer(htmlContent, defaultOptions);
-      
-      case 'html-pdf-node':
-        return await this.convertWithHtmlPdfNode(htmlContent, defaultOptions);
-      
-      case 'basic':
+      } catch (err) {
+        console.warn('[HtmlToPdfService] Puppeteer conversion failed, falling back to basic PDF:', err.message);
         return await this.convertWithBasicPdf(htmlContent, defaultOptions);
-      
-      default:
-        throw new Error('No PDF generation strategy available');
+      }
     }
+
+    if (this.strategy === 'html-pdf-node') {
+      try {
+        return await this.convertWithHtmlPdfNode(htmlContent, defaultOptions);
+      } catch (err) {
+        console.warn('[HtmlToPdfService] html-pdf-node conversion failed, falling back to basic PDF:', err.message);
+        return await this.convertWithBasicPdf(htmlContent, defaultOptions);
+      }
+    }
+
+    return await this.convertWithBasicPdf(htmlContent, defaultOptions);
   }
 
   /**
@@ -203,7 +209,8 @@ class HtmlToPdfService {
       const maxWidth = width - (margin * 2);
       
       // Split text into lines
-      const lines = this.wrapText(textContent, font, fontSize, maxWidth);
+      const sanitizedText = textContent.replace(/[^\x00-\x7F]/g, ' ');
+      const lines = this.wrapText(sanitizedText, font, fontSize, maxWidth);
       
       let y = height - margin;
       for (const line of lines) {

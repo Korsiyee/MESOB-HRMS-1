@@ -20,8 +20,12 @@ function getBearerToken(authHeader) {
 }
 
 async function authenticateJwt(req, res, next) {
+  // Allow public GET employee photo (for <img> tags without auth header)
+  if (req.method === "GET" && req.path.includes("/employees/") && req.path.endsWith("/photo")) {
+    return next();
+  }
+
   try {
-    console.log('[authMiddleware] Authorization header:', req.headers.authorization?.substring(0, 50) + '...');
     const token = getBearerToken(req.headers.authorization);
     if (!token) {
       console.log('[authMiddleware] ❌ NO TOKEN extracted from header');

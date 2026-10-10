@@ -216,15 +216,18 @@ const Topbar = ({ title = 'Dashboard', sidebarWidth = 240, onHamburger, isMobile
         right: 0,
         height: 64,
         zIndex: 30,
-        background: "linear-gradient(180deg, #1e3a37 0%, #162e2b 100%)",
-        borderBottom: "2px solid rgba(255,255,255,0.1)",
+        background: "rgba(255, 255, 255, 0.7)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+        borderBottom: "1px solid rgba(255, 255, 255, 0.3)",
+        borderRadius: "0 0 16px 16px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         padding: "0 24px",
         transition: "left 0.3s ease",
         fontFamily: "Poppins, sans-serif",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+        boxShadow: "0 4px 16px rgba(0, 0, 0, 0.06)",
       }}
     >
       {/* Left — Hamburger (mobile/tablet) + Amharic text */}
@@ -236,14 +239,20 @@ const Topbar = ({ title = 'Dashboard', sidebarWidth = 240, onHamburger, isMobile
             onClick={onHamburger}
             aria-label="Open menu"
             style={{
-              width: 40, height: 40, borderRadius: 8, border: 'none',
-              background: 'rgba(255,255,255,0.1)',
+              width: 40, height: 40, borderRadius: 8, border: '1px solid rgba(20,184,166,0.2)',
+              background: 'rgba(20,184,166,0.08)',
               cursor: 'pointer', display: 'flex', alignItems: 'center',
-              justifyContent: 'center', color: 'white', flexShrink: 0,
-              transition: 'background 0.15s',
+              justifyContent: 'center', color: '#14B8A6', flexShrink: 0,
+              transition: 'all 0.15s',
             }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.18)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(20,184,166,0.15)';
+              e.currentTarget.style.borderColor = '#14B8A6';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(20,184,166,0.08)';
+              e.currentTarget.style.borderColor = 'rgba(20,184,166,0.2)';
+            }}
           >
             <Menu size={20} />
           </button>
@@ -252,11 +261,11 @@ const Topbar = ({ title = 'Dashboard', sidebarWidth = 240, onHamburger, isMobile
         {/* Amharic + English text — hidden on small mobile */}
         {!isMobile && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
-            <p style={{ margin: 0, fontSize: isTablet ? '0.85rem' : '1.05rem', color: 'rgba(255,255,255,0.9)', fontWeight: 700, letterSpacing: 0.4, whiteSpace: 'nowrap', fontFamily: "'Nokia Pure Headline', 'Poppins', sans-serif" }}>
+            <p style={{ margin: 0, fontSize: isTablet ? '0.85rem' : '1.05rem', color: '#2A4441', fontWeight: 700, letterSpacing: 0.4, whiteSpace: 'nowrap', fontFamily: "'Nokia Pure Headline', 'Poppins', sans-serif" }}>
               የኢትዮጵያ ፌደራል ዴሞክራቲክ ሪፐብሊክ የመሶብ አገልግሎት
             </p>
             {!isTablet && (
-              <p style={{ margin: 0, fontSize: '0.75rem', color: 'rgba(255,255,255,0.75)', fontWeight: 500, letterSpacing: 0.3, whiteSpace: 'nowrap', fontFamily: 'Poppins, sans-serif', lineHeight: 1.2 }}>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: '#2A4441', fontWeight: 500, letterSpacing: 0.3, whiteSpace: 'nowrap', fontFamily: 'Poppins, sans-serif', lineHeight: 1.2, opacity: 0.8 }}>
                 Federal Democratic Republic of Ethiopia Mesob Service
               </p>
             )}
@@ -266,7 +275,7 @@ const Topbar = ({ title = 'Dashboard', sidebarWidth = 240, onHamburger, isMobile
 
       {/* Center — HRMS title */}
       <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }}>
-        <h1 style={{ margin: 0, fontSize: isMobile ? '1.1rem' : '1.4rem', fontWeight: 800, color: '#ffffff', fontFamily: 'Poppins, sans-serif', letterSpacing: 2, lineHeight: 1 }}>HRMS</h1>
+        <h1 style={{ margin: 0, fontSize: isMobile ? '1.1rem' : '1.4rem', fontWeight: 800, color: '#14B8A6', fontFamily: 'Poppins, sans-serif', letterSpacing: 2, lineHeight: 1 }}>HRMS</h1>
       </div>
 
       {/* Right — Bell / Avatar */}
@@ -279,29 +288,29 @@ const Topbar = ({ title = 'Dashboard', sidebarWidth = 240, onHamburger, isMobile
               position: "relative",
               width: 40,
               height: 40,
-              border: `1px solid ${panelOpen ? "#14B8A6" : "rgba(255,255,255,0.2)"}`,
+              border: `1px solid ${panelOpen ? "#14B8A6" : "rgba(20,184,166,0.2)"}`,
               borderRadius: 8,
               background: panelOpen
                 ? "rgba(20,184,166,0.15)"
-                : "rgba(255,255,255,0.1)",
+                : "rgba(20,184,166,0.06)",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "rgba(255,255,255,0.9)",
+              color: "#14B8A6",
               transition: "all 0.2s",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+              e.currentTarget.style.background = "rgba(20,184,166,0.12)";
               e.currentTarget.style.borderColor = "#14B8A6";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = panelOpen
                 ? "rgba(20,184,166,0.15)"
-                : "rgba(255,255,255,0.1)";
+                : "rgba(20,184,166,0.06)";
               e.currentTarget.style.borderColor = panelOpen
                 ? "#14B8A6"
-                : "rgba(255,255,255,0.2)";
+                : "rgba(20,184,166,0.2)";
             }}
             aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
           >
@@ -317,7 +326,7 @@ const Topbar = ({ title = 'Dashboard', sidebarWidth = 240, onHamburger, isMobile
                   borderRadius: 9,
                   padding: "0 4px",
                   background: "#EF4444",
-                  border: "2px solid #162e2b",
+                  border: "2px solid #C5CECC",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -346,30 +355,30 @@ const Topbar = ({ title = 'Dashboard', sidebarWidth = 240, onHamburger, isMobile
               gap: 10,
               padding: "6px 12px 6px 6px",
               borderRadius: 8,
-              border: "1px solid rgba(255,255,255,0.2)",
-              background: "rgba(255,255,255,0.1)",
+              border: "1px solid rgba(20,184,166,0.2)",
+              background: "rgba(20,184,166,0.06)",
               cursor: "pointer",
               transition: "all 0.2s",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+              e.currentTarget.style.background = "rgba(20,184,166,0.12)";
               e.currentTarget.style.borderColor = "#14B8A6";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(255,255,255,0.1)";
-              e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
+              e.currentTarget.style.background = "rgba(20,184,166,0.06)";
+              e.currentTarget.style.borderColor = "rgba(20,184,166,0.2)";
             }}
           >
-            <Avatar imageUrl={user?.profile_photo_url} name={fullName} size={36} borderColor="rgba(255,255,255,0.2)" borderWidth="2px" />
+            <Avatar imageUrl={user?.profile_photo_url} name={fullName} size={36} borderColor="#14B8A6" borderWidth="2px" />
             {/* Full name + role — hide on mobile */}
             {!isMobile && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ffffff', lineHeight: 1.2 }}>{fullName}</span>
-                <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.65)', fontWeight: 500 }}>{(user?.role?.name || 'USER').replace(/_/g, ' ')}</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#2A4441', lineHeight: 1.2 }}>{fullName}</span>
+                <span style={{ fontSize: '0.65rem', color: '#2A4441', fontWeight: 500, opacity: 0.75 }}>{(user?.role?.name || 'USER').replace(/_/g, ' ')}</span>
               </div>
             )}
             {!isMobile && (
-              <ChevronDown size={14} style={{ color: 'rgba(255,255,255,0.7)', transform: dropOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', marginLeft: 4 }} />
+              <ChevronDown size={14} style={{ color: '#2A4441', opacity: 0.7, transform: dropOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', marginLeft: 4 }} />
             )}
           </button>
 

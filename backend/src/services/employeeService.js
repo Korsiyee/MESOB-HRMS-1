@@ -106,7 +106,7 @@ async function listEmployees(filters = {}) {
     }
   }
   if (filters.departmentUuid) {
-    whereClause += " AND p.department_uuid = ?";
+    whereClause += " AND COALESCE(e.department_uuid, p.department_uuid) = ?";
     params.push(filters.departmentUuid);
   }
   if (filters.positionUuid) {
@@ -123,7 +123,7 @@ async function listEmployees(filters = {}) {
   const [countRows] = await executeQuery(
     `SELECT COUNT(*) AS total FROM Employees e
      LEFT JOIN Positions   p ON p.uuid = e.position_uuid
-     LEFT JOIN Departments d ON d.uuid = p.department_uuid
+     LEFT JOIN Departments d ON d.uuid = COALESCE(e.department_uuid, p.department_uuid)
      ${whereClause}`,
     params,
   );
@@ -131,14 +131,23 @@ async function listEmployees(filters = {}) {
   let query = `
     SELECT e.uuid, e.mesob_id, e.title, e.first_name, e.middle_name, e.last_name,
       e.mother_name, e.gender, e.date_of_birth, e.nationality, e.hire_date,
-      e.prior_gov_service_years, e.status, e.attendance_exempt, p.department_uuid,
+      e.prior_gov_service_years, e.status, e.attendance_exempt,
+      COALESCE(e.department_uuid, p.department_uuid) AS department_uuid,
       e.position_uuid, e.profile_photo_key, e.created_at,
       e.updated_at,
       d.name  AS department_name,
-      p.title AS position_title
+      p.title AS position_title,
+      cur_lvl.level_uuid,
+      cur_lvl.level_name
     FROM Employees e
     LEFT JOIN Positions   p ON p.uuid = e.position_uuid
-    LEFT JOIN Departments d ON d.uuid = p.department_uuid
+    LEFT JOIN Departments d ON d.uuid = COALESCE(e.department_uuid, p.department_uuid)
+    LEFT JOIN (
+      SELECT elh.employee_uuid, elh.level_uuid, l.name AS level_name
+      FROM EmployeeLevelHistory elh
+      JOIN Levels l ON l.uuid = elh.level_uuid
+      WHERE elh.effective_to IS NULL
+    ) cur_lvl ON cur_lvl.employee_uuid = e.uuid
     ${whereClause}
     ORDER BY e.created_at DESC
   `;
@@ -306,6 +315,27 @@ async function createEmployee(payload) {
       );
     }
 
+    if (payload.level_uuid) {
+      const [versions] = await connection.execute(
+        "SELECT uuid FROM LevelVersions WHERE level_uuid = ? ORDER BY (effective_to IS NULL) DESC, version_number DESC LIMIT 1",
+        [payload.level_uuid]
+      );
+      await connection.execute(
+        `INSERT INTO EmployeeLevelHistory (
+           uuid, employee_uuid, level_uuid, level_version_uuid,
+           effective_from, effective_to, changed_by_uuid, reason, created_at
+         ) VALUES (?, ?, ?, ?, CURRENT_DATE, NULL, ?, ?, CURRENT_TIMESTAMP)`,
+        [
+          randomUUID(),
+          employeeUuid,
+          payload.level_uuid,
+          versions[0]?.uuid || null,
+          payload.created_by_uuid || null,
+          "Initial level assignment",
+        ]
+      );
+    }
+
     return employeeUuid;
   });
 
@@ -352,13 +382,22 @@ async function getEmployeeByUuid(employeeUuid, options = {}) {
       SELECT e.uuid, e.mesob_id, e.title, e.first_name, e.middle_name, e.last_name, e.mother_name,
         e.gender, e.date_of_birth, e.nationality, e.profile_photo_key, e.tin_number,
         e.pension_code, e.bank_name, e.bank_account_number, e.hire_date,
-        e.prior_gov_service_years, e.status, e.attendance_exempt, p.department_uuid,
+        e.prior_gov_service_years, e.status, e.attendance_exempt,
+        COALESCE(e.department_uuid, p.department_uuid) AS department_uuid,
         e.position_uuid, e.created_at, e.updated_at,
         d.name AS department_name,
-        p.title AS position_title
+        p.title AS position_title,
+        cur_lvl.level_uuid,
+        cur_lvl.level_name
       FROM Employees e
       LEFT JOIN Positions p ON p.uuid = e.position_uuid
-      LEFT JOIN Departments d ON d.uuid = p.department_uuid
+      LEFT JOIN Departments d ON d.uuid = COALESCE(e.department_uuid, p.department_uuid)
+      LEFT JOIN (
+        SELECT elh.employee_uuid, elh.level_uuid, l.name AS level_name
+        FROM EmployeeLevelHistory elh
+        JOIN Levels l ON l.uuid = elh.level_uuid
+        WHERE elh.effective_to IS NULL
+      ) cur_lvl ON cur_lvl.employee_uuid = e.uuid
       WHERE e.uuid = ?
       LIMIT 1
     `,
@@ -457,7 +496,8 @@ async function updateEmployee(employeeUuid, payload) {
       }
     }
 
-    if (!fields.length && !Array.isArray(payload.addresses)) {
+    const hasLevel = Object.prototype.hasOwnProperty.call(payload, 'level_uuid') && payload.level_uuid;
+    if (!fields.length && !Array.isArray(payload.addresses) && !hasLevel) {
       throw new ApiError(
         "No updatable employee fields provided.",
         400,
@@ -471,6 +511,41 @@ async function updateEmployee(employeeUuid, payload) {
         `UPDATE Employees SET ${fields.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE uuid = ?`,
         values,
       );
+    }
+
+    // Handle level assignment updates
+    if (hasLevel) {
+      const [currentLevels] = await connection.execute(
+        "SELECT uuid, level_uuid FROM EmployeeLevelHistory WHERE employee_uuid = ? AND effective_to IS NULL ORDER BY created_at DESC LIMIT 1",
+        [employeeUuid]
+      );
+      const currentLevelUuid = currentLevels[0]?.level_uuid;
+      if (currentLevelUuid !== payload.level_uuid) {
+        if (currentLevels.length > 0) {
+          await connection.execute(
+            "UPDATE EmployeeLevelHistory SET effective_to = CURRENT_DATE WHERE employee_uuid = ? AND effective_to IS NULL",
+            [employeeUuid]
+          );
+        }
+        const [versions] = await connection.execute(
+          "SELECT uuid FROM LevelVersions WHERE level_uuid = ? ORDER BY (effective_to IS NULL) DESC, version_number DESC LIMIT 1",
+          [payload.level_uuid]
+        );
+        await connection.execute(
+          `INSERT INTO EmployeeLevelHistory (
+             uuid, employee_uuid, level_uuid, level_version_uuid,
+             effective_from, effective_to, changed_by_uuid, reason, created_at
+           ) VALUES (?, ?, ?, ?, CURRENT_DATE, NULL, ?, ?, CURRENT_TIMESTAMP)`,
+          [
+            randomUUID(),
+            employeeUuid,
+            payload.level_uuid,
+            versions[0]?.uuid || null,
+            payload.changed_by_uuid || null,
+            payload.level_reason || "Level updated via employee profile",
+          ]
+        );
+      }
     }
 
     // Rule 4: if department changed, auto-remove this employee as head of their previous department

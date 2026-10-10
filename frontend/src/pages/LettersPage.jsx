@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { LetterApi } from "../api/letterApi";
+import { EmployeeApi } from "../api/employeeApi";
 import {
   FileText, Plus, Eye, Trash2, RefreshCw, X, Edit2, Search, Send,
-  CheckCircle, XCircle, Clock, Filter, Download, Upload, AlertCircle
+  CheckCircle, XCircle, Clock, Filter, Download, Upload, AlertCircle, Sparkles
 } from "lucide-react";
 import PDFTemplateModal from "../components/PDFTemplateModal";
 import LetterTemplateModal from "../components/LetterTemplateModal";
@@ -355,6 +356,11 @@ const LettersPage = () => {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewHTML, setPreviewHTML] = useState(null);
   const [placeholders, setPlaceholders] = useState([]);
+  const [requestFilter, setRequestFilter] = useState('ALL');
+  const [inlineEmployees, setInlineEmployees] = useState([]);
+  const [inlineForm, setInlineForm] = useState({ template_uuid: '', employee_uuid: '', ref_no: '' });
+  const [inlineGenerating, setInlineGenerating] = useState(false);
+  const [inlinePreview, setInlinePreview] = useState(null);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -380,6 +386,45 @@ const LettersPage = () => {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  useEffect(() => {
+    EmployeeApi.list({ pageSize: 500 })
+      .then(res => setInlineEmployees(Array.isArray(res.data) ? res.data : (res.data?.employees || [])))
+      .catch(() => {});
+  }, []);
+
+  const handleInlinePreview = async () => {
+    if (!inlineForm.template_uuid || !inlineForm.employee_uuid) {
+      dialog.showError("Please select both a template and an employee first.");
+      return;
+    }
+    setInlineGenerating(true);
+    try {
+      const res = await LetterApi.previewEnhancedLetter(inlineForm);
+      setInlinePreview(res.data);
+    } catch (err) {
+      dialog.showError(err.message || "Failed to generate preview");
+    } finally {
+      setInlineGenerating(false);
+    }
+  };
+
+  const handleInlineDownload = async () => {
+    if (!inlineForm.template_uuid || !inlineForm.employee_uuid) {
+      dialog.showError("Please select both a template and an employee first.");
+      return;
+    }
+    setInlineGenerating(true);
+    try {
+      const result = await LetterApi.generateEnhancedLetter(inlineForm);
+      dialog.showSuccess(`Letter generated and downloaded successfully!\nFilename: ${result.filename}`);
+      loadData();
+    } catch (err) {
+      dialog.showError(`Failed to generate letter:\n${err.message}`);
+    } finally {
+      setInlineGenerating(false);
+    }
+  };
 
   const handleDeleteTemplate = async (uuid) => {
     dialog.showDeleteConfirm(
@@ -520,15 +565,20 @@ const LettersPage = () => {
     <div style={{ fontFamily: 'Poppins, sans-serif' }}>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* Header */}
+      {/* Header Banner */}
       <div style={{ background: C.headerBg, borderRadius: 16, padding: '24px 28px', color: '#fff', marginBottom: 24, boxShadow: '0 8px 32px rgba(0,0,0,0.15)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 700, color: '#E8F0EE', letterSpacing: '-0.5px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <span style={{ fontSize: '0.72rem', letterSpacing: '0.04em', textTransform: 'uppercase', color: 'rgba(232,240,238,0.5)', fontWeight: 600 }}>
+                Letters & Documents
+              </span>
+            </div>
+            <h1 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800, color: '#E8F0EE', letterSpacing: '-0.5px' }}>
               Letters Management
             </h1>
-            <p style={{ margin: '6px 0 0', color: 'rgba(232,240,238,0.7)', fontSize: '0.85rem' }}>
-              Manage templates, generate letters, and review employee requests
+            <p style={{ margin: '6px 0 0', color: 'rgba(232,240,238,0.75)', fontSize: '0.84rem' }}>
+              {templates.length} templates · {pendingCount} pending requests · {allRequestsCount} total requests
             </p>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
@@ -547,37 +597,106 @@ const LettersPage = () => {
         </div>
       </div>
 
-      <style>{`.spinning{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <style>{`
+        .spinning { animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-      {/* Tabs */}
-      <Card style={{ padding: '0 24px', marginBottom: 24 }}>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {[
-            ['templates', 'Letter Templates', FileText],
-            ['generate', 'Generate Letter', Send],
-            ['requests', `Letter Requests ${pendingCount > 0 ? `(${pendingCount} pending)` : `(${allRequestsCount})`}`, Clock],
-          ].map(([key, label, Icon]) => (
-            <button key={key} onClick={() => setActiveTab(key)} style={{
-              padding: '16px 20px', background: 'none', border: 'none',
-              borderBottom: activeTab === key ? `3px solid ${C.primary}` : '3px solid transparent',
-              color: activeTab === key ? C.primary : C.textMuted,
-              fontWeight: activeTab === key ? 700 : 500, fontSize: '0.85rem',
-              cursor: 'pointer', fontFamily: 'Poppins, sans-serif', transition: 'all 0.2s',
-              display: 'flex', alignItems: 'center', gap: 8,
-            }}
-              onMouseEnter={e => activeTab !== key && (e.currentTarget.style.color = C.textSub)}
-              onMouseLeave={e => activeTab !== key && (e.currentTarget.style.color = C.textMuted)}
+        @keyframes letterSwipeAnim {
+          0% {
+            opacity: 0;
+            transform: translateX(18px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        .letter-swipe-pane {
+          animation: letterSwipeAnim 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}</style>
+
+      {/* Redesigned Sliding Pill Tabs */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '6px',
+        background: 'rgba(238, 241, 240, 0.95)',
+        borderRadius: 14,
+        border: `1px solid ${C.cardBorder}`,
+        boxShadow: C.shadow,
+        marginBottom: 24,
+        overflowX: 'auto',
+      }}>
+        {[
+          { key: 'templates', label: 'Letter Templates', icon: FileText, count: templates.length },
+          { key: 'generate', label: 'Generate Letter', icon: Send },
+          { 
+            key: 'requests', 
+            label: 'Letter Requests', 
+            icon: Clock, 
+            count: pendingCount > 0 ? `${pendingCount} pending` : allRequestsCount,
+            isPendingBadge: pendingCount > 0
+          },
+        ].map(({ key, label, icon: Icon, count, isPendingBadge }) => {
+          const isActive = activeTab === key;
+          return (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '10px 20px',
+                borderRadius: 10,
+                border: 'none',
+                background: isActive ? 'linear-gradient(135deg, #0F766E 0%, #0d655e 100%)' : 'transparent',
+                color: isActive ? '#FFFFFF' : C.textSub,
+                boxShadow: isActive ? '0 4px 14px rgba(15,118,110,0.28)' : 'none',
+                fontSize: '0.84rem',
+                fontWeight: isActive ? 700 : 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                fontFamily: 'Poppins, sans-serif',
+                transition: 'all 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) e.currentTarget.style.background = 'rgba(15,118,110,0.08)';
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) e.currentTarget.style.background = 'transparent';
+              }}
             >
-              <Icon size={16} /> {label}
+              <Icon size={16} />
+              <span>{label}</span>
+              {count !== undefined && (
+                <span style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  padding: '2px 8px',
+                  borderRadius: 12,
+                  background: isActive
+                    ? (isPendingBadge ? '#EF4444' : 'rgba(255,255,255,0.22)')
+                    : (isPendingBadge ? '#FEF3C7' : 'rgba(0,80,60,0.08)'),
+                  color: isActive
+                    ? '#FFFFFF'
+                    : (isPendingBadge ? '#B45309' : C.textMuted),
+                  transition: 'all 0.2s',
+                }}>
+                  {count}
+                </span>
+              )}
             </button>
-          ))}
-        </div>
-      </Card>
+          );
+        })}
+      </div>
 
       {/* Templates Tab */}
       {activeTab === 'templates' && (
-        <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 16 }}>
+        <div key="templates" className="letter-swipe-pane">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 16, flexWrap: 'wrap' }}>
             <SearchInput value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search templates..." />
             <div style={{ display: 'flex', gap: 10 }}>
               <GreenBtn variant="secondary" onClick={() => { setShowPDFTemplateModal(true); }}>
@@ -610,180 +729,350 @@ const LettersPage = () => {
               )}
             </Card>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
               {filteredTemplates.map(tpl => (
-                <Card key={tpl.uuid} hover style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, position: 'relative', overflow: 'visible' }}>
+                <Card key={tpl.uuid} hover style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 12, position: 'relative', overflow: 'visible' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                     <div style={{ width: 48, height: 48, borderRadius: 12, background: `linear-gradient(135deg, ${C.primary}, #14B8A6)`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(15,118,110,0.3)', flexShrink: 0 }}>
                       <FileText size={24} color="#fff" />
                     </div>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, background: 'rgba(15,118,110,0.1)', color: C.primary, padding: '4px 12px', borderRadius: 20, flexShrink: 0 }}>
-                      {tpl.category || tpl.type}
-                    </span>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, background: 'rgba(15,118,110,0.1)', color: C.primary, padding: '4px 10px', borderRadius: 20 }}>
+                        {tpl.category || tpl.type}
+                      </span>
+                      {tpl.template_type === 'pdf' && (
+                        <span style={{ fontSize: '0.68rem', fontWeight: 700, background: '#EFF6FF', color: '#1E40AF', padding: '4px 8px', borderRadius: 20 }}>
+                          PDF
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div style={{ flex: 1, minHeight: 80 }}>
-                    <h3 style={{ margin: '0 0 8px', fontSize: '1rem', fontWeight: 700, color: C.textMain, lineHeight: 1.3 }}>
+                  <div style={{ flex: 1, minHeight: 70 }}>
+                    <h3 style={{ margin: '0 0 6px', fontSize: '1rem', fontWeight: 700, color: C.textMain, lineHeight: 1.3 }}>
                       {tpl.title || tpl.name}
                     </h3>
                     <p style={{ margin: 0, fontSize: '0.78rem', color: C.textMuted, lineHeight: 1.5 }}>
-                      {tpl.description || 'No description provided'}
+                      {tpl.description || 'Ready for generation with dynamic employee variables'}
                     </p>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
-                    <button 
-                      onClick={() => handlePreviewTemplate(tpl)} 
-                      title="Preview"
-                      style={{
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        color: C.primary, padding: '8px', borderRadius: 6,
-                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'all 0.15s',
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(15,118,110,0.1)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                    >
-                      <Eye size={16} />
-                    </button>
-                    <button 
-                      onClick={() => { setEditingTemplate(tpl); setShowTemplateModal(true); }}
-                      title="Edit"
-                      style={{
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        color: C.primary, padding: '8px', borderRadius: 6,
-                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'all 0.15s',
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(15,118,110,0.1)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    <button 
-                      onClick={() => handleDeleteTemplate(tpl.uuid)} 
-                      disabled={deletingUuid === tpl.uuid}
-                      title="Delete"
-                      style={{
-                        background: 'none', border: 'none', cursor: deletingUuid === tpl.uuid ? 'not-allowed' : 'pointer',
-                        color: '#DC2626', padding: '8px', borderRadius: 6,
-                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'all 0.15s', opacity: deletingUuid === tpl.uuid ? 0.5 : 1,
-                      }}
-                      onMouseEnter={e => !deletingUuid && (e.currentTarget.style.background = 'rgba(220,38,38,0.1)')}
-                      onMouseLeave={e => !deletingUuid && (e.currentTarget.style.background = 'none')}
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+                    <span style={{ fontSize: '0.72rem', color: C.textMuted }}>
+                      {tpl.created_at ? new Date(tpl.created_at).toLocaleDateString('en-GB') : 'Active'}
+                    </span>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button 
+                        onClick={() => handlePreviewTemplate(tpl)} 
+                        title="Preview Template"
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: C.primary, padding: '8px', borderRadius: 6,
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(15,118,110,0.1)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                      >
+                        <Eye size={16} />
+                      </button>
+                      <button 
+                        onClick={() => { setEditingTemplate(tpl); setShowTemplateModal(true); }}
+                        title="Edit Template"
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: C.primary, padding: '8px', borderRadius: 6,
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(15,118,110,0.1)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteTemplate(tpl.uuid)} 
+                        disabled={deletingUuid === tpl.uuid}
+                        title="Delete Template"
+                        style={{
+                          background: 'none', border: 'none', cursor: deletingUuid === tpl.uuid ? 'not-allowed' : 'pointer',
+                          color: '#DC2626', padding: '8px', borderRadius: 6,
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          transition: 'all 0.15s', opacity: deletingUuid === tpl.uuid ? 0.5 : 1,
+                        }}
+                        onMouseEnter={e => !deletingUuid && (e.currentTarget.style.background = 'rgba(220,38,38,0.1)')}
+                        onMouseLeave={e => !deletingUuid && (e.currentTarget.style.background = 'none')}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 </Card>
               ))}
             </div>
           )}
-        </>
+        </div>
       )}
 
       {/* Generate Letter Tab */}
       {activeTab === 'generate' && (
-        <Card style={{ padding: 40, textAlign: 'center', maxWidth: 600, margin: '0 auto' }}>
-          <div style={{ width: 80, height: 80, borderRadius: '50%', background: `linear-gradient(135deg, ${C.primary}, #14B8A6)`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', boxShadow: '0 8px 24px rgba(15,118,110,0.3)' }}>
-            <Send size={36} color="#fff" />
+        <div key="generate" className="letter-swipe-pane">
+          <div style={{ display: 'grid', gridTemplateColumns: inlinePreview ? '1fr 1.1fr' : '1fr', gap: 24, maxWidth: inlinePreview ? 1200 : 760, margin: '0 auto' }}>
+            <Card style={{ padding: 32 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24, paddingBottom: 16, borderBottom: `1px solid ${C.border}` }}>
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: `linear-gradient(135deg, ${C.primary}, #14B8A6)`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(15,118,110,0.25)' }}>
+                  <Send size={24} color="#fff" />
+                </div>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: C.textMain }}>
+                    Generate Official Letter
+                  </h2>
+                  <p style={{ margin: '3px 0 0', fontSize: '0.8rem', color: C.textMuted }}>
+                    Select template and employee to generate a branded, official PDF letter
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: C.textSub, marginBottom: 8 }}>
+                    1. Select Letter Template *
+                  </label>
+                  <select
+                    value={inlineForm.template_uuid}
+                    onChange={e => setInlineForm(p => ({ ...p, template_uuid: e.target.value }))}
+                    style={{
+                      width: '100%', padding: '11px 14px', borderRadius: 10, border: `1px solid ${C.border}`,
+                      fontSize: '0.85rem', color: C.textMain, background: '#fff', outline: 'none',
+                      fontFamily: 'Poppins, sans-serif', cursor: 'pointer',
+                    }}
+                  >
+                    <option value="">— Choose a template —</option>
+                    {templates.map(t => (
+                      <option key={t.uuid} value={t.uuid}>
+                        {t.title || t.name} ({t.category || t.type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: C.textSub, marginBottom: 8 }}>
+                    2. Select Recipient Employee *
+                  </label>
+                  <select
+                    value={inlineForm.employee_uuid}
+                    onChange={e => setInlineForm(p => ({ ...p, employee_uuid: e.target.value }))}
+                    style={{
+                      width: '100%', padding: '11px 14px', borderRadius: 10, border: `1px solid ${C.border}`,
+                      fontSize: '0.85rem', color: C.textMain, background: '#fff', outline: 'none',
+                      fontFamily: 'Poppins, sans-serif', cursor: 'pointer',
+                    }}
+                  >
+                    <option value="">— Choose an employee —</option>
+                    {inlineEmployees.map(emp => (
+                      <option key={emp.uuid} value={emp.uuid}>
+                        {emp.first_name} {emp.middle_name || ''} {emp.last_name} ({emp.mesob_id || 'ID'}) - {emp.position_title || emp.position || 'Staff'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: C.textSub, marginBottom: 8 }}>
+                    3. Reference Number (Optional)
+                    <span style={{ fontSize: '0.72rem', fontWeight: 400, color: C.textMuted, marginLeft: 8 }}>(Auto-generated if left blank)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={inlineForm.ref_no}
+                    onChange={e => setInlineForm(p => ({ ...p, ref_no: e.target.value }))}
+                    placeholder="e.g., FDRE/HR/2026/0145"
+                    style={{
+                      width: '100%', padding: '11px 14px', borderRadius: 10, border: `1px solid ${C.border}`,
+                      fontSize: '0.85rem', color: C.textMain, background: '#fff', outline: 'none',
+                      fontFamily: 'Poppins, sans-serif',
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
+                  <GreenBtn 
+                    variant="secondary" 
+                    onClick={handleInlinePreview} 
+                    disabled={inlineGenerating || !inlineForm.template_uuid || !inlineForm.employee_uuid}
+                    style={{ flex: 1, justifyContent: 'center', padding: '12px' }}
+                  >
+                    <Eye size={16} /> {inlineGenerating ? 'Generating...' : 'Live Preview'}
+                  </GreenBtn>
+                  <GreenBtn 
+                    onClick={handleInlineDownload} 
+                    disabled={inlineGenerating || !inlineForm.template_uuid || !inlineForm.employee_uuid}
+                    style={{ flex: 1, justifyContent: 'center', padding: '12px' }}
+                  >
+                    <Download size={16} /> {inlineGenerating ? 'Generating...' : 'Download PDF'}
+                  </GreenBtn>
+                </div>
+              </div>
+            </Card>
+
+            {/* Inline Preview Pane */}
+            {inlinePreview && (
+              <Card style={{ padding: 24, display: 'flex', flexDirection: 'column', maxHeight: 600 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, paddingBottom: 10, borderBottom: `1px solid ${C.border}` }}>
+                  <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: C.primary, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Sparkles size={16} /> Live Letter Preview
+                  </h3>
+                  <button 
+                    onClick={() => setInlinePreview(null)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted }}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                <div style={{ flex: 1, overflowY: 'auto', background: '#fff', padding: 20, borderRadius: 10, border: `1px solid ${C.border}` }}>
+                  {inlinePreview.html_content ? (
+                    <div dangerouslySetInnerHTML={{ __html: inlinePreview.html_content }} style={{ fontSize: '0.85rem', lineHeight: 1.8 }} />
+                  ) : (
+                    <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'Georgia, serif', fontSize: '0.85rem' }}>
+                      {inlinePreview.main_body || 'No content generated.'}
+                    </pre>
+                  )}
+                </div>
+              </Card>
+            )}
           </div>
-          <h2 style={{ margin: '0 0 12px', fontSize: '1.3rem', fontWeight: 700, color: C.textMain }}>
-            Generate Employee Letter
-          </h2>
-          <p style={{ margin: '0 0 28px', color: C.textMuted, fontSize: '0.9rem', lineHeight: 1.6 }}>
-            Select a template and enter an employee's Mesob ID to generate a personalized letter. 
-            The letter will be automatically filled with the employee's information.
-          </p>
-          <GreenBtn onClick={() => setShowGenerateModal(true)} style={{ padding: '12px 28px', fontSize: '0.9rem' }}>
-            <Send size={16} /> Start Generating
-          </GreenBtn>
-        </Card>
+        </div>
       )}
 
-      {/* Pending Requests Tab */}
+      {/* Letter Requests Tab */}
       {activeTab === 'requests' && (
-        <>
+        <div key="requests" className="letter-swipe-pane">
+          {/* Filter Pills */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+            {[
+              { key: 'ALL', label: `All Requests (${pendingRequests.length})` },
+              { key: 'PENDING', label: `Pending (${pendingCount})` },
+              { key: 'APPROVED', label: `Approved (${pendingRequests.filter(r => r.status === 'APPROVED').length})` },
+              { key: 'REJECTED', label: `Rejected (${pendingRequests.filter(r => r.status === 'REJECTED').length})` },
+            ].map(filter => {
+              const isSelected = requestFilter === filter.key;
+              return (
+                <button
+                  key={filter.key}
+                  onClick={() => setRequestFilter(filter.key)}
+                  style={{
+                    padding: '7px 16px',
+                    borderRadius: 20,
+                    border: isSelected ? `1.5px solid ${C.primary}` : `1px solid ${C.border}`,
+                    background: isSelected ? 'rgba(15,118,110,0.12)' : C.card,
+                    color: isSelected ? C.primary : C.textMuted,
+                    fontSize: '0.8rem',
+                    fontWeight: isSelected ? 700 : 500,
+                    cursor: 'pointer',
+                    fontFamily: 'Poppins, sans-serif',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {filter.label}
+                </button>
+              );
+            })}
+          </div>
+
           {loading ? (
             <div style={{ padding: 60, textAlign: 'center', color: C.textMuted }}>
               <RefreshCw size={32} className="spinning" style={{ margin: '0 auto 12px' }} />
               <p>Loading requests...</p>
             </div>
-          ) : pendingRequests.length === 0 ? (
+          ) : pendingRequests.filter(r => requestFilter === 'ALL' || r.status === requestFilter).length === 0 ? (
             <Card style={{ padding: 60, textAlign: 'center' }}>
               <Clock size={56} style={{ margin: '0 auto 16px', opacity: 0.2, color: C.textMuted }} />
-              <h3 style={{ margin: '0 0 8px', fontSize: '1.1rem', color: C.textMain }}>No requests</h3>
+              <h3 style={{ margin: '0 0 8px', fontSize: '1.1rem', color: C.textMain }}>
+                {requestFilter === 'ALL' ? 'No letter requests yet' : `No ${requestFilter.toLowerCase()} requests`}
+              </h3>
               <p style={{ margin: 0, color: C.textMuted, fontSize: '0.85rem' }}>
-                All letter requests have been reviewed
+                Employee submitted requests will appear here for review and official issuance
               </p>
             </Card>
           ) : (
             <div style={{ display: 'grid', gap: 16 }}>
-              {pendingRequests.map((req, i) => {
-                const statusColors = {
-                  PENDING: { bg: '#FEF9C3', text: '#92400E', icon: Clock, label: 'PENDING' },
-                  APPROVED: { bg: '#DCFCE7', text: '#166534', icon: CheckCircle, label: 'APPROVED' },
-                  REJECTED: { bg: '#FEE2E2', text: '#991B1B', icon: XCircle, label: 'REJECTED' },
-                };
-                const statusInfo = statusColors[req.status] || statusColors.PENDING;
-                const StatusIcon = statusInfo.icon;
+              {pendingRequests
+                .filter(r => requestFilter === 'ALL' || r.status === requestFilter)
+                .map((req) => {
+                  const statusColors = {
+                    PENDING: { bg: '#FEF9C3', text: '#92400E', icon: Clock, label: 'PENDING' },
+                    APPROVED: { bg: '#DCFCE7', text: '#166534', icon: CheckCircle, label: 'APPROVED' },
+                    REJECTED: { bg: '#FEE2E2', text: '#991B1B', icon: XCircle, label: 'REJECTED' },
+                  };
+                  const statusInfo = statusColors[req.status] || statusColors.PENDING;
+                  const StatusIcon = statusInfo.icon;
 
-                return (
-                  <Card key={req.uuid} hover style={{ padding: 24, display: 'flex', gap: 20, alignItems: 'flex-start' }}>
-                    <div style={{ width: 56, height: 56, borderRadius: 12, background: 'rgba(15,118,110,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <FileText size={28} color={C.primary} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                        <div>
-                          <h3 style={{ margin: '0 0 4px', fontSize: '1rem', fontWeight: 700, color: C.textMain }}>
-                            {req.template_name}
-                          </h3>
-                          <p style={{ margin: 0, fontSize: '0.85rem', color: C.textMuted }}>
-                            Requested by <strong>{req.employee_name}</strong> ({req.mesob_id})
-                          </p>
+                  return (
+                    <Card key={req.uuid} hover style={{ padding: 22, display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+                      <div style={{ width: 52, height: 52, borderRadius: 12, background: 'rgba(15,118,110,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <FileText size={26} color={C.primary} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+                          <div>
+                            <h3 style={{ margin: '0 0 4px', fontSize: '1rem', fontWeight: 700, color: C.textMain }}>
+                              {req.template_name || 'Letter'}
+                            </h3>
+                            <p style={{ margin: 0, fontSize: '0.84rem', color: C.textMuted }}>
+                              Requested by <strong>{req.employee_name || 'Employee'}</strong> ({req.mesob_id || 'ID'})
+                            </p>
+                          </div>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 700, background: statusInfo.bg, color: statusInfo.text, padding: '4px 12px', borderRadius: 20, display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+                            <StatusIcon size={13} /> {statusInfo.label}
+                          </span>
                         </div>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 700, background: statusInfo.bg, color: statusInfo.text, padding: '4px 12px', borderRadius: 20, display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                          <StatusIcon size={12} /> {statusInfo.label}
-                        </span>
-                      </div>
-                      <div style={{ marginBottom: 16, padding: 12, background: 'rgba(0,80,60,0.03)', borderRadius: 8, fontSize: '0.8rem', color: C.textSub, lineHeight: 1.5 }}>
-                        <strong>Requested on:</strong> {new Date(req.requested_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                        {req.status === 'PENDING' ? (
-                          <>
+                        <div style={{ marginBottom: 14, padding: '10px 14px', background: 'rgba(0,80,60,0.03)', borderRadius: 8, fontSize: '0.78rem', color: C.textSub, lineHeight: 1.5 }}>
+                          <strong>Requested on:</strong> {req.requested_at ? new Date(req.requested_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                          {req.reviewed_by_name && (
+                            <span style={{ marginLeft: 16 }}>
+                              <strong>Reviewed by:</strong> {req.reviewed_by_name}
+                            </span>
+                          )}
+                          {req.rejection_reason && (
+                            <div style={{ marginTop: 6, color: '#991B1B' }}>
+                              <strong>Reason:</strong> {req.rejection_reason}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                          {req.status === 'PENDING' ? (
+                            <>
+                              <GreenBtn onClick={() => handlePreviewRequest(req)} variant="secondary" style={{ fontSize: '0.8rem', padding: '8px 16px' }}>
+                                <Eye size={14} /> Preview Content
+                              </GreenBtn>
+                              <GreenBtn onClick={() => handleApproveRequest(req.uuid)} disabled={approvingUuid === req.uuid} style={{ fontSize: '0.8rem', padding: '8px 16px' }}>
+                                <CheckCircle size={14} /> {approvingUuid === req.uuid ? 'Approving...' : 'Approve & Issue'}
+                              </GreenBtn>
+                              <GreenBtn onClick={() => handleRejectRequest(req.uuid)} variant="danger" style={{ fontSize: '0.8rem', padding: '8px 16px' }}>
+                                <XCircle size={14} /> Reject
+                              </GreenBtn>
+                            </>
+                          ) : req.status === 'APPROVED' ? (
+                            <>
+                              <GreenBtn onClick={() => handlePreviewRequest(req)} variant="secondary" style={{ fontSize: '0.8rem', padding: '8px 16px' }}>
+                                <Eye size={14} /> Preview
+                              </GreenBtn>
+                              <GreenBtn onClick={() => handleGenerateApprovedLetter(req)} disabled={approvingUuid === req.uuid} style={{ fontSize: '0.8rem', padding: '8px 16px' }}>
+                                <Download size={14} /> {approvingUuid === req.uuid ? 'Generating...' : 'Generate & Download PDF'}
+                              </GreenBtn>
+                            </>
+                          ) : (
                             <GreenBtn onClick={() => handlePreviewRequest(req)} variant="secondary" style={{ fontSize: '0.8rem', padding: '8px 16px' }}>
                               <Eye size={14} /> Preview
                             </GreenBtn>
-                            <GreenBtn onClick={() => handleApproveRequest(req.uuid)} disabled={approvingUuid === req.uuid} style={{ fontSize: '0.8rem', padding: '8px 16px' }}>
-                              <CheckCircle size={14} /> {approvingUuid === req.uuid ? 'Approving...' : 'Approve & Issue'}
-                            </GreenBtn>
-                            <GreenBtn onClick={() => handleRejectRequest(req.uuid)} variant="danger" style={{ fontSize: '0.8rem', padding: '8px 16px' }}>
-                              <XCircle size={14} /> Reject
-                            </GreenBtn>
-                          </>
-                        ) : req.status === 'APPROVED' ? (
-                          <>
-                            <GreenBtn onClick={() => handlePreviewRequest(req)} variant="secondary" style={{ fontSize: '0.8rem', padding: '8px 16px' }}>
-                              <Eye size={14} /> Preview
-                            </GreenBtn>
-                            <GreenBtn onClick={() => handleGenerateApprovedLetter(req)} disabled={approvingUuid === req.uuid} style={{ fontSize: '0.8rem', padding: '8px 16px' }}>
-                              <Download size={14} /> {approvingUuid === req.uuid ? 'Generating...' : 'Generate & Download'}
-                            </GreenBtn>
-                          </>
-                        ) : (
-                          <GreenBtn onClick={() => handlePreviewRequest(req)} variant="secondary" style={{ fontSize: '0.8rem', padding: '8px 16px' }}>
-                            <Eye size={14} /> Preview
-                          </GreenBtn>
-                        )}
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </Card>
-                );
-              })}
+                    </Card>
+                  );
+                })}
             </div>
           )}
-        </>
+        </div>
       )}
 
       {/* Modals */}
