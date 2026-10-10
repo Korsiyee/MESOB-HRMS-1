@@ -374,7 +374,7 @@ const createRequest = async (req, res) => {
     
     // Check if requester is HR staff or Department Head
     const isHRStaff = ["HR_OFFICER", "HR_ADMIN", "SUPER_ADMIN"].includes(requester_role);
-    const isDeptHead = requester_role === "DEPARTMENT_HEAD";
+    const isDeptHead = requester_role === "DEPT_HEAD";
     
     if (isHRStaff || isDeptHead) {
       // Get the employee's department to determine routing
@@ -394,10 +394,11 @@ const createRequest = async (req, res) => {
       } else if (isHRStaff && employeeDeptUuid) {
         // HR staff → Check if they are also the department head of their department
         const [hrHeadRows] = await pool.execute(
-          `SELECT u.uuid, u.role, e.department_uuid as hr_dept_uuid
+          `SELECT u.uuid, r.code as role, e.department_uuid as hr_dept_uuid
            FROM Users u
            JOIN Employees e ON e.uuid = u.employee_uuid
-           WHERE u.role = 'DEPARTMENT_HEAD'
+           JOIN Roles r ON r.uuid = u.role_uuid
+           WHERE r.code = 'DEPT_HEAD'
            LIMIT 100`
         );
         
@@ -417,7 +418,8 @@ const createRequest = async (req, res) => {
             `SELECT u.uuid
              FROM Users u
              JOIN Employees e ON e.uuid = u.employee_uuid
-             WHERE e.department_uuid = ? AND u.role = 'DEPARTMENT_HEAD'
+             JOIN Roles r ON r.uuid = u.role_uuid
+             WHERE e.department_uuid = ? AND r.code = 'DEPT_HEAD'
              LIMIT 1`,
             [employeeDeptUuid]
           );
@@ -874,7 +876,7 @@ const getPendingRequests = async (req, res) => {
     // Department heads only see PENDING_DEPARTMENT requests for their own department
     // HR roles only see PENDING_HR requests (not PENDING_DEPARTMENT)
     const departmentUuid =
-      userRole === "DEPARTMENT_HEAD" ? req.user?.department_uuid : null;
+      userRole === "DEPT_HEAD" ? req.user?.department_uuid : null;
 
     const pendingRequests = await RequestService.getPendingRequests({ 
       departmentUuid,
@@ -931,12 +933,12 @@ const getEmployeeRequests = async (req, res) => {
       });
     }
 
-    // Authorization: Users can access their own requests OR have permission
-    const authorizationService = require("../services/authorizationService");
-    const canViewAll = await authorizationService.hasPermission(req.user.uuid, 'leave.view_all');
+    // Authorization: Users can access their own requests OR have module access
+    const moduleAuthService = require("../services/moduleAuthService");
+    const hasModuleAccess = await moduleAuthService.hasModule(req.user.uuid, 'LEAVE_REQUESTS');
     const isOwnRequest = req.user.employee_uuid && req.user.employee_uuid === uuid;
 
-    if (!isOwnRequest && !canViewAll) {
+    if (!isOwnRequest && !hasModuleAccess) {
       return sendError(res, {
         status: 403,
         message: "You can only view your own leave requests.",
@@ -1053,7 +1055,7 @@ const departmentApproveRejectRequest = async (req, res) => {
     const request = requests[0];
 
     // Access control based on role and request status
-    if (userRole === "DEPARTMENT_HEAD") {
+    if (userRole === "DEPT_HEAD") {
       // Department heads can only approve PENDING_DEPARTMENT requests from their own department
       if (request.status !== "PENDING_DEPARTMENT") {
         return sendError(res, {
@@ -1302,7 +1304,7 @@ const getRequestById = async (req, res) => {
     // Access control: Check if user has permission to view this request
     const isOwnRequest = request.employee_uuid === userEmployeeUuid;
     const isHRRole = ["HR_OFFICER", "HR_ADMIN", "SUPER_ADMIN"].includes(userRole);
-    const isDeptHeadOfSameDept = userRole === "DEPARTMENT_HEAD" && request.department_uuid === userDepartmentUuid;
+    const isDeptHeadOfSameDept = userRole === "DEPT_HEAD" && request.department_uuid === userDepartmentUuid;
     const isAssignedApprover = request.department_head_id === userUuid || request.hr_supervisor_id === userUuid;
 
     if (!isOwnRequest && !isHRRole && !isDeptHeadOfSameDept && !isAssignedApprover) {
@@ -1314,7 +1316,7 @@ const getRequestById = async (req, res) => {
     }
 
     // Additional logic: Department heads should not see HR-pending requests unless they're the assigned dept head
-    if (userRole === "DEPARTMENT_HEAD" && request.status === "PENDING_HR" && request.department_head_id !== userUuid) {
+    if (userRole === "DEPT_HEAD" && request.status === "PENDING_HR" && request.department_head_id !== userUuid) {
       return sendError(res, {
         status: 403,
         message: "You do not have permission to view this request at its current approval stage.",

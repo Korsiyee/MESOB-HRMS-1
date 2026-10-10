@@ -120,7 +120,8 @@ class RequestService {
               `SELECT u.uuid 
                FROM Users u
                JOIN Employees e ON e.uuid = u.employee_uuid
-               WHERE p.department_uuid = ? AND u.role = 'DEPARTMENT_HEAD'
+               JOIN Roles r ON r.uuid = u.role_uuid
+               WHERE e.department_uuid = ? AND r.code = 'DEPT_HEAD'
                LIMIT 1`,
               [deptUuid]
             );

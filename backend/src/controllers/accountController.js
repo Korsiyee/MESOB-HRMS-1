@@ -9,9 +9,9 @@ const {
   revokeAllUserTokens,
 } = require("../services/authService");
 
-const VALID_ROLES = [
+const VALID_ROLE_CODES = [
   "EMPLOYEE",
-  "DEPARTMENT_HEAD",
+  "DEPT_HEAD",
   "HR_OFFICER",
   "HR_ADMIN",
   "SUPER_ADMIN",
@@ -27,7 +27,7 @@ exports.createAccount = async (req, res) => {
       employee_uuid,
       username,
       password,
-      role = "EMPLOYEE",
+      role_uuid,
       is_active = true,
       must_change_password = false,
     } = req.body;
@@ -41,52 +41,36 @@ exports.createAccount = async (req, res) => {
       });
     }
 
-    if (!role && !role_id) {
-      return sendError(res, {
-        status: 400,
-        message: "role or role_id is required.",
-        error: "VALIDATION_ERROR",
-      });
-    }
-    
-    const authorizationService = require("../services/authorizationService");
-    
-    // Determine target role_id
-    let targetRoleId = role_id;
-    
-    // Backward compatibility: if role string provided, look up role_id
-    if (!targetRoleId && role) {
-      if (!VALID_ROLES.includes(role)) {
+    const pool = db.promise();
+
+    // Determine target role UUID
+    let targetRoleUuid = role_uuid;
+    if (!targetRoleUuid) {
+      // Default to EMPLOYEE role
+      const [defaultRole] = await pool.execute(
+        "SELECT uuid FROM Roles WHERE code = 'EMPLOYEE' AND is_active = 1 LIMIT 1"
+      );
+      if (!defaultRole.length) {
         return sendError(res, {
-          status: 400,
-          message: `Invalid role. Must be one of: ${VALID_ROLES.join(", ")}`,
-          error: "INVALID_ROLE",
-        });
-      }
-      
-      const roleRecord = await authorizationService.getRoleByCode(role);
-      if (!roleRecord) {
-        return sendError(res, {
-          status: 400,
-          message: `Role not found: ${role}`,
+          status: 500,
+          message: "Default EMPLOYEE role not found.",
           error: "ROLE_NOT_FOUND",
         });
       }
-      targetRoleId = roleRecord.id;
-    }
-    
-    // SECURITY: Validate actor can assign this role
-    const canAssign = await authorizationService.canModifyRole(
-      req.user.role_id,
-      targetRoleId
-    );
-    
-    if (!canAssign) {
-      return sendError(res, {
-        status: 403,
-        message: "Cannot assign a role equal to or higher than your own privilege level.",
-        error: "FORBIDDEN",
-      });
+      targetRoleUuid = defaultRole[0].uuid;
+    } else {
+      // Verify the provided role_uuid exists
+      const [roleCheck] = await pool.execute(
+        "SELECT uuid FROM Roles WHERE uuid = ? AND is_active = 1 LIMIT 1",
+        [targetRoleUuid]
+      );
+      if (!roleCheck.length) {
+        return sendError(res, {
+          status: 400,
+          message: "Invalid role_uuid.",
+          error: "VALIDATION_ERROR",
+        });
+      }
     }
 
     // Check if username already exists
@@ -100,7 +84,6 @@ exports.createAccount = async (req, res) => {
     }
 
     // Check if employee exists
-    const pool = db.promise();
     const [employees] = await pool.execute(
       "SELECT uuid, first_name, last_name FROM Employees WHERE uuid = ?",
       [employee_uuid]
@@ -134,36 +117,33 @@ exports.createAccount = async (req, res) => {
 
     // Insert new user
     await pool.execute(
-      `INSERT INTO Users (uuid, employee_uuid, username, password_hash, role_id, is_active, must_change_password)
+      `INSERT INTO Users (uuid, employee_uuid, username, password_hash, role_uuid, is_active, must_change_password)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         userUuid,
         employee_uuid,
         username,
         password_hash,
-        targetRoleId, // Use role_id instead of role string
+        targetRoleUuid,
         is_active ? 1 : 0,
         must_change_password ? 1 : 0,
       ]
     );
-    
-    // Get role info for response
-    const roleInfo = await authorizationService.getRoleById(targetRoleId);
 
     // Fetch created user with department info
     const [newUser] = await pool.execute(
-      `SELECT u.uuid, u.employee_uuid, u.username, u.role_id, u.is_active, u.must_change_password,
+      `SELECT u.uuid, u.employee_uuid, u.username, u.role_uuid, r.code as role, u.is_active, u.must_change_password,
               u.created_at, u.updated_at, 
               e.first_name, e.middle_name, e.last_name, e.mesob_id, e.department_uuid,
               a.email
        FROM Users u
+       LEFT JOIN Roles r ON r.uuid = u.role_uuid
        LEFT JOIN Employees e ON e.uuid = u.employee_uuid
        LEFT JOIN EmployeeAddresses a ON e.uuid = a.employee_uuid AND a.address_type = 'CURRENT'
        WHERE u.uuid = ?`,
       [userUuid]
     );
 
-    // Note: Permit.io sync removed - using database-driven permissions now
     console.log(`[Account] Created new user ${newUser[0].username}`);
 
     // Audit log
@@ -172,7 +152,7 @@ exports.createAccount = async (req, res) => {
       action: "CREATE_USER_ACCOUNT",
       entityType: "USER",
       entityUuid: userUuid,
-      diff: { username, role_id: targetRoleId, employee_uuid },
+      diff: { username, role_uuid: targetRoleUuid, employee_uuid },
       ipAddress: req.ip,
     });
 
@@ -216,9 +196,9 @@ exports.listAccounts = async (req, res) => {
 
     const params = [];
 
-    // Filter by role
-    if (role && VALID_ROLES.includes(role)) {
-      query += " AND u.role = ?";
+    // Filter by role code
+    if (role && VALID_ROLE_CODES.includes(role)) {
+      query += " AND r.code = ?";
       params.push(role);
     }
 
@@ -316,7 +296,7 @@ exports.getAccount = async (req, res) => {
 exports.changeAccountRole = async (req, res) => {
   try {
     const { uuid } = req.params;
-    const { role, role_id } = req.body; // Accept both role string (deprecated) and role_id
+    const { role_uuid: newRoleUuid } = req.body;
     
     // Prevent self-modification
     if (uuid === req.user.uuid) {
@@ -327,12 +307,19 @@ exports.changeAccountRole = async (req, res) => {
       });
     }
 
+    if (!newRoleUuid) {
+      return sendError(res, {
+        status: 400,
+        message: "role_uuid is required.",
+        error: "VALIDATION_ERROR",
+      });
+    }
+
     const pool = db.promise();
-    const authorizationService = require("../services/authorizationService");
 
     // Check if account exists and get current role
     const [existing] = await pool.execute(
-      "SELECT uuid, role_id, username FROM Users WHERE uuid = ?",
+      "SELECT uuid, role_uuid, username FROM Users WHERE uuid = ?",
       [uuid]
     );
 
@@ -345,68 +332,25 @@ exports.changeAccountRole = async (req, res) => {
     }
     
     const targetUser = existing[0];
-    const oldRoleId = targetUser.role_id;
-    
-    // Determine new role_id
-    let newRoleId = role_id;
-    
-    // Backward compatibility: if role string provided, look up role_id
-    if (!newRoleId && role) {
-      const roleRecord = await authorizationService.getRoleByCode(role);
-      if (!roleRecord) {
-        return sendError(res, {
-          status: 400,
-          message: `Invalid role: ${role}`,
-          error: "INVALID_ROLE",
-        });
-      }
-      newRoleId = roleRecord.id;
-    }
-    
-    if (!newRoleId) {
-      return sendError(res, {
-        status: 400,
-        message: "role_id or role is required.",
-        error: "VALIDATION_ERROR",
-      });
-    }
-    
-    // SECURITY: Validate actor can modify target user's current role
-    const canModifyCurrentRole = await authorizationService.canModifyRole(
-      req.user.role_id,
-      oldRoleId
-    );
-    
-    if (!canModifyCurrentRole) {
-      return sendError(res, {
-        status: 403,
-        message: "Insufficient privileges to modify this user's role.",
-        error: "FORBIDDEN",
-      });
-    }
-    
-    // SECURITY: Validate actor can assign the new role
-    const canAssignNewRole = await authorizationService.canModifyRole(
-      req.user.role_id,
-      newRoleId
-    );
-    
-    if (!canAssignNewRole) {
-      return sendError(res, {
-        status: 403,
-        message: "Cannot assign a role equal to or higher than your own privilege level.",
-        error: "FORBIDDEN",
-      });
-    }
+    const oldRoleUuid = targetUser.role_uuid;
 
-    // Get role info for audit log
-    const oldRoleInfo = await authorizationService.getRoleById(oldRoleId);
-    const newRoleInfo = await authorizationService.getRoleById(newRoleId);
+    // Get role names for audit log
+    const [oldRoleRows] = await pool.execute(
+      "SELECT code, name FROM Roles WHERE uuid = ?",
+      [oldRoleUuid]
+    );
+    const [newRoleRows] = await pool.execute(
+      "SELECT code, name FROM Roles WHERE uuid = ?",
+      [newRoleUuid]
+    );
+    
+    const oldRoleInfo = oldRoleRows.length ? oldRoleRows[0] : null;
+    const newRoleInfo = newRoleRows.length ? newRoleRows[0] : null;
 
     // Update role
     await pool.execute(
-      "UPDATE Users SET role_id = ? WHERE uuid = ?",
-      [newRoleId, uuid]
+      "UPDATE Users SET role_uuid = ? WHERE uuid = ?",
+      [newRoleUuid, uuid]
     );
 
     // Note: Permit.io sync removed - using database-driven permissions now

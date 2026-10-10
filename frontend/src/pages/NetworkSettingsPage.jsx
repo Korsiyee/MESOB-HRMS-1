@@ -3,6 +3,7 @@ import { NetworkSettingsApi } from '../api/networkSettingsApi';
 import { RefreshCw, Plus, Pencil, Trash2, X, Wifi, Shield, AlertCircle } from 'lucide-react';
 import { useDialog } from '../context/DialogContext';
 import { PermissionGuard } from '../components/PermissionGuard';
+import { usePermissions } from '../hooks/usePermissions';
 
 /* ── Palette ── */
 const C = {
@@ -505,10 +506,20 @@ const NetworkSettingsPage = () => {
 };
 
 // Wrap with permission guard to enforce RBAC
-const ProtectedNetworkSettingsPage = () => (
-  <PermissionGuard permissions="NetworkSettings.View">
-    <NetworkSettingsPage />
-  </PermissionGuard>
-);
+// Allow access if user has NetworkSettings.View permission OR is an admin (SUPER_ADMIN/HR_ADMIN)
+const ProtectedNetworkSettingsPage = () => {
+  const { hasPermission, isAdmin } = usePermissions();
+  
+  if (!hasPermission('NetworkSettings.View') && !isAdmin()) {
+    return (
+      <div style={{ padding: '40px 20px', textAlign: 'center', fontFamily: 'Poppins,sans-serif' }}>
+        <p style={{ fontSize: '1.1rem', color: '#DC2626', fontWeight: 600 }}>Access Denied</p>
+        <p style={{ fontSize: '0.9rem', color: '#64748B' }}>You don't have permission to manage network settings.</p>
+      </div>
+    );
+  }
+  
+  return <NetworkSettingsPage />;
+};
 
 export default ProtectedNetworkSettingsPage;

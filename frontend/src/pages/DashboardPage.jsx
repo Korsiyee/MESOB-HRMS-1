@@ -36,10 +36,24 @@ const DonutRing = ({ pct = 80 }) => {
 
 const DashboardPage = () => {
   const { user } = useAuth();
+  
+  // Primary: Use dashboard value from static RBAC (provided at login)
+  const dashboard = user?.dashboard || localStorage.getItem('userDashboard');
+  
+  // Route based on dashboard value from backend
+  if (dashboard === 'employee') {
+    return <EmployeeDashboardPage />;
+  }
+  
+  if (dashboard === 'department') {
+    return <DeptHeadDashboardPage />;
+  }
+  
+  // dashboard === 'hr' or default for HR_OFFICER, HR_ADMIN, SUPER_ADMIN
+  // Fallback to permission-based routing for backward compatibility
   const canViewOrgStats = usePermission('dashboard', 'view_organization');
   const canViewDeptStats = usePermission('dashboard', 'view_department');
 
-  // Route based on permissions, not roles
   // If no org-wide view, check for department view
   if (!canViewOrgStats && canViewDeptStats) {
     return <DeptHeadDashboardPage />;

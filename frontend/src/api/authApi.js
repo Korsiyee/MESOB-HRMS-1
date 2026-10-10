@@ -12,7 +12,10 @@ export const AuthApi = {
     console.log('[AuthApi.login] Response data:', { 
       hasAccessToken: !!response.data?.accessToken,
       hasRefreshToken: !!response.data?.refreshToken,
-      hasUser: !!response.data?.user 
+      hasUser: !!response.data?.user,
+      hasRole: !!response.data?.role,
+      hasDashboard: !!response.data?.dashboard,
+      hasModules: !!response.data?.modules
     });
     
     if (response.data?.accessToken) {
@@ -32,6 +35,22 @@ export const AuthApi = {
       console.log('[AuthApi.login] ✅ User stored');
     }
     
+    // Store role, dashboard, and modules from static RBAC
+    if (response.data?.role) {
+      localStorage.setItem("userRole", JSON.stringify(response.data.role));
+      console.log('[AuthApi.login] ✅ Role stored:', response.data.role.code);
+    }
+    
+    if (response.data?.dashboard) {
+      localStorage.setItem("userDashboard", response.data.dashboard);
+      console.log('[AuthApi.login] ✅ Dashboard stored:', response.data.dashboard);
+    }
+    
+    if (response.data?.modules) {
+      localStorage.setItem("userModules", JSON.stringify(response.data.modules));
+      console.log('[AuthApi.login] ✅ Modules stored, count:', response.data.modules.length);
+    }
+    
     return response;
   },
 
@@ -46,6 +65,9 @@ export const AuthApi = {
       localStorage.removeItem("authToken");
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("user");
+      localStorage.removeItem("userRole");
+      localStorage.removeItem("userDashboard");
+      localStorage.removeItem("userModules");
     }
   },
 

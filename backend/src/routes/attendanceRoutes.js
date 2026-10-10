@@ -18,7 +18,7 @@ const {
   getTodayPunchStatus,
 } = require("../controllers/attendanceController");
 // Use module-level authorization
-const { requireModule, withScope, checkSelfAccess } = require("../middleware/moduleAuth");
+const { requireModule, checkSelfAccess } = require("../middleware/moduleAuth");
 const { authenticateJwt } = require("../middleware/authMiddleware");
 const { requireCompanyWifi } = require("../middleware/requireCompanyWifi");
 
@@ -30,19 +30,19 @@ router.post("/self-punch", authenticateJwt, requireCompanyWifi, selfPunch);
 router.get("/self-punch/today", authenticateJwt, getTodayPunchStatus);
 
 // Analytics - require ATTENDANCE module with scope filtering
-router.get("/analytics/summary", requireModule('ATTENDANCE'), withScope(), getOverviewSummary);
-router.get("/analytics/trend", requireModule('ATTENDANCE'), withScope(), getAttendanceTrend);
-router.get("/analytics/departments", requireModule('ATTENDANCE'), withScope(), getDepartmentStats);
-router.get("/analytics/top-employees", requireModule('ATTENDANCE'), withScope(), getTopEmployees);
-router.get("/analytics/corrections", requireModule('ATTENDANCE'), withScope(), getRecentCorrections);
+router.get("/analytics/summary", requireModule('ATTENDANCE_RECORDS'), getOverviewSummary);
+router.get("/analytics/trend", requireModule('ATTENDANCE_RECORDS'), getAttendanceTrend);
+router.get("/analytics/departments", requireModule('ATTENDANCE_RECORDS'), getDepartmentStats);
+router.get("/analytics/top-employees", requireModule('ATTENDANCE_RECORDS'), getTopEmployees);
+router.get("/analytics/corrections", requireModule('ATTENDANCE_RECORDS'), getRecentCorrections);
 
 // Admin CRUD - require ATTENDANCE module
-router.get("/admin/all", requireModule('ATTENDANCE'), withScope(), getAllAttendance);
-router.post("/", requireModule('ATTENDANCE'), createAttendance);
-router.post("/log", requireModule('ATTENDANCE'), logAttendance);
-router.post("/delete-by-date", requireModule('ATTENDANCE'), deleteAttendanceByEmployeeAndDate);
-router.patch("/:uuid/correct", requireModule('ATTENDANCE'), correctAttendance);
-router.delete("/:uuid", requireModule('ATTENDANCE'), deleteAttendance);
+router.get("/admin/all", requireModule('ATTENDANCE_RECORDS'), getAllAttendance);
+router.post("/", requireModule('ATTENDANCE_RECORDS'), createAttendance);
+router.post("/log", requireModule('ATTENDANCE_RECORDS'), logAttendance);
+router.post("/delete-by-date", requireModule('ATTENDANCE_RECORDS'), deleteAttendanceByEmployeeAndDate);
+router.patch("/:uuid/correct", requireModule('ATTENDANCE_RECORDS'), correctAttendance);
+router.delete("/:uuid", requireModule('ATTENDANCE_RECORDS'), deleteAttendance);
 
 // Per-employee view - self-access always allowed
 router.get("/:uuid/today-status", checkSelfAccess(), getTodayStatus);

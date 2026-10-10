@@ -6,8 +6,8 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword123
-      MYSQL_DATABASE: mesob_db
-      MYSQL_USER: mesob_user
+      MYSQL_DATABASE: mesob_hrms
+      MYSQL_USER: mesob
       MYSQL_PASSWORD: mesob_password
     ports:
       - "3306:3306"

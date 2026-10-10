@@ -64,10 +64,19 @@ const LoginRoute = () => {
   const navigate = useNavigate();
   if (isLoading) return <LoadingScreen />;
   if (isAuthenticated) return <Navigate to="/" replace />;
+  
   const handleLoginSuccess = (data) => {
-    if (data?.user) login(data.user);
+    if (data?.user) {
+      const permissionsObj = {
+        role: data.role,
+        dashboard: data.dashboard,
+        modules: data.modules || []
+      };
+      login(data.user, permissionsObj, permissionsObj);
+    }
     navigate('/', { replace: true });
   };
+  
   return <Login onLoginSuccess={handleLoginSuccess} />;
 };
 

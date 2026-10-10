@@ -244,7 +244,7 @@ async function createEmployee(payload) {
           uuid, mesob_id, title, first_name, middle_name, last_name,
           mother_name, gender, date_of_birth, nationality, profile_photo_key,
           tin_number, pension_code, bank_name, bank_account_number,
-          hire_date, prior_gov_service, status, attendance_exempt,
+          hire_date, prior_gov_service_years, status, attendance_exempt,
           department_uuid, position_uuid
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
@@ -269,6 +269,7 @@ async function createEmployee(payload) {
         status,
         payload.attendance_exempt ? 1 : 0,
         payload.department_uuid || null,
+        payload.position_uuid || null,
       ],
     );
 
@@ -337,7 +338,7 @@ async function getEmployee(connOrUuid, maybeUuid) {
   const employeeUuid = hasConnection ? maybeUuid : connOrUuid;
 
   const [rows] = await executor.execute(
-    "SELECT uuid, hire_date, prior_gov_service, status FROM Employees WHERE uuid = ? LIMIT 1",
+    "SELECT uuid, hire_date, prior_gov_service_years, status FROM Employees WHERE uuid = ? LIMIT 1",
     [String(employeeUuid || "").trim()],
   );
 
@@ -428,7 +429,7 @@ async function updateEmployee(employeeUuid, payload) {
       "bank_name",
       "bank_account_number",
       "hire_date",
-      "prior_gov_service",
+      "prior_gov_service_years",
       "attendance_exempt",
       "department_uuid",
       "position_uuid",

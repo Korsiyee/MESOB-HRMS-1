@@ -38,9 +38,19 @@ export function useModulePermissions() {
         return;
       }
 
-      // Check if permissions are in auth context (from login)
-      if (user.permissions) {
+      // Check if permissions are in auth context (from login or /auth/me)
+      if (user.permissions && user.permissions.modules) {
         setPermissions(user.permissions);
+        setLoading(false);
+        return;
+      }
+
+      if (user.modules) {
+        setPermissions({
+          modules: user.modules,
+          role: user.role,
+          dashboard: user.dashboard,
+        });
         setLoading(false);
         return;
       }

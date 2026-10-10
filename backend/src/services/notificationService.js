@@ -18,7 +18,9 @@ const { db } = require("../config/db");
  */
 async function getUsersByRole(role) {
   const [rows] = await db.promise().execute(
-    "SELECT uuid FROM Users WHERE role = ? AND is_active = 1",
+    `SELECT u.uuid FROM Users u
+     JOIN Roles r ON r.uuid = u.role_uuid
+     WHERE r.code = ? AND u.is_active = 1`,
     [role]
   );
   return rows.map((r) => r.uuid);
@@ -88,7 +90,7 @@ async function fanOut(recipientUuids, payload) {
 /**
  * Employee submits a leave request.
  * Notify: Department Head(s) of the employee's department.
- * If submitter is DEPARTMENT_HEAD → notify HR_ADMIN + SUPER_ADMIN.
+ * If submitter is DEPT_HEAD → notify HR_ADMIN + SUPER_ADMIN.
  * If submitter is HR_ADMIN / HR_OFFICER → notify SUPER_ADMIN.
  */
 async function notifyLeaveSubmitted({
@@ -107,7 +109,7 @@ async function notifyLeaveSubmitted({
   const daysLabel = totalDays != null ? `${Number(totalDays).toFixed(1)} day(s)` : "—";
   const dateRange = `${fmtDate(startDate)} to ${fmtDate(endDate)}`;
 
-  if (senderRole === "DEPARTMENT_HEAD") {
+  if (senderRole === "DEPT_HEAD") {
     // Dept head's own request → HR_ADMIN + SUPER_ADMIN
     const hrAdmins = await getUsersByRole("HR_ADMIN");
     const superAdmins = await getUsersByRole("SUPER_ADMIN");
@@ -147,7 +149,7 @@ async function notifyLeaveSubmitted({
     recipients.push(departmentHeadUserUuid);
   } else {
     // Fall back: notify all dept heads (shouldn't normally happen)
-    const allDeptHeads = await getUsersByRole("DEPARTMENT_HEAD");
+    const allDeptHeads = await getUsersByRole("DEPT_HEAD");
     recipients.push(...allDeptHeads);
   }
 
@@ -187,7 +189,7 @@ async function notifyDepartmentApproved({
 
   await fanOut(recipients, {
     senderUuid: senderUserUuid,
-    senderRole: senderRole || "DEPARTMENT_HEAD",
+    senderRole: senderRole || "DEPT_HEAD",
     type: "LEAVE_DEPT_APPROVED",
     title: "Leave Request Approved by Department Head",
     message: `${departmentHeadName || "Department Head"} approved ${employeeFullName}'s ${leaveType} leave request (${daysLabel}, ${dateRange}). Awaiting your final review.`,
@@ -213,7 +215,7 @@ async function notifyDepartmentRejected({
   await insertNotification({
     recipientUuid: employeeUserUuid,
     senderUuid: senderUserUuid,
-    senderRole: senderRole || "DEPARTMENT_HEAD",
+    senderRole: senderRole || "DEPT_HEAD",
     type: "LEAVE_DEPT_REJECTED",
     title: "Leave Request Rejected by Department Head",
     message: `Your ${leaveType || "leave"} request was rejected by ${departmentHeadName || "your Department Head"}${rejectionReason ? `. Reason: ${rejectionReason}` : "."}`,
@@ -340,7 +342,7 @@ async function notifyLetterSubmitted({
   const recipients = [...new Set([...hrAdmins, ...superAdmins])];
 
   const rolePart =
-    senderRole === "DEPARTMENT_HEAD"
+    senderRole === "DEPT_HEAD"
       ? " (Department Head)"
       : senderRole === "HR_ADMIN" || senderRole === "HR_OFFICER"
       ? " (HR)"

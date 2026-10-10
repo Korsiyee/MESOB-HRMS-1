@@ -11,12 +11,12 @@ const {
   getEmployeeHistory,
 } = require("../controllers/shiftController");
 // Use module-level authorization
-const { requireModule, withScope } = require("../middleware/moduleAuth");
+const { requireModule } = require("../middleware/moduleAuth");
 
 const router = express.Router();
 
 // All shift operations require SHIFTS module
-router.get("/", requireModule('SHIFTS'), withScope(), listShifts);
+router.get("/", requireModule('SHIFTS'), listShifts);
 router.get("/gaps", requireModule('SHIFTS'), detectGaps);
 router.get("/:uuid", requireModule('SHIFTS'), getShift);
 router.get("/:uuid/employees", requireModule('SHIFTS'), getShiftEmployees);

@@ -66,10 +66,9 @@ async function getPositionByUuid(uuid) {
             e.gender, e.status, e.hire_date,
             d.name AS department_name,
             es.shift_uuid as current_shift_uuid,
-            s.name as current_shift_name,
-            es.assignment_type
+            s.name as current_shift_name
      FROM Employees e
-     LEFT JOIN Departments d ON d.uuid = p.department_uuid
+     LEFT JOIN Departments d ON d.uuid = e.department_uuid
      LEFT JOIN EmployeeShifts es ON es.employee_uuid = e.uuid 
        AND es.effective_from <= CURRENT_DATE()
        AND (es.effective_to IS NULL OR es.effective_to >= CURRENT_DATE())
@@ -100,9 +99,15 @@ async function createPosition(payload) {
   }
 
   const uuid = randomUUID();
+  // Generate position_code from title (required NOT NULL column)
+  const positionCode = title
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_|_$/g, '')
+    .substring(0, 50);
   await executeQuery(
-    "INSERT INTO Positions (uuid, title, grade, department_uuid) VALUES (?, ?, ?, ?)",
-    [uuid, title, payload.grade || null, departmentUuid],
+    "INSERT INTO Positions (uuid, position_code, title, grade, department_uuid) VALUES (?, ?, ?, ?, ?)",
+    [uuid, positionCode, title, payload.grade || null, departmentUuid],
   );
 
   return getPositionByUuid(uuid);

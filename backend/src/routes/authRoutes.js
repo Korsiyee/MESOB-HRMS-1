@@ -20,7 +20,7 @@ const router = express.Router();
 router.post("/register", 
   authRateLimiter, 
   authenticateJwt,
-  requireModule('ORGANIZATION'),
+  requireModule('REGISTER_EMPLOYEE'),
   register
 );
 router.post(
@@ -52,7 +52,7 @@ router.post(
   "/force-logout/:userUuid",
   authRateLimiter,
   authenticateJwt,
-  requireModule('ORGANIZATION'),
+  requireModule('REGISTER_EMPLOYEE'),
   forceLogout,
 );
 // Frontend permission check endpoint

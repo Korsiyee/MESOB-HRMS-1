@@ -4,6 +4,7 @@ import { ArrowLeft, Check, Upload, Users, Plus, Trash2, FileText, Camera } from 
 import { EmployeeApi } from "../api/employeeApi";
 import { LevelApi } from "../api/levelApi";
 import { RbacApi } from "../api/rbacApi";
+import { getAllRoles } from "../api/roleManagement";
 import PrettyDatePicker from "../components/PrettyDatePicker";
 import FaceCaptureModal from "../components/FaceCaptureModal";
 import { FaceRecognitionApi } from "../api/faceRecognitionApi";
@@ -295,7 +296,7 @@ const Step2 = ({ data, onChange }) => (
 );
 
 /* ── Step 3: Financial Information ── */
-const Step3 = ({ data, onChange, departments, positions, levels, occupations }) => (
+const Step3 = ({ data, onChange, departments, positions, levels, occupations, roles }) => (
   <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
     <div>
       <h3 style={{ margin: "0 0 14px", fontSize: "0.9rem", fontWeight: 700, color: C.textMain, borderBottom: `1px solid ${C.border}`, paddingBottom: 8 }}>Bank Information</h3>
@@ -345,6 +346,15 @@ const Step3 = ({ data, onChange, departments, positions, levels, occupations }) 
             <option value="">Select Occupation</option>
             {occupations.map(o => <option key={o.uuid} value={o.uuid}>{o.name}</option>)}
           </select>
+        </Field>
+        <Field label="User Role">
+          <select value={data.role_uuid} onChange={e => onChange("role_uuid", e.target.value)} style={fld}>
+            <option value="">Select Role (Optional)</option>
+            {roles.map(r => <option key={r.uuid} value={r.uuid}>{r.name}</option>)}
+          </select>
+          <p style={{ fontSize: "0.7rem", color: C.textMuted, margin: "4px 0 0", fontStyle: "italic" }}>
+            Assigns system access role to this employee's account
+          </p>
         </Field>
         <Field label="Hire Date" required>
           <PrettyDatePicker 
@@ -749,7 +759,7 @@ const EmployeeRegistrationPage = () => {
   const [financial, setFinancial] = useState({
     bank_name: "", bank_account_number: "", tin_number: "", pension_code: "",
     department_uuid: "", position_uuid: "", level_uuid: "", occupation_uuid: "",
-    hire_date: "", prior_gov_service: 0,
+    hire_date: "", prior_gov_service: 0, role_uuid: "",  // Added role_uuid
   });
   const [extraInfo, setExtraInfo] = useState({
     "Education": [{}],
@@ -765,6 +775,7 @@ const EmployeeRegistrationPage = () => {
   const [positions, setPositions] = useState([]);
   const [levels, setLevels] = useState([]);
   const [occupations, setOccupations] = useState([]);
+  const [roles, setRoles] = useState([]);  // Added roles
 
   /* ── Load dropdown data and restore draft on mount ── */
   useEffect(() => {
@@ -773,12 +784,14 @@ const EmployeeRegistrationPage = () => {
       EmployeeApi.listPositions().catch(() => ({ data: [] })),
       LevelApi.list().catch(() => ({ data: [] })),
       RbacApi.listOccupations().catch(() => ({ data: [] })),
-    ]).then(([d, p, l, o]) => {
+      getAllRoles().catch(() => ({ data: { roles: [] } })),  // Added role loading
+    ]).then(([d, p, l, o, r]) => {
       // Defensive array checks to prevent .map() crashes
       setDepartments(Array.isArray(d?.data) ? d.data : []);
       setPositions(Array.isArray(p?.data) ? p.data : []);
       setLevels(Array.isArray(l?.data) ? l.data : []);
       setOccupations(Array.isArray(o?.data) ? o.data : []);
+      setRoles(Array.isArray(r?.data?.roles) ? r.data.roles : []);  // Added roles
     }).catch(err => {
       console.error('Failed to load dropdown data:', err);
       // Ensure all are arrays even on complete failure
@@ -786,6 +799,7 @@ const EmployeeRegistrationPage = () => {
       setPositions([]);
       setLevels([]);
       setOccupations([]);
+      setRoles([]);  // Added roles
     });
 
     // Restore draft from backend
@@ -993,6 +1007,7 @@ const EmployeeRegistrationPage = () => {
         ...(orNull(financial.position_uuid)    && { position_uuid:    financial.position_uuid }),
         ...(orNull(financial.level_uuid)       && { level_uuid:       financial.level_uuid }),
         ...(orNull(financial.occupation_uuid)  && { occupation_uuid:  financial.occupation_uuid }),
+        ...(orNull(financial.role_uuid)        && { role_uuid:        financial.role_uuid }),  // Added role_uuid
         ...(bankName && bankAccount ? { bank_name: bankName, bank_account_number: bankAccount } : {}),
         ...(orNull(financial.tin_number)   && { tin_number:   financial.tin_number.trim() }),
         ...(orNull(financial.pension_code) && { pension_code: financial.pension_code.trim() }),
@@ -1180,6 +1195,7 @@ const EmployeeRegistrationPage = () => {
             positions={positions}
             levels={levels}
             occupations={occupations}
+            roles={roles}
           />
         )}
         {step === 3 && (

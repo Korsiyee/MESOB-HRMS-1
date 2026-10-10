@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 const letterConfigController = require("../controllers/letterConfigController");
 const { authenticateJwt } = require("../middleware/authMiddleware");
-const { authorize } = require("../middleware/authorize");
 const multer = require("multer");
 
 // Configure multer for logo upload
@@ -19,21 +18,17 @@ const upload = multer({
 router.get("/organization", authenticateJwt, letterConfigController.getOrganizationConfig);
 
 // Update organization configuration
-router.put("/organization", authorize("Letters.Update"), letterConfigController.updateOrganizationConfig);
 
 // Upload organization logo
-router.post("/organization/logo", authorize("Letters.Update"), upload.single("logo"), letterConfigController.uploadOrganizationLogo);
 
 /* ─── Letter Layout Configuration ─────────────────────────────── */
 
 // Get all letter layouts
-router.get("/layouts", authorize("Letters.View"), letterConfigController.getLetterLayouts);
 
 // Get active letter layout (all authenticated users)
 router.get("/layouts/active", authenticateJwt, letterConfigController.getActiveLetterLayout);
 
 // Activate a specific letter layout
-router.post("/layouts/:id/activate", authorize("Letters.Update"), letterConfigController.activateLetterLayout);
 
 /* ─── Placeholders & Categories ─────────────────────────────── */
 

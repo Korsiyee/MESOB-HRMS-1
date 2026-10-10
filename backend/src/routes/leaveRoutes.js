@@ -12,16 +12,16 @@ const { requireModule, checkSelfAccess } = require("../middleware/moduleAuth");
 const router = express.Router();
 
 // Get aggregated balance stats for dashboard
-router.get("/balances/aggregated", requireModule('HOME'), getAggregatedBalances);
+router.get("/balances/aggregated", requireModule('LEAVE_REQUESTS'), getAggregatedBalances);
 
 // Employee can view their own balance, or those with LEAVE module
-router.get("/balances/:uuid", checkSelfAccess('LEAVE'), getBalance);
+router.get("/balances/:uuid", checkSelfAccess('LEAVE_REQUESTS'), getBalance);
 
 // HR can rebuild individual balances
-router.post("/balances/:uuid/rebuild", requireModule('LEAVE'), rebuildBalance);
-router.post("/balances/rebuild", requireModule('LEAVE'), rebuildBalanceByBody);
+router.post("/balances/:uuid/rebuild", requireModule('LEAVE_SETTINGS'), rebuildBalance);
+router.post("/balances/rebuild", requireModule('LEAVE_SETTINGS'), rebuildBalanceByBody);
 
-// Only users with LEAVE module can rebuild all balances
-router.post("/balances/rebuild-all", requireModule('LEAVE'), rebuildAllBalances);
+// Only users with LEAVE_SETTINGS module can rebuild all balances
+router.post("/balances/rebuild-all", requireModule('LEAVE_SETTINGS'), rebuildAllBalances);
 
 module.exports = router;

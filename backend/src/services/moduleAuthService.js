@@ -1,31 +1,31 @@
 /**
  * Module-Level Authorization Service
  * 
- * Simple module-level permission system that replaces Permit.io
+ * Simple module-level access control using STATIC role-module mapping
  * 
  * Key Concepts:
- * - Permissions are granted at MODULE level (not individual actions)
- * - Each role has a SCOPE that determines what data they can see:
- *   - ORGANIZATION: All data across the organization
- *   - DEPARTMENT: Data within user's department only
- *   - PERSONAL: User's own data only
+ * - 5 static roles: EMPLOYEE, DEPT_HEAD, HR_OFFICER, HR_ADMIN, SUPER_ADMIN
+ * - Access is determined by STATIC configuration (roleModuleMapping.js)
+ * - Module assignments are hardcoded and cannot be changed via UI
  * 
  * Modules:
- * - HOME, EMPLOYEES, ORGANIZATION, ATTENDANCE, SHIFTS, LETTERS, LEAVE
- * - Personal Space is always accessible to all authenticated users
+ * - Employee List, Employee Profile, Register Employee, Departments, Positions, Levels
+ * - Attendance Records, Network Settings, Shifts, Letters, Leave Requests, Leave Settings
+ * - Accounts, Audit Logs, My Attendance, My Letters, My Leaves, My Accounts
  */
 
 const { db } = require('../config/db');
+const { getModulesForRole, getDashboardForRole } = require('../config/roleModuleMapping');
 
 /**
- * Get user's permissions from database
- * Returns modules the user can access and their scopes
+ * Get user's role and accessible modules using STATIC mapping
  * 
  * @param {string} userUuid - User UUID
- * @returns {Promise<Object>} { modules: [], role: {}, defaultScope: {} }
+ * @returns {Promise<Object>} { modules: [], role: {}, dashboard: string }
  */
 async function getUserPermissions(userUuid) {
   try {
+    // Get user's role from database
     const [rows] = await db.promise().query(`
       SELECT 
         u.uuid as user_uuid,
@@ -35,73 +35,50 @@ async function getUserPermissions(userUuid) {
         r.uuid as role_uuid,
         r.code as role_code,
         r.name as role_name,
-        r.hierarchy_level,
-        ds.uuid as default_scope_uuid,
-        ds.code as default_scope_code,
-        ds.name as default_scope_name,
-        ds.level as default_scope_level,
-        m.uuid as module_uuid,
-        m.code as module_code,
-        m.name as module_name,
-        s.uuid as scope_uuid,
-        s.code as scope_code,
-        s.name as scope_name,
-        s.level as scope_level
+        r.hierarchy_level
       FROM Users u
       INNER JOIN Roles r ON u.role_uuid = r.uuid
       LEFT JOIN Employees e ON e.uuid = u.employee_uuid
-      LEFT JOIN Scopes ds ON r.default_scope_uuid = ds.uuid
-      LEFT JOIN RoleModules rm ON r.uuid = rm.role_uuid
-      LEFT JOIN Modules m ON rm.module_uuid = m.uuid
-      LEFT JOIN Scopes s ON rm.scope_uuid = s.uuid
-      WHERE u.uuid = ? AND r.is_active = TRUE AND (m.is_active = TRUE OR m.is_active IS NULL)
+      WHERE u.uuid = ? AND r.is_active = TRUE
     `, [userUuid]);
 
     if (rows.length === 0) {
       return null;
     }
 
-    // Build permission object
-    const firstRow = rows[0];
+    const userData = rows[0];
+    
+    // Get modules from STATIC configuration based on role
+    const moduleCodesForRole = getModulesForRole(userData.role_code);
+    
+    // Get full module details from database
     const modules = [];
-    const moduleMap = new Map();
-
-    for (const row of rows) {
-      if (row.module_uuid && !moduleMap.has(row.module_uuid)) {
-        moduleMap.set(row.module_uuid, {
-          uuid: row.module_uuid,
-          code: row.module_code,
-          name: row.module_name,
-          scope: {
-            uuid: row.scope_uuid,
-            code: row.scope_code,
-            name: row.scope_name,
-            level: row.scope_level
-          }
-        });
-        modules.push(moduleMap.get(row.module_uuid));
-      }
+    if (moduleCodesForRole.length > 0) {
+      const placeholders = moduleCodesForRole.map(() => '?').join(',');
+      const [moduleRows] = await db.promise().query(`
+        SELECT uuid, code, name, category, icon, display_order
+        FROM Modules
+        WHERE code IN (${placeholders}) AND is_active = TRUE
+        ORDER BY display_order
+      `, moduleCodesForRole);
+      
+      modules.push(...moduleRows);
     }
 
     return {
       user: {
-        uuid: firstRow.user_uuid,
-        username: firstRow.username,
-        employee_uuid: firstRow.employee_uuid,
-        department_uuid: firstRow.department_uuid
+        uuid: userData.user_uuid,
+        username: userData.username,
+        employee_uuid: userData.employee_uuid,
+        department_uuid: userData.department_uuid
       },
       role: {
-        uuid: firstRow.role_uuid,
-        code: firstRow.role_code,
-        name: firstRow.role_name,
-        hierarchy_level: firstRow.hierarchy_level
+        uuid: userData.role_uuid,
+        code: userData.role_code,
+        name: userData.role_name,
+        hierarchy_level: userData.hierarchy_level
       },
-      defaultScope: {
-        uuid: firstRow.default_scope_uuid,
-        code: firstRow.default_scope_code,
-        name: firstRow.default_scope_name,
-        level: firstRow.default_scope_level
-      },
+      dashboard: getDashboardForRole(userData.role_code),
       modules
     };
   } catch (error) {
@@ -114,8 +91,8 @@ async function getUserPermissions(userUuid) {
  * Check if user has access to a module
  * 
  * @param {string} userUuid - User UUID
- * @param {string} moduleCode - Module code (HOME, EMPLOYEES, etc.)
- * @returns {Promise<Object|null>} Module permission with scope, or null if no access
+ * @param {string} moduleCode - Module code (EMPLOYEE_LIST, MY_ATTENDANCE, etc.)
+ * @returns {Promise<Object|null>} Module object or null if no access
  */
 async function checkModuleAccess(userUuid, moduleCode) {
   try {
@@ -136,114 +113,13 @@ async function checkModuleAccess(userUuid, moduleCode) {
 }
 
 /**
- * Get scope filter for SQL queries
- * Returns SQL WHERE clause based on user's scope
- * 
- * @param {Object} scope - Scope object { code, level }
- * @param {string} userDepartmentUuid - User's department UUID
- * @param {string} userEmployeeUuid - User's employee UUID
- * @param {Object} options - Query options
- * @param {string} options.departmentColumn - Column name for department (default: 'department_uuid')
- * @param {string} options.employeeColumn - Column name for employee (default: 'employee_uuid')
- * @returns {Object} { where: string, params: [] }
- */
-function getScopeFilter(scope, userDepartmentUuid, userEmployeeUuid, options = {}) {
-  const {
-    departmentColumn = 'department_uuid',
-    employeeColumn = 'employee_uuid'
-  } = options;
-
-  switch (scope.code) {
-    case 'ORGANIZATION':
-      // Access to all records
-      return { where: '1=1', params: [] };
-    
-    case 'DEPARTMENT':
-      // Access to department records only
-      if (!userDepartmentUuid) {
-        return { where: '1=0', params: [] }; // No department = no access
-      }
-      return {
-        where: `${departmentColumn} = ?`,
-        params: [userDepartmentUuid]
-      };
-    
-    case 'PERSONAL':
-      // Access to own records only
-      if (!userEmployeeUuid) {
-        return { where: '1=0', params: [] }; // No employee = no access
-      }
-      return {
-        where: `${employeeColumn} = ?`,
-        params: [userEmployeeUuid]
-      };
-    
-    default:
-      // Unknown scope = deny access
-      return { where: '1=0', params: [] };
-  }
-}
-
-/**
- * Apply scope filter to a query
- * Helper to add scope-based WHERE clause to SQL queries
- * 
- * @param {Object} baseQuery - { sql: string, params: [] }
- * @param {Object} scope - Scope object
- * @param {string} userDepartmentUuid - User's department UUID
- * @param {string} userEmployeeUuid - User's employee UUID
- * @param {Object} options - Filter options
- * @returns {Object} { sql: string, params: [] }
- */
-function applyScopeToQuery(baseQuery, scope, userDepartmentUuid, userEmployeeUuid, options = {}) {
-  const scopeFilter = getScopeFilter(scope, userDepartmentUuid, userEmployeeUuid, options);
-  
-  // Add scope filter to WHERE clause
-  const hasWhere = baseQuery.sql.toUpperCase().includes('WHERE');
-  const connector = hasWhere ? ' AND ' : ' WHERE ';
-  
-  return {
-    sql: baseQuery.sql + connector + scopeFilter.where,
-    params: [...baseQuery.params, ...scopeFilter.params]
-  };
-}
-
-/**
- * Check if user can access specific resource based on scope
- * Used for detail pages and updates
- * 
- * @param {Object} scope - Scope object
- * @param {string} userDepartmentUuid - User's department UUID
- * @param {string} userEmployeeUuid - User's employee UUID
- * @param {Object} resource - Resource being accessed
- * @param {string} resource.department_uuid - Resource's department
- * @param {string} resource.employee_uuid - Resource's employee
- * @returns {boolean} True if user can access resource
- */
-function canAccessResource(scope, userDepartmentUuid, userEmployeeUuid, resource) {
-  switch (scope.code) {
-    case 'ORGANIZATION':
-      return true; // Can access all resources
-    
-    case 'DEPARTMENT':
-      return resource.department_uuid === userDepartmentUuid;
-    
-    case 'PERSONAL':
-      return resource.employee_uuid === userEmployeeUuid;
-    
-    default:
-      return false;
-  }
-}
-
-/**
  * Get all modules
  * @returns {Promise<Array>} List of all modules
  */
 async function getAllModules() {
   try {
     const [modules] = await db.promise().query(`
-      SELECT uuid, code, name, description, icon, display_order
+      SELECT uuid, code, name, description, category, icon, display_order
       FROM Modules
       WHERE is_active = TRUE
       ORDER BY display_order
@@ -256,89 +132,55 @@ async function getAllModules() {
 }
 
 /**
- * Get all scopes
- * @returns {Promise<Array>} List of all scopes
- */
-async function getAllScopes() {
-  try {
-    const [scopes] = await db.promise().query(`
-      SELECT uuid, code, name, description, level
-      FROM Scopes
-      ORDER BY level DESC
-    `);
-    return scopes;
-  } catch (error) {
-    console.error('[ModuleAuth] Error fetching scopes:', error);
-    throw error;
-  }
-}
-
-/**
- * Get role with its module permissions
+ * Get role with its assigned modules using STATIC mapping
  * @param {string} roleUuid - Role UUID
  * @returns {Promise<Object|null>} Role with modules
  */
 async function getRolePermissions(roleUuid) {
   try {
-    const [rows] = await db.promise().query(`
+    // Get role details from database
+    const [roleRows] = await db.promise().query(`
       SELECT 
-        r.uuid as role_uuid,
-        r.code as role_code,
-        r.name as role_name,
-        r.description,
-        r.hierarchy_level,
-        r.is_system_role,
-        ds.uuid as default_scope_uuid,
-        ds.code as default_scope_code,
-        ds.name as default_scope_name,
-        m.uuid as module_uuid,
-        m.code as module_code,
-        m.name as module_name,
-        s.uuid as scope_uuid,
-        s.code as scope_code,
-        s.name as scope_name
-      FROM Roles r
-      LEFT JOIN Scopes ds ON r.default_scope_uuid = ds.uuid
-      LEFT JOIN RoleModules rm ON r.uuid = rm.role_uuid
-      LEFT JOIN Modules m ON rm.module_uuid = m.uuid
-      LEFT JOIN Scopes s ON rm.scope_uuid = s.uuid
-      WHERE r.uuid = ? AND r.is_active = TRUE
+        uuid as role_uuid,
+        code as role_code,
+        name as role_name,
+        description,
+        hierarchy_level,
+        is_system_role
+      FROM Roles
+      WHERE uuid = ? AND is_active = TRUE
     `, [roleUuid]);
 
-    if (rows.length === 0) {
+    if (roleRows.length === 0) {
       return null;
     }
 
-    const firstRow = rows[0];
+    const role = roleRows[0];
+    
+    // Get modules from STATIC configuration
+    const moduleCodesForRole = getModulesForRole(role.role_code);
+    
+    // Get full module details from database
     const modules = [];
-
-    for (const row of rows) {
-      if (row.module_uuid) {
-        modules.push({
-          uuid: row.module_uuid,
-          code: row.module_code,
-          name: row.module_name,
-          scope: {
-            uuid: row.scope_uuid,
-            code: row.scope_code,
-            name: row.scope_name
-          }
-        });
-      }
+    if (moduleCodesForRole.length > 0) {
+      const placeholders = moduleCodesForRole.map(() => '?').join(',');
+      const [moduleRows] = await db.promise().query(`
+        SELECT uuid, code, name, category, icon, display_order
+        FROM Modules
+        WHERE code IN (${placeholders}) AND is_active = TRUE
+        ORDER BY display_order
+      `, moduleCodesForRole);
+      
+      modules.push(...moduleRows);
     }
 
     return {
-      uuid: firstRow.role_uuid,
-      code: firstRow.role_code,
-      name: firstRow.role_name,
-      description: firstRow.description,
-      hierarchy_level: firstRow.hierarchy_level,
-      is_system_role: firstRow.is_system_role,
-      defaultScope: firstRow.default_scope_uuid ? {
-        uuid: firstRow.default_scope_uuid,
-        code: firstRow.default_scope_code,
-        name: firstRow.default_scope_name
-      } : null,
+      uuid: role.role_uuid,
+      code: role.role_code,
+      name: role.role_name,
+      description: role.description,
+      hierarchy_level: role.hierarchy_level,
+      is_system_role: role.is_system_role,
       modules
     };
   } catch (error) {
@@ -348,47 +190,23 @@ async function getRolePermissions(roleUuid) {
 }
 
 /**
- * Update role's module permissions
+ * Update role's module assignments - NO-OP since mappings are static
+ * This function is kept for backward compatibility but does nothing
  * @param {string} roleUuid - Role UUID
- * @param {Array} modulePermissions - Array of { module_uuid, scope_uuid }
+ * @param {Array<string>} moduleUuids - Array of module UUIDs
  * @returns {Promise<void>}
+ * @deprecated Module assignments are now static and cannot be changed
  */
-async function updateRolePermissions(roleUuid, modulePermissions) {
-  const connection = await db.promise().getConnection();
-  
-  try {
-    await connection.beginTransaction();
-
-    // Remove existing permissions
-    await connection.query('DELETE FROM RoleModules WHERE role_uuid = ?', [roleUuid]);
-
-    // Add new permissions
-    for (const perm of modulePermissions) {
-      const { v4: uuidv4 } = require('uuid');
-      await connection.query(
-        'INSERT INTO RoleModules (uuid, role_uuid, module_uuid, scope_uuid) VALUES (?, ?, ?, ?)',
-        [uuidv4(), roleUuid, perm.module_uuid, perm.scope_uuid]
-      );
-    }
-
-    await connection.commit();
-  } catch (error) {
-    await connection.rollback();
-    console.error('[ModuleAuth] Error updating role permissions:', error);
-    throw error;
-  } finally {
-    connection.release();
-  }
+async function updateRolePermissions(roleUuid, moduleUuids) {
+  console.warn('[ModuleAuth] updateRolePermissions called but module assignments are static and cannot be changed');
+  // This is a no-op - module assignments are now hardcoded in roleModuleMapping.js
+  return;
 }
 
 module.exports = {
   getUserPermissions,
   checkModuleAccess,
-  getScopeFilter,
-  applyScopeToQuery,
-  canAccessResource,
   getAllModules,
-  getAllScopes,
   getRolePermissions,
-  updateRolePermissions
+  updateRolePermissions // Kept for backward compatibility but does nothing
 };

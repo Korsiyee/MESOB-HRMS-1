@@ -103,7 +103,7 @@ export const getAllPermissions = async () => {
  * @returns {Promise} All data scopes
  */
 export const getAllDataScopes = async () => {
-  return await apiRequest('/role-management/data-scopes', { method: 'GET' });
+  return await apiRequest('/role-management/scopes', { method: 'GET' });
 };
 
 /**

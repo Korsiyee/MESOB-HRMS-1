@@ -32,7 +32,16 @@ const Login = ({ onLoginSuccess }) => {
     setIsLoading(true);
     try {
       const response = await AuthApi.login(formData.username, formData.password);
-      if (onLoginSuccess) onLoginSuccess(response.data);
+      
+      // Pass full response data including role, dashboard, modules
+      if (onLoginSuccess) {
+        onLoginSuccess({
+          user: response.data.user,
+          role: response.data.role,
+          dashboard: response.data.dashboard,
+          modules: response.data.modules
+        });
+      }
     } catch (err) {
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {

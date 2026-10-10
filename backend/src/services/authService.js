@@ -5,7 +5,7 @@ const { requireEnv, getEnv } = require("../config/env");
 const { executeQuery } = require("../utils/dbQuery");
 const { getSignedUrl } = require("./employeeStorageService");
 const { db } = require("../config/db");
-const authorizationService = require("./authorizationService"); // NEW: Use authorization service
+const moduleAuthService = require("./moduleAuthService"); // Use moduleAuthService instead
 
 const JWT_SECRET = requireEnv("JWT_SECRET");
 const JWT_REFRESH_SECRET = requireEnv("JWT_REFRESH_SECRET");
@@ -24,7 +24,6 @@ async function findUserByUsername(username) {
         Users.is_active,
         Users.refresh_token,
         Users.token_version,
-        Users.permissions_version,
         Employees.department_uuid
       FROM Users
       LEFT JOIN Employees ON Employees.uuid = Users.employee_uuid
@@ -47,8 +46,6 @@ async function findUserByUuid(uuid) {
         Users.role_uuid,
         Users.is_active,
         Users.refresh_token,
-        Users.token_version,
-        Users.permissions_version,
         Users.last_activity,
         Employees.department_uuid
       FROM Users
@@ -92,14 +89,12 @@ async function verifyPassword(password, passwordHash) {
 }
 
 async function createAccessToken(user) {
-  // JWT contains minimal identity data - permissions come from authorization service
+  // JWT contains minimal identity data
   const payload = {
     uuid: user.uuid,
     employee_uuid: user.employee_uuid,
-    role_id: user.role_id, // NEW: Use role_id instead of role string
+    role_uuid: user.role_uuid,
     department_uuid: user.department_uuid || null,
-    token_version: user.token_version || 0,
-    permissions_version: user.permissions_version || 1,
   };
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
@@ -109,10 +104,8 @@ async function createRefreshToken(user) {
   const payload = {
     uuid: user.uuid,
     employee_uuid: user.employee_uuid,
-    role_id: user.role_id, // NEW: Use role_id instead of role string
+    role_uuid: user.role_uuid,
     department_uuid: user.department_uuid || null,
-    token_version: user.token_version || 0,
-    permissions_version: user.permissions_version || 1,
     tokenId: randomUUID(),
   };
   return jwt.sign(payload, JWT_REFRESH_SECRET, {
@@ -185,13 +178,22 @@ async function login(username, password) {
         .join(" ")
     : null;
 
-  // OLD Permit.io removed - ensureUserInPermit disabled
-  // This used to sync user to Permit on login
-  // try {
-  //   await ensureUserInPermit(user.uuid);
-  // } catch (permitError) {
-  //   console.error('[Auth] Failed to sync user to Permit on login:', permitError.message);
-  // }
+  // Get role and modules using STATIC mapping
+  const moduleAuthService = require("./moduleAuthService");
+  let roleData = null;
+  let dashboard = 'employee'; // default
+  let modules = [];
+  
+  try {
+    const permissions = await moduleAuthService.getUserPermissions(user.uuid);
+    if (permissions) {
+      roleData = permissions.role;
+      dashboard = permissions.dashboard;
+      modules = permissions.modules;
+    }
+  } catch (err) {
+    console.error("Error fetching role and modules during login:", err);
+  }
 
   return {
     accessToken,
@@ -208,6 +210,9 @@ async function login(username, password) {
       profile_photo_url: profilePhotoUrl,
       mesob_id: employeeData?.mesob_id || null,
     },
+    role: roleData,
+    dashboard: dashboard,
+    modules: modules
   };
 }
 
@@ -234,7 +239,7 @@ async function refreshToken(oldRefreshToken) {
 
     // Lock the user row for update to prevent concurrent modifications
     const [users] = await connection.execute(
-      `SELECT u.uuid, u.employee_uuid, u.username, u.role, u.is_active, u.refresh_token, u.token_version, p.department_uuid
+      `SELECT u.uuid, u.employee_uuid, u.username, u.role_uuid, u.is_active, u.refresh_token, e.department_uuid
        FROM Users u
        LEFT JOIN Employees e ON e.uuid = u.employee_uuid
        WHERE u.uuid = ? 
@@ -260,16 +265,7 @@ async function refreshToken(oldRefreshToken) {
       throw error;
     }
 
-    // Validate token version matches (prevents using old tokens after revocation)
-    if ((user.token_version || 0) !== (payload.token_version || 0)) {
-      await connection.rollback();
-      const error = new Error("Token has been revoked. Please login again.");
-      error.status = 401;
-      error.code = "TOKEN_REVOKED";
-      throw error;
-    }
-
-    // Generate new tokens with current token version
+    // Generate new tokens
     const accessToken = await createAccessToken(user);
     const refreshToken = await createRefreshToken(user);
 
@@ -304,8 +300,7 @@ async function logout(userUuid) {
 async function revokeAllUserTokens(userUuid) {
   await executeQuery(
     `UPDATE Users 
-     SET token_version = token_version + 1, 
-         refresh_token = NULL,
+     SET refresh_token = NULL,
          last_activity = NULL
      WHERE uuid = ?`,
     [userUuid]
@@ -362,24 +357,6 @@ async function getUserWithOccupations(userUuid) {
     }
   }
 
-  // Fetch occupations (DEPRECATED - using old tables for now)
-  let occupations = [];
-  // OLD: permissions system disabled
-  // let permissions = [];
-  // try {
-  //   permissions = await authorizationService.getUserPermissions(userUuid);
-  // } catch (err) {
-  //   console.error("Error fetching permissions:", err);
-  // }
-  
-  // OLD: role info system disabled
-  // let roleInfo = null;
-  // try {
-  //   roleInfo = await authorizationService.getUserRole(userUuid);
-  // } catch (err) {
-  //   console.error("Error fetching role:", err);
-  // }
-
   // Build full name from employee data
   const fullName = employeeData
     ? [employeeData.first_name, employeeData.middle_name, employeeData.last_name]
@@ -387,21 +364,36 @@ async function getUserWithOccupations(userUuid) {
         .join(" ")
     : null;
 
+  // Get role and modules using moduleAuthService
+  const moduleAuthService = require("./moduleAuthService");
+  let roleData = null;
+  let dashboard = 'employee';
+  let modules = [];
+  try {
+    const permissions = await moduleAuthService.getUserPermissions(user.uuid);
+    if (permissions) {
+      roleData = permissions.role;
+      dashboard = permissions.dashboard;
+      modules = permissions.modules;
+    }
+  } catch (err) {
+    console.error("Error fetching role and modules:", err);
+  }
+
   return {
     uuid: user.uuid,
     employee_uuid: user.employee_uuid,
     department_uuid: user.department_uuid || null,
     username: user.username,
     email: employeeData?.email || null,
-    role_id: user.role_id,
-    role_uuid: user.role_uuid, // Using module system now
-    role_id: user.role_id, // Legacy support
+    role_uuid: user.role_uuid,
     is_active: Boolean(user.is_active),
     full_name: fullName,
     profile_photo_url: profilePhotoUrl,
     mesob_id: employeeData?.mesob_id || null,
-    // permissions: fetched separately by getCurrentUser endpoint
-    occupations: [], // DEPRECATED: Empty for backward compat
+    role: roleData,
+    dashboard: dashboard,
+    modules: modules,
   };
 }
 
@@ -444,34 +436,19 @@ async function register(registrationData, actorRoleId = null) {
     throw error;
   }
   
-  // Determine target role_id
-  let targetRoleId = role_id;
-  
-  // Backward compatibility: If role_id not provided but role string is, look up role_id
-  if (!targetRoleId && role) {
-    const roleRecord = await authorizationService.getRoleByCode(role);
-    if (!roleRecord) {
-      const error = new Error(`Invalid role: ${role}`);
-      error.status = 400;
-      throw error;
-    }
-    targetRoleId = roleRecord.id;
-  }
+  // Determine target role_uuid
+  let targetRoleUuid = role_id;
   
   // Default to Employee role if not specified
-  if (!targetRoleId) {
-    const employeeRole = await authorizationService.getRoleByCode('EMPLOYEE');
-    targetRoleId = employeeRole.id;
-  }
-  
-  // SECURITY: Validate role hierarchy if actor is specified
-  if (actorRoleId) {
-    const canAssign = await authorizationService.canModifyRole(actorRoleId, targetRoleId);
-    if (!canAssign) {
-      const error = new Error(
-        "Cannot assign a role equal to or higher than your own privilege level."
-      );
-      error.status = 403;
+  if (!targetRoleUuid) {
+    const [roleRows] = await executeQuery(
+      `SELECT uuid FROM Roles WHERE code = 'EMPLOYEE' AND is_active = 1 LIMIT 1`
+    );
+    if (roleRows && roleRows.length > 0) {
+      targetRoleUuid = roleRows[0].uuid;
+    } else {
+      const error = new Error("Default EMPLOYEE role not found in database.");
+      error.status = 500;
       throw error;
     }
   }
@@ -502,9 +479,9 @@ async function register(registrationData, actorRoleId = null) {
   const passwordHash = await generatePasswordHash(password);
 
   await executeQuery(
-    `INSERT INTO Users (uuid, employee_uuid, username, password_hash, role_id, is_active)
+    `INSERT INTO Users (uuid, employee_uuid, username, password_hash, role_uuid, is_active)
      VALUES (?, ?, ?, ?, ?, 1)`,
-    [userUuid, employee.uuid, username, passwordHash, targetRoleId],
+    [userUuid, employee.uuid, username, passwordHash, targetRoleUuid],
   );
 
   // Fetch the created user
@@ -514,32 +491,19 @@ async function register(registrationData, actorRoleId = null) {
   const accessToken = await createAccessToken(user);
   const refreshTokenValue = await createRefreshToken(user);
   await updateUserRefreshToken(userUuid, refreshTokenValue);
-  
-  // Get role info for response
-  const roleInfo = await authorizationService.getRoleById(targetRoleId);
 
-  // Sync user to Permit (new user registration)
+  // Get role info for response
+  let roleCode = null;
+  let roleName = null;
   try {
-    const fullName = [first_name, middle_name, last_name].filter(Boolean).join(' ');
-    const email = addresses && addresses.length > 0 ? addresses[0].email : null;
-    
-    // OLD Permit.io removed
-    // await syncUserToPermit(
-    //       {
-    //         uuid: user.uuid,
-    //         username: user.username,
-    //         role: roleInfo ? roleInfo.code : 'EMPLOYEE',
-    //         employee_uuid: employee.uuid,
-    //         department_uuid: employee.department_uuid,
-    //         is_active: true,
-    //       },
-    //       fullName,
-    //       email
-    // );
-    console.log(`[Auth] Successfully synced new user ${username} to Permit`);
-  } catch (permitError) {
-    // Don't block registration if Permit sync fails
-    console.error('[Auth] Failed to sync new user to Permit:', permitError.message);
+    const moduleAuthService = require("./moduleAuthService");
+    const permissions = await moduleAuthService.getUserPermissions(userUuid);
+    if (permissions && permissions.role) {
+      roleCode = permissions.role.code;
+      roleName = permissions.role.name;
+    }
+  } catch (err) {
+    console.error('[Auth] Failed to get role info:', err.message);
   }
 
   return {
@@ -550,9 +514,9 @@ async function register(registrationData, actorRoleId = null) {
       employee_uuid: user.employee_uuid,
       department_uuid: user.department_uuid || null,
       username: user.username,
-      role_id: targetRoleId,
-      role: roleInfo ? roleInfo.code : null,
-      role_name: roleInfo ? roleInfo.name : null,
+      role_uuid: targetRoleUuid,
+      role: roleCode,
+      role_name: roleName,
       is_active: Boolean(user.is_active),
     },
     employee: {

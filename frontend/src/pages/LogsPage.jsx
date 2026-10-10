@@ -343,7 +343,7 @@ const LogsPage = () => {
 
 // Wrap with permission guard to enforce RBAC
 const ProtectedLogsPage = () => (
-  <PermissionGuard permissions="AuditLogs.Read">
+  <PermissionGuard permissions="AuditLogs.View">
     <LogsPage />
   </PermissionGuard>
 );

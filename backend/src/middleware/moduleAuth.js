@@ -1,11 +1,11 @@
 /**
  * Module-Level Authorization Middleware
  * 
- * Simple module-level permission checking that replaces Permit.io
+ * Simple module-level access control for static RBAC system
  * 
  * Usage:
- *   router.get('/employees', requireModule('EMPLOYEES'), employeeController.list);
- *   router.get('/attendance', requireModule('ATTENDANCE'), attendanceController.list);
+ *   router.get('/employees', requireModule('EMPLOYEE_LIST'), employeeController.list);
+ *   router.get('/attendance', requireModule('MY_ATTENDANCE'), attendanceController.list);
  */
 
 const { sendError } = require('../utils/response');
@@ -14,18 +14,18 @@ const moduleAuthService = require('../services/moduleAuthService');
 /**
  * Middleware to require access to a specific module
  * 
- * @param {string} moduleCode - Module code (HOME, EMPLOYEES, ORGANIZATION, etc.)
+ * @param {string} moduleCode - Module code (EMPLOYEE_LIST, MY_ATTENDANCE, etc.)
  * @param {Object} options - Additional options
  * @param {boolean} options.optional - If true, don't block request if module not accessible (just set req.moduleAccess)
  * @returns {Function} Express middleware
  * 
  * @example
- * // Require EMPLOYEES module access
- * router.get('/employees', requireModule('EMPLOYEES'), controller.list);
+ * // Require EMPLOYEE_LIST module access
+ * router.get('/employees', requireModule('EMPLOYEE_LIST'), controller.list);
  * 
  * @example
  * // Optional check (sets req.moduleAccess but doesn't block)
- * router.get('/dashboard', requireModule('HOME', { optional: true }), controller.dashboard);
+ * router.get('/dashboard', requireModule('MY_ATTENDANCE', { optional: true }), controller.dashboard);
  */
 function requireModule(moduleCode, options = {}) {
   const { optional = false } = options;
@@ -66,8 +66,7 @@ function requireModule(moduleCode, options = {}) {
 
       if (moduleAccess) {
         console.log(
-          `[ModuleAuth] ✅ Access granted - User: ${req.user.username}, ` +
-          `Module: ${moduleCode}, Scope: ${moduleAccess.scope.code}`
+          `[ModuleAuth] ✅ Access granted - User: ${req.user.username}, Module: ${moduleCode}`
         );
       }
 
@@ -91,8 +90,8 @@ function requireModule(moduleCode, options = {}) {
  * @returns {Function} Express middleware
  * 
  * @example
- * // User needs EMPLOYEES or ORGANIZATION access
- * router.get('/staff', requireAnyModule(['EMPLOYEES', 'ORGANIZATION']), controller.list);
+ * // User needs EMPLOYEE_LIST or DEPARTMENTS access
+ * router.get('/staff', requireAnyModule(['EMPLOYEE_LIST', 'DEPARTMENTS']), controller.list);
  */
 function requireAnyModule(moduleCodes) {
   return async (req, res, next) => {
@@ -145,143 +144,6 @@ function requireAnyModule(moduleCodes) {
 }
 
 /**
- * Middleware to apply scope filtering to requests
- * Loads user permissions and sets up scope context
- * Should be used after requireModule to get full permission context
- * 
- * @returns {Function} Express middleware
- * 
- * @example
- * router.get('/employees',
- *   requireModule('EMPLOYEES'),
- *   withScope(),
- *   controller.list
- * );
- */
-function withScope() {
-  return async (req, res, next) => {
-    try {
-      if (!req.user || !req.user.uuid) {
-        return sendError(res, {
-          status: 401,
-          message: 'Not authenticated',
-          error: 'UNAUTHORIZED'
-        });
-      }
-
-      // Get full user permissions
-      const permissions = await moduleAuthService.getUserPermissions(req.user.uuid);
-
-      if (!permissions) {
-        return sendError(res, {
-          status: 403,
-          message: 'Unable to load user permissions',
-          error: 'FORBIDDEN'
-        });
-      }
-
-      // Store permissions in request
-      req.permissions = permissions;
-
-      // If moduleAccess is set, use that scope; otherwise use default scope
-      req.scope = req.moduleAccess 
-        ? req.moduleAccess.scope 
-        : permissions.defaultScope;
-
-      next();
-    } catch (error) {
-      console.error('[ModuleAuth] Error loading permissions:', error);
-      return sendError(res, {
-        status: 500,
-        message: 'Failed to load permissions',
-        error: 'INTERNAL_SERVER_ERROR'
-      });
-    }
-  };
-}
-
-/**
- * Middleware to check resource-level access based on scope
- * Used for detail views and updates
- * 
- * @param {Function} getResource - Function to get resource: (req) => Promise<resource>
- * @returns {Function} Express middleware
- * 
- * @example
- * router.get('/employees/:uuid',
- *   requireModule('EMPLOYEES'),
- *   withScope(),
- *   checkResourceAccess(async (req) => {
- *     const [rows] = await db.query('SELECT * FROM Employees WHERE uuid = ?', [req.params.uuid]);
- *     return rows[0];
- *   }),
- *   controller.getById
- * );
- */
-function checkResourceAccess(getResource) {
-  return async (req, res, next) => {
-    try {
-      if (!req.scope || !req.user) {
-        return sendError(res, {
-          status: 403,
-          message: 'Scope information not available',
-          error: 'FORBIDDEN'
-        });
-      }
-
-      // Get the resource
-      const resource = await getResource(req);
-
-      if (!resource) {
-        return sendError(res, {
-          status: 404,
-          message: 'Resource not found',
-          error: 'NOT_FOUND'
-        });
-      }
-
-      // Check if user can access this resource based on scope
-      const canAccess = moduleAuthService.canAccessResource(
-        req.scope,
-        req.user.department_uuid,
-        req.user.employee_uuid,
-        resource
-      );
-
-      if (!canAccess) {
-        console.log(
-          `[ModuleAuth] ❌ Resource access denied - User: ${req.user.username}, ` +
-          `Scope: ${req.scope.code}`
-        );
-
-        return sendError(res, {
-          status: 403,
-          message: 'You do not have access to this resource',
-          error: 'FORBIDDEN'
-        });
-      }
-
-      // Store resource in request for controller use
-      req.resource = resource;
-
-      console.log(
-        `[ModuleAuth] ✅ Resource access granted - User: ${req.user.username}, ` +
-        `Scope: ${req.scope.code}`
-      );
-
-      next();
-    } catch (error) {
-      console.error('[ModuleAuth] Error checking resource access:', error);
-      return sendError(res, {
-        status: 500,
-        message: 'Access check failed',
-        error: 'INTERNAL_SERVER_ERROR'
-      });
-    }
-  };
-}
-
-/**
  * Middleware to allow self-access OR module access
  * Useful for endpoints where users can access their own data OR have module permissions
  * 
@@ -289,8 +151,8 @@ function checkResourceAccess(getResource) {
  * @returns {Function} Express middleware
  * 
  * @example
- * // Allow user to access their own data, OR anyone with EMPLOYEES module
- * router.get('/employees/:uuid', checkSelfAccess('EMPLOYEES'), controller.getById);
+ * // Allow user to access their own data, OR anyone with EMPLOYEE_PROFILE module
+ * router.get('/employees/:uuid', checkSelfAccess('EMPLOYEE_PROFILE'), controller.getById);
  */
 function checkSelfAccess(moduleCode = null) {
   return async (req, res, next) => {
@@ -353,10 +215,75 @@ function checkSelfAccess(moduleCode = null) {
   };
 }
 
+/**
+ * Middleware to check if user's role matches required roles
+ * Useful for role-specific operations
+ * 
+ * @param {string|string[]} roleCodes - Role code(s) required (e.g., 'HR_ADMIN' or ['HR_ADMIN', 'SUPER_ADMIN'])
+ * @returns {Function} Express middleware
+ * 
+ * @example
+ * // Only HR_ADMIN and SUPER_ADMIN can access
+ * router.post('/settings', requireRole(['HR_ADMIN', 'SUPER_ADMIN']), controller.updateSettings);
+ */
+function requireRole(roleCodes) {
+  const allowedRoles = Array.isArray(roleCodes) ? roleCodes : [roleCodes];
+
+  return async (req, res, next) => {
+    try {
+      if (!req.user || !req.user.uuid) {
+        return sendError(res, {
+          status: 401,
+          message: 'Not authenticated',
+          error: 'UNAUTHORIZED'
+        });
+      }
+
+      // Get user permissions to access role info
+      const permissions = await moduleAuthService.getUserPermissions(req.user.uuid);
+
+      if (!permissions || !permissions.role) {
+        return sendError(res, {
+          status: 403,
+          message: 'Unable to verify user role',
+          error: 'FORBIDDEN'
+        });
+      }
+
+      // Check if user's role is in allowed roles
+      if (allowedRoles.includes(permissions.role.code)) {
+        console.log(
+          `[ModuleAuth] ✅ Role check passed - User: ${req.user.username}, Role: ${permissions.role.code}`
+        );
+        req.userRole = permissions.role;
+        return next();
+      }
+
+      console.log(
+        `[ModuleAuth] ❌ Role check failed - User: ${req.user.username}, ` +
+        `Role: ${permissions.role.code}, Required: ${allowedRoles.join(' OR ')}`
+      );
+
+      return sendError(res, {
+        status: 403,
+        message: 'You do not have the required role to access this resource',
+        error: 'FORBIDDEN',
+        details: { requiredRoles: allowedRoles }
+      });
+    } catch (error) {
+      console.error('[ModuleAuth] Error in requireRole:', error);
+      return sendError(res, {
+        status: 500,
+        message: 'Authorization check failed',
+        error: 'INTERNAL_SERVER_ERROR'
+      });
+    }
+  };
+}
+
 module.exports = {
   requireModule,
   requireAnyModule,
-  withScope,
-  checkResourceAccess,
-  checkSelfAccess
+  checkSelfAccess,
+  requireRole
 };

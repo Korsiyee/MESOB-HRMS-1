@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, ChevronDown, LogOut, User, Calendar, CheckCheck, X, Menu, UserCheck } from 'lucide-react';
+import { Bell, ChevronDown, LogOut, User, CheckCheck, X, Menu } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { useNavigate } from 'react-router-dom';
 import Avatar from '../common/Avatar';
 import apiClient from '../../api/apiClient';
-import FaceRecognitionAttendance from '../FaceRecognitionAttendance';
 
 /* ── tiny helpers ──────────────────────────────────────────────── */
 const fmtTime = (iso) => {
@@ -160,7 +159,6 @@ const Topbar = ({ title = 'Dashboard', sidebarWidth = 240, onHamburger, isMobile
 
   const [dropOpen, setDropOpen] = useState(false);
   const [empInfo,  setEmpInfo]  = useState(null);
-  const [showPunchModal, setShowPunchModal] = useState(false);
   const dropRef  = useRef(null);
   const bellRef  = useRef(null);
   const panelRef = useRef(null);
@@ -208,9 +206,6 @@ const Topbar = ({ title = 'Dashboard', sidebarWidth = 240, onHamburger, isMobile
     ? [empInfo.first_name, empInfo.middle_name, empInfo.last_name].filter(Boolean).join(' ')
     : (user?.full_name || user?.username || 'Admin');
   const mesobId = empInfo?.mesob_id || '';
-
-  const getCurrentDate = () =>
-    new Date().toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
 
   return (
     <header
@@ -274,48 +269,8 @@ const Topbar = ({ title = 'Dashboard', sidebarWidth = 240, onHamburger, isMobile
         <h1 style={{ margin: 0, fontSize: isMobile ? '1.1rem' : '1.4rem', fontWeight: 800, color: '#ffffff', fontFamily: 'Poppins, sans-serif', letterSpacing: 2, lineHeight: 1 }}>HRMS</h1>
       </div>
 
-      {/* Right — Date / Punch / Bell / Avatar */}
+      {/* Right — Bell / Avatar */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        {/* Date — hidden on mobile */}
-        {!isMobile && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', fontSize: isTablet ? '0.72rem' : '0.8rem', color: '#ffffff', fontWeight: 600, whiteSpace: 'nowrap' }}>
-            <Calendar size={16} style={{ color: '#14B8A6' }} />
-            {getCurrentDate()}
-          </div>
-        )}
-
-        {/* Punch Button */}
-        <button
-          onClick={() => setShowPunchModal(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '8px 16px',
-            borderRadius: 8,
-            border: '1px solid rgba(255,255,255,0.2)',
-            background: 'rgba(20,184,166,0.15)',
-            cursor: 'pointer',
-            fontSize: '0.8rem',
-            color: '#14B8A6',
-            fontWeight: 700,
-            transition: 'all 0.2s',
-            whiteSpace: 'nowrap',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(20,184,166,0.25)';
-            e.currentTarget.style.borderColor = '#14B8A6';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(20,184,166,0.15)';
-            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
-          }}
-          aria-label="Punch Attendance"
-        >
-          <UserCheck size={18} />
-          {!isMobile && 'PUNCH'}
-        </button>
-
         {/* Bell */}
         <div style={{ position: "relative" }} ref={bellRef}>
           <button
@@ -410,7 +365,7 @@ const Topbar = ({ title = 'Dashboard', sidebarWidth = 240, onHamburger, isMobile
             {!isMobile && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                 <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ffffff', lineHeight: 1.2 }}>{fullName}</span>
-                <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.65)', fontWeight: 500 }}>{(user?.role || 'USER').replace(/_/g, ' ')}</span>
+                <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.65)', fontWeight: 500 }}>{(user?.role?.name || 'USER').replace(/_/g, ' ')}</span>
               </div>
             )}
             {!isMobile && (
@@ -471,7 +426,7 @@ const Topbar = ({ title = 'Dashboard', sidebarWidth = 240, onHamburger, isMobile
                     color: "#6c757d",
                   }}
                 >
-                  {user?.email || (user?.role || "").replace(/_/g, " ")}
+                  {user?.email || (user?.role?.name || "").replace(/_/g, " ")}
                 </p>
               </div>
 
@@ -540,17 +495,6 @@ const Topbar = ({ title = 'Dashboard', sidebarWidth = 240, onHamburger, isMobile
           )}
         </div>
       </div>
-
-      {/* Face Recognition Attendance Modal */}
-      {showPunchModal && (
-        <FaceRecognitionAttendance
-          onClose={() => setShowPunchModal(false)}
-          onSuccess={() => {
-            setShowPunchModal(false);
-            // Optionally show success notification
-          }}
-        />
-      )}
     </header>
   );
 };

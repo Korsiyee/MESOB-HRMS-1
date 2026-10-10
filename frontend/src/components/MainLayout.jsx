@@ -63,9 +63,9 @@ const MainLayout = ({ children, activePage, onNavigate }) => {
   const user = AuthApi.getStoredUser();
 
   const isAdmin =
-    user?.role === "HR_ADMIN" ||
-    user?.role === "SUPER_ADMIN" ||
-    user?.role === "HR_OFFICER";
+    user?.role?.name === "HR_ADMIN" ||
+    user?.role?.name === "SUPER_ADMIN" ||
+    user?.role?.name === "HR_OFFICER";
 
   const portalLabel = isAdmin ? "HRMS Admin Portal" : "HRMS Employee Portal";
 
@@ -536,7 +536,7 @@ const MainLayout = ({ children, activePage, onNavigate }) => {
                     fontFamily: "Outfit, sans-serif",
                   }}
                 >
-                  {user?.role?.replace(/_/g, " ") || "Employee"}
+                  {user?.role?.name?.replace(/_/g, " ") || "Employee"}
                 </span>
               </div>
             </div>

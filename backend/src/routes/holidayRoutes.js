@@ -1,6 +1,5 @@
 const express = require("express");
 const HolidayService = require("../services/holidayService");
-const { authorize } = require("../middleware/authorize");
 const { authenticateJwt } = require("../middleware/authMiddleware");
 const { safeLogEvent } = require("../services/auditLogService");
 const { sendSuccess, sendError } = require("../utils/response");
@@ -8,7 +7,7 @@ const { sendSuccess, sendError } = require("../utils/response");
 const router = express.Router();
 
 // POST /api/holidays/initialize - Initialize holidays for a range of years
-router.post("/initialize", authorize("Holidays.Create"), async (req, res) => {
+router.post("/initialize", authenticateJwt, async (req, res) => {
   try {
     const { startYear, endYear, overwriteManual } = req.body;
 
@@ -133,7 +132,7 @@ router.get("/check/:date", authenticateJwt, async (req, res) => {
 });
 
 // POST /api/holidays - Add a new holiday
-router.post("/", authorize("Holidays.Create"), async (req, res) => {
+router.post("/", authenticateJwt, async (req, res) => {
   try {
     const { date, name, type, ethiopian_date } = req.body;
 
@@ -181,7 +180,7 @@ router.post("/", authorize("Holidays.Create"), async (req, res) => {
 });
 
 // PATCH /api/holidays/:date/status - Update holiday status
-router.patch("/:date/status", authorize("Holidays.Update"), async (req, res) => {
+router.patch("/:date/status", authenticateJwt, async (req, res) => {
   try {
     const { date } = req.params;
     const { is_active } = req.body;
@@ -221,7 +220,7 @@ router.patch("/:date/status", authorize("Holidays.Update"), async (req, res) => 
 });
 
 // PATCH /api/holidays/item/:uuid - Update a holiday record by UUID
-router.patch("/item/:uuid", authorize("Holidays.Update"), async (req, res) => {
+router.patch("/item/:uuid", authenticateJwt, async (req, res) => {
   try {
     const { uuid } = req.params;
     const holiday = await HolidayService.updateHolidayByUuid(
@@ -254,7 +253,7 @@ router.patch("/item/:uuid", authorize("Holidays.Update"), async (req, res) => {
 });
 
 // DELETE /api/holidays/item/:uuid - Permanently delete holiday by UUID
-router.delete("/item/:uuid", authorize("Holidays.Delete"), async (req, res) => {
+router.delete("/item/:uuid", authenticateJwt, async (req, res) => {
   try {
     const { uuid } = req.params;
     const result = await HolidayService.deleteHolidayByUuid(uuid);
@@ -304,7 +303,7 @@ router.get("/statistics", authenticateJwt, async (req, res) => {
 });
 
 // POST /api/holidays/sync/:ethiopianYear - Sync holidays for Ethiopian year
-router.post("/sync/:ethiopianYear", authorize("Holidays.Create"), async (req, res) => {
+router.post("/sync/:ethiopianYear", authenticateJwt, async (req, res) => {
   try {
     const { ethiopianYear } = req.params;
     const { overwriteManual } = req.body || {};

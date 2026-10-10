@@ -201,9 +201,7 @@ exports.forceLogout = asyncHandler(async (req, res) => {
 });
 
 exports.register = asyncHandler(async (req, res) => {
-  // SECURITY: Pass actor's role_id for hierarchy validation
-  const actorRoleId = req.user?.role_id || null;
-  const result = await AuthService.register(req.body || {}, actorRoleId);
+  const result = await AuthService.register(req.body || {});
   
   // Log account creation
   await safeLogEvent({
@@ -213,7 +211,7 @@ exports.register = asyncHandler(async (req, res) => {
     entityUuid: result.user.uuid,
     diff: { 
       username: result.user.username,
-      role_id: result.user.role_id,
+      role_uuid: result.user.role_uuid,
       employee_uuid: result.employee.uuid 
     },
     ipAddress: getClientIp(req),
@@ -238,28 +236,70 @@ exports.checkPermission = asyncHandler(async (req, res) => {
 
   const { action, resource } = req.query;
 
-  if (!action || !resource) {
-    throw new ApiError("action and resource are required.", 400, "VALIDATION_ERROR");
+  if (!action && !resource) {
+    throw new ApiError("action or resource is required.", 400, "VALIDATION_ERROR");
   }
 
-  // Check module access instead of action-level permissions
+  const role = req.user.role;
+  if (role === 'SUPER_ADMIN') {
+    return sendSuccess(res, {
+      status: 200,
+      data: { allowed: true },
+    });
+  }
+
+  const queryStr = `${action || ''}_${resource || ''}`.toLowerCase();
+
+  // Handle specific action queries from frontend hooks
+  if (queryStr.includes('manage_all') || queryStr.includes('view_organization') || queryStr.includes('approve_hr')) {
+    return sendSuccess(res, {
+      status: 200,
+      data: { allowed: ['SUPER_ADMIN', 'HR_ADMIN'].includes(role) },
+    });
+  }
+
+  if (queryStr.includes('manage_department') || queryStr.includes('approve_department') || queryStr.includes('view_department')) {
+    return sendSuccess(res, {
+      status: 200,
+      data: { allowed: ['SUPER_ADMIN', 'HR_ADMIN', 'DEPT_HEAD'].includes(role) },
+    });
+  }
+
+  if (queryStr.includes('letters') && queryStr.includes('manage')) {
+    return sendSuccess(res, {
+      status: 200,
+      data: { allowed: ['SUPER_ADMIN', 'HR_ADMIN', 'HR_OFFICER'].includes(role) },
+    });
+  }
+
+  // Check module access using actual DB module codes
   const { checkModuleAccess } = require("../services/moduleAuthService");
   
-  // Map resource to module code (simplified check)
   const resourceToModule = {
-    'employees': 'EMPLOYEES',
-    'departments': 'ORGANIZATION',
-    'positions': 'ORGANIZATION',
-    'levels': 'ORGANIZATION',
-    'attendance': 'ATTENDANCE',
+    'employees': 'EMPLOYEE_LIST',
+    'employee': 'EMPLOYEE_LIST',
+    'departments': 'DEPARTMENTS',
+    'positions': 'POSITIONS',
+    'levels': 'LEVELS',
+    'attendance': 'ATTENDANCE_RECORDS',
     'shifts': 'SHIFTS',
     'letters': 'LETTERS',
-    'leave': 'LEAVE',
-    'requests': 'LEAVE'
+    'leave': 'LEAVE_REQUESTS',
+    'requests': 'LEAVE_REQUESTS',
+    'accounts': 'ACCOUNTS',
+    'logs': 'AUDIT_LOGS'
   };
   
-  const moduleCode = resourceToModule[resource];
-  const allowed = moduleCode ? await checkModuleAccess(req.user.uuid, moduleCode) : false;
+  const target = (resource || action || '').toLowerCase();
+  const moduleCode = resourceToModule[target];
+  let allowed = false;
+
+  if (moduleCode) {
+    const access = await checkModuleAccess(req.user.uuid, moduleCode);
+    allowed = Boolean(access);
+  } else if (target === 'dashboard' || !target) {
+    allowed = true;
+  }
 
   return sendSuccess(res, {
     status: 200,

@@ -17,8 +17,8 @@ router.get("/", authenticateJwt, listPolicies);
 router.get("/:leaveType", authenticateJwt, getPolicy);
 
 // Manage policies (requires LEAVE module)
-router.post("/", requireModule('LEAVE'), createPolicy);
-router.patch("/:leaveType", requireModule('LEAVE'), updatePolicy);
-router.delete("/:leaveType", requireModule('LEAVE'), deletePolicy);
+router.post("/", requireModule('LEAVE_SETTINGS'), createPolicy);
+router.patch("/:leaveType", requireModule('LEAVE_SETTINGS'), updatePolicy);
+router.delete("/:leaveType", requireModule('LEAVE_SETTINGS'), deletePolicy);
 
 module.exports = router;

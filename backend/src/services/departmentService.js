@@ -12,11 +12,11 @@ async function listDepartments({ tree = false } = {}) {
         d.head_employee_uuid,
         d.created_at,
         d.updated_at,
-        COUNT(DISTINCT e.uuid)                                    AS member_count,
-        SUM(CASE WHEN e.gender = 'MALE'   THEN 1 ELSE 0 END)     AS male_count,
-        SUM(CASE WHEN e.gender = 'FEMALE' THEN 1 ELSE 0 END)     AS female_count,
-        COUNT(DISTINCT pos.uuid)                                  AS position_count,
-        COUNT(DISTINCT CASE WHEN e2.uuid IS NOT NULL THEN pos.uuid END) AS filled_positions,
+        COUNT(DISTINCT CASE WHEN e.status = 'ACTIVE' THEN e.uuid END) AS member_count,
+        COUNT(DISTINCT CASE WHEN e.gender = 'MALE' AND e.status = 'ACTIVE' THEN e.uuid END) AS male_count,
+        COUNT(DISTINCT CASE WHEN e.gender = 'FEMALE' AND e.status = 'ACTIVE' THEN e.uuid END) AS female_count,
+        COUNT(DISTINCT pos.uuid) AS position_count,
+        COUNT(DISTINCT CASE WHEN e2.uuid IS NOT NULL AND e2.status = 'ACTIVE' THEN pos.uuid END) AS filled_positions,
         CONCAT_WS(' ', h.first_name, h.middle_name, h.last_name) AS head_employee_name,
         p.name                                                    AS parent_name
       FROM Departments d
@@ -24,7 +24,7 @@ async function listDepartments({ tree = false } = {}) {
       LEFT JOIN Employees   h   ON h.uuid              = d.head_employee_uuid
       LEFT JOIN Departments p   ON p.uuid              = d.parent_uuid
       LEFT JOIN Positions   pos ON pos.department_uuid = d.uuid
-      LEFT JOIN Employees   e2  ON e2.position_uuid    = pos.uuid AND e2.status = 'ACTIVE'
+      LEFT JOIN Employees   e2  ON e2.position_uuid    = pos.uuid
       GROUP BY d.uuid, d.name, d.parent_uuid, d.head_employee_uuid,
                d.created_at, d.updated_at, h.first_name, h.middle_name, h.last_name, p.name
       ORDER BY d.name ASC
@@ -74,13 +74,19 @@ async function getDepartmentByUuid(uuid) {
         d.head_employee_uuid,
         d.created_at,
         d.updated_at,
-        COUNT(DISTINCT e.uuid) AS member_count,
+        COUNT(DISTINCT CASE WHEN e.status = 'ACTIVE' THEN e.uuid END) AS member_count,
+        COUNT(DISTINCT CASE WHEN e.gender = 'MALE' AND e.status = 'ACTIVE' THEN e.uuid END) AS male_count,
+        COUNT(DISTINCT CASE WHEN e.gender = 'FEMALE' AND e.status = 'ACTIVE' THEN e.uuid END) AS female_count,
+        COUNT(DISTINCT pos.uuid) AS position_count,
+        COUNT(DISTINCT CASE WHEN e2.uuid IS NOT NULL AND e2.status = 'ACTIVE' THEN pos.uuid END) AS filled_positions,
         CONCAT_WS(' ', h.first_name, h.middle_name, h.last_name) AS head_employee_name,
         p.name AS parent_name
       FROM Departments d
-      LEFT JOIN Employees e  ON e.department_uuid = d.uuid
-      LEFT JOIN Employees h  ON h.uuid = d.head_employee_uuid
-      LEFT JOIN Departments p ON p.uuid = d.parent_uuid
+      LEFT JOIN Employees   e   ON e.department_uuid = d.uuid
+      LEFT JOIN Employees   h   ON h.uuid = d.head_employee_uuid
+      LEFT JOIN Departments p   ON p.uuid = d.parent_uuid
+      LEFT JOIN Positions   pos ON pos.department_uuid = d.uuid
+      LEFT JOIN Employees   e2  ON e2.position_uuid = pos.uuid
       WHERE d.uuid = ?
       GROUP BY d.uuid, d.name, d.parent_uuid, d.head_employee_uuid,
                d.created_at, d.updated_at, h.first_name, h.middle_name, h.last_name, p.name
@@ -89,7 +95,18 @@ async function getDepartmentByUuid(uuid) {
     [String(uuid || "").trim()],
   );
 
-  return rows[0] || null;
+  if (rows[0]) {
+    return {
+      ...rows[0],
+      member_count:     Number(rows[0].member_count     || 0),
+      male_count:       Number(rows[0].male_count       || 0),
+      female_count:     Number(rows[0].female_count     || 0),
+      position_count:   Number(rows[0].position_count   || 0),
+      filled_positions: Number(rows[0].filled_positions || 0),
+    };
+  }
+
+  return null;
 }
 
 async function ensureDepartmentExists(uuid) {
@@ -206,9 +223,15 @@ async function createDepartment(payload) {
   }
 
   const uuid = randomUUID();
+  // Generate dept_code from name (required NOT NULL column)
+  const deptCode = name
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_|_$/g, '')
+    .substring(0, 50);
   await executeQuery(
-    "INSERT INTO Departments (uuid, name, parent_uuid, head_employee_uuid) VALUES (?, ?, ?, ?)",
-    [uuid, name, parentUuid, headUuid],
+    "INSERT INTO Departments (uuid, dept_code, name, parent_uuid, head_employee_uuid) VALUES (?, ?, ?, ?, ?)",
+    [uuid, deptCode, name, parentUuid, headUuid],
   );
 
   await assertNoCircularParent(uuid, parentUuid);

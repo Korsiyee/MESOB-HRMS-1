@@ -68,13 +68,39 @@ exports.getDraft = asyncHandler(async (req, res) => {
 exports.createEmployee = asyncHandler(async (req, res) => {
   assertValidation(validateEmployeeCreate(req.body || {}));
 
-  const employee = await EmployeeService.createEmployee(req.body || {});
+  const payload = req.body || {};
+  
+  // Extract role_uuid if provided (optional during registration)
+  const roleUuid = payload.role_uuid;
+  delete payload.role_uuid; // Remove from employee data
+  
+  const employee = await EmployeeService.createEmployee(payload);
+  
+  // If role_uuid provided, assign role to the new user
+  if (roleUuid && employee.user_uuid) {
+    const rbacService = require("../services/rbacService");
+    try {
+      await rbacService.assignRoleToUser(employee.user_uuid, roleUuid);
+      await safeLogEvent({
+        actorUuid: req.user?.uuid || null,
+        action: AUDIT_ACTIONS.USER_ROLE_ASSIGN,
+        entityType: AUDIT_ENTITY_TYPES.USER,
+        entityUuid: employee.user_uuid,
+        diff: { role_uuid: roleUuid, employee_uuid: employee.uuid },
+        ipAddress: getClientIp(req),
+      });
+    } catch (roleError) {
+      console.error("Failed to assign role during employee creation:", roleError);
+      // Don't fail the employee creation if role assignment fails
+    }
+  }
+  
   await safeLogEvent({
     actorUuid: req.user?.uuid || null,
     action: AUDIT_ACTIONS.EMPLOYEE_CREATE,
     entityType: AUDIT_ENTITY_TYPES.EMPLOYEE,
     entityUuid: employee.uuid,
-    diff: { mesob_id: employee.mesob_id },
+    diff: { mesob_id: employee.mesob_id, role_uuid: roleUuid },
     ipAddress: getClientIp(req),
   });
 
@@ -293,7 +319,7 @@ exports.getEmployeeDashboard = asyncHandler(async (req, res) => {
   // RBAC: employees can only see their own dashboard
   if (
     req.user?.employee_uuid !== uuid &&
-    !["HR_OFFICER", "HR_ADMIN", "SUPER_ADMIN", "DEPARTMENT_HEAD"].includes(req.user?.role)
+    !["HR_OFFICER", "HR_ADMIN", "SUPER_ADMIN", "DEPT_HEAD"].includes(req.user?.role)
   ) {
     throw new ApiError("You can only view your own dashboard.", 403, "FORBIDDEN");
   }
@@ -357,9 +383,9 @@ exports.getEmployeeDashboard = asyncHandler(async (req, res) => {
 exports.getDeptHeadStats = asyncHandler(async (req, res) => {
   const user = req.user;
 
-  // Only DEPARTMENT_HEAD (or HR admins for testing) may call this
+  // Only DEPT_HEAD (or HR admins for testing) may call this
   const deptUuid =
-    user?.role === "DEPARTMENT_HEAD"
+    user?.role === "DEPT_HEAD"
       ? user.department_uuid
       : req.query.department_uuid;
 
@@ -434,7 +460,7 @@ exports.getDeptHeadStats = asyncHandler(async (req, res) => {
 ───────────────────────────────────────────────────────── */
 exports.getDeptEmployees = asyncHandler(async (req, res) => {
   const user = req.user;
-  const deptUuid = user?.role === "DEPARTMENT_HEAD"
+  const deptUuid = user?.role === "DEPT_HEAD"
     ? user.department_uuid
     : req.query.department_uuid;
 
@@ -527,4 +553,53 @@ exports.searchEmployeesForAttendance = asyncHandler(async (req, res) => {
   );
 
   return sendSuccess(res, { data: employeesWithPhotos });
+});
+
+/* ─────────────────────────────────────────────────────────
+   Update Employee Role
+   Allows HR Admin/Super Admin to change an employee's role
+───────────────────────────────────────────────────────── */
+exports.updateEmployeeRole = asyncHandler(async (req, res) => {
+  const { uuid } = req.params;
+  const { role_uuid } = req.body;
+
+  if (!role_uuid) {
+    throw new ApiError("Role UUID is required.", 400, "VALIDATION_ERROR");
+  }
+
+  // First, get the employee to find their user_uuid
+  const employee = await EmployeeService.getEmployeeByUuid(uuid, {
+    includeDocuments: false,
+  });
+
+  if (!employee.user_uuid) {
+    throw new ApiError(
+      "This employee has no associated user account.",
+      400,
+      "VALIDATION_ERROR"
+    );
+  }
+
+  // Assign the new role to the user
+  const rbacService = require("../services/rbacService");
+  await rbacService.assignRoleToUser(employee.user_uuid, role_uuid);
+
+  // Log the role change
+  await safeLogEvent({
+    actorUuid: req.user?.uuid || null,
+    action: AUDIT_ACTIONS.USER_ROLE_ASSIGN,
+    entityType: AUDIT_ENTITY_TYPES.USER,
+    entityUuid: employee.user_uuid,
+    diff: { 
+      employee_uuid: uuid,
+      new_role_uuid: role_uuid,
+    },
+    ipAddress: getClientIp(req),
+  });
+
+  return sendSuccess(res, { 
+    status: 200, 
+    message: "Employee role updated successfully. User must re-login for changes to take effect.",
+    data: { employee_uuid: uuid, user_uuid: employee.user_uuid }
+  });
 });

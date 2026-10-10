@@ -19,7 +19,7 @@ const {
   getPlaceholders,
 } = require("../controllers/letterController");
 // Use module-level authorization
-const { requireModule, checkSelfAccess, withScope } = require("../middleware/moduleAuth");
+const { requireModule, checkSelfAccess } = require("../middleware/moduleAuth");
 const { authenticateJwt } = require("../middleware/authMiddleware");
 const {
   uploadSingle,
@@ -52,8 +52,8 @@ router.get("/requests/my", authenticateJwt, getMyLetterRequests);
 router.delete("/requests/:uuid", authenticateJwt, cancelLetterRequest);
 
 // Letter requests - HR workflow with scope filtering
-router.get("/requests/pending", requireModule('LETTERS'), withScope(), getPendingLetterRequests);
-router.get("/requests/all", requireModule('LETTERS'), withScope(), getAllLetterRequests);
+router.get("/requests/pending", requireModule('LETTERS'), getPendingLetterRequests);
+router.get("/requests/all", requireModule('LETTERS'), getAllLetterRequests);
 router.post("/requests/:uuid/approve", requireModule('LETTERS'), approveLetterRequest);
 router.post("/requests/:uuid/reject", requireModule('LETTERS'), rejectLetterRequest);
 

@@ -101,7 +101,7 @@ const MyAccountPage = () => {
     }
     return ['rgba(0,80,60,0.08)', C.textMuted];
   };
-  const [rbg, rc] = roleColor(user?.role);
+  const [rbg, rc] = roleColor(user?.role?.name);
 
   return (
     <div style={{ fontFamily:'Poppins,sans-serif', maxWidth:860, margin:'0 auto' }}>
@@ -130,7 +130,7 @@ const MyAccountPage = () => {
               )}
               <p style={{ margin:'4px 0 0', fontSize:'0.75rem', color:'rgba(232,240,238,0.6)' }}>System Account Information</p>
               <span style={{ display:'inline-block', marginTop:8, padding:'3px 12px', borderRadius:99, background:'rgba(255,255,255,0.12)', color:'#E8F0EE', fontSize:'0.7rem', fontWeight:700, letterSpacing:0.5 }}>
-                {(user?.role||'EMPLOYEE').replace(/_/g,' ')}
+                {(user?.role?.name||'EMPLOYEE').replace(/_/g,' ')}
               </span>
             </div>
             <div style={{ position:'absolute', top:-30, right:-30, width:160, height:160, borderRadius:'50%', background:'rgba(255,255,255,0.04)', pointerEvents:'none' }}/>
@@ -157,7 +157,7 @@ const MyAccountPage = () => {
               <div style={{ marginTop:18 }}>
                 <label style={labelStyle}>Role</label>
                 <span style={{ display:'inline-block', padding:'4px 12px', borderRadius:99, background:rbg, color:rc, fontSize:'0.72rem', fontWeight:700 }}>
-                  {(user?.role||'EMPLOYEE').replace(/_/g,' ')}
+                  {(user?.role?.name||'EMPLOYEE').replace(/_/g,' ')}
                 </span>
               </div>
             </div>

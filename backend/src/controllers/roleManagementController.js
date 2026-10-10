@@ -1,35 +1,32 @@
 /**
  * Role Management Controller
  * 
- * Handles all role management operations:
- * - Role CRUD
- * - Permission assignment
- * - Data scope configuration
- * - User role assignment
- * - Permission overrides and delegations
+ * Simplified controller for static role management:
+ * - View 5 static roles (read-only)
+ * - Assign roles to users
+ * - View role hierarchy and statistics
+ * 
+ * Note: Roles and their module assignments are STATIC and defined in code.
+ * Module assignments cannot be changed through the API.
  */
 
-const rbacService = require("../services/rbacService");
 const roleManagementService = require("../services/roleManagementService");
-const permissionOverrideService = require("../services/permissionOverrideService");
 const { sendSuccess, sendError } = require("../utils/response");
 const asyncHandler = require("../middleware/asyncHandler");
 
 // ============================================================================
-// ROLE CRUD OPERATIONS
+// ROLE VIEWING (Read-Only)
 // ============================================================================
 
 /**
- * Get all roles
+ * Get all roles (5 static roles)
  * GET /api/role-management/roles
  */
 exports.getAllRoles = asyncHandler(async (req, res) => {
-  const { includeInactive, systemOnly, customOnly } = req.query;
+  const { includeInactive } = req.query;
   
-  const roles = await rbacService.getAllRoles({
-    includeInactive: includeInactive === 'true',
-    systemOnly: systemOnly === 'true',
-    customOnly: customOnly === 'true'
+  const roles = await roleManagementService.getAllRoles({
+    includeInactive: includeInactive === 'true'
   });
   
   sendSuccess(res, {
@@ -39,7 +36,7 @@ exports.getAllRoles = asyncHandler(async (req, res) => {
 });
 
 /**
- * Get role by UUID with full details
+ * Get role by UUID with full details including modules (read-only)
  * GET /api/role-management/roles/:roleUuid
  */
 exports.getRoleDetails = asyncHandler(async (req, res) => {
@@ -62,105 +59,6 @@ exports.getRoleDetails = asyncHandler(async (req, res) => {
 });
 
 /**
- * Create new custom role
- * POST /api/role-management/roles
- */
-exports.createRole = asyncHandler(async (req, res) => {
-  const { code, name, description, hierarchyLevel } = req.body;
-  
-  // Validate required fields
-  if (!code || !name) {
-    return sendError(res, {
-      status: 400,
-      message: "Role code and name are required",
-      error: "INVALID_INPUT"
-    });
-  }
-  
-  // Validate code format (uppercase, underscore separated)
-  if (!/^[A-Z_]+$/.test(code)) {
-    return sendError(res, {
-      status: 400,
-      message: "Role code must contain only uppercase letters and underscores",
-      error: "INVALID_CODE_FORMAT"
-    });
-  }
-  
-  const role = await roleManagementService.createRole(
-    { code, name, description, hierarchyLevel },
-    req.user.uuid
-  );
-  
-  sendSuccess(res, {
-    status: 201,
-    message: "Role created successfully",
-    data: { role }
-  });
-});
-
-/**
- * Update role
- * PUT /api/role-management/roles/:roleUuid
- */
-exports.updateRole = asyncHandler(async (req, res) => {
-  const { roleUuid } = req.params;
-  const { name, description, hierarchyLevel } = req.body;
-  
-  const role = await roleManagementService.updateRole(
-    roleUuid,
-    { name, description, hierarchyLevel },
-    req.user.uuid
-  );
-  
-  sendSuccess(res, {
-    message: "Role updated successfully",
-    data: { role }
-  });
-});
-
-/**
- * Delete role
- * DELETE /api/role-management/roles/:roleUuid
- */
-exports.deleteRole = asyncHandler(async (req, res) => {
-  const { roleUuid } = req.params;
-  
-  await roleManagementService.deleteRole(roleUuid, req.user.uuid);
-  
-  sendSuccess(res, {
-    message: "Role deleted successfully"
-  });
-});
-
-/**
- * Activate/deactivate role
- * PATCH /api/role-management/roles/:roleUuid/status
- */
-exports.setRoleStatus = asyncHandler(async (req, res) => {
-  const { roleUuid } = req.params;
-  const { is_active } = req.body;
-  
-  if (typeof is_active !== 'boolean') {
-    return sendError(res, {
-      status: 400,
-      message: "is_active must be a boolean",
-      error: "INVALID_INPUT"
-    });
-  }
-  
-  const role = await roleManagementService.setRoleActiveStatus(
-    roleUuid,
-    is_active,
-    req.user.uuid
-  );
-  
-  sendSuccess(res, {
-    message: `Role ${is_active ? 'activated' : 'deactivated'} successfully`,
-    data: { role }
-  });
-});
-
-/**
  * Get users assigned to role
  * GET /api/role-management/roles/:roleUuid/users
  */
@@ -175,190 +73,40 @@ exports.getRoleUsers = asyncHandler(async (req, res) => {
   });
 });
 
-// ============================================================================
-// PERMISSIONS AND RESOURCES
-// ============================================================================
-
 /**
- * Get all permissions grouped by resource
- * GET /api/role-management/permissions
+ * Get role hierarchy
+ * GET /api/role-management/roles/hierarchy
  */
-exports.getAllPermissions = asyncHandler(async (req, res) => {
-  const permissions = await rbacService.getAllPermissionsGrouped();
+exports.getRoleHierarchy = asyncHandler(async (req, res) => {
+  const hierarchy = await roleManagementService.getRoleHierarchy();
   
   sendSuccess(res, {
-    message: "Permissions retrieved successfully",
-    data: { resources: permissions }
+    message: "Role hierarchy retrieved successfully",
+    data: { hierarchy }
   });
 });
 
 /**
- * Get all data scopes
- * GET /api/role-management/scopes
+ * Get role statistics
+ * GET /api/role-management/roles/:roleUuid/statistics
  */
-exports.getAllScopes = asyncHandler(async (req, res) => {
-  const scopes = await rbacService.getAllDataScopes();
-  
-  sendSuccess(res, {
-    message: "Data scopes retrieved successfully",
-    data: { scopes }
-  });
-});
-
-// ============================================================================
-// PERMISSION ASSIGNMENT
-// ============================================================================
-
-/**
- * Assign single permission to role
- * POST /api/role-management/roles/:roleUuid/permissions
- */
-exports.assignPermission = asyncHandler(async (req, res) => {
+exports.getRoleStatistics = asyncHandler(async (req, res) => {
   const { roleUuid } = req.params;
-  const { permissionUuid } = req.body;
   
-  if (!permissionUuid) {
+  try {
+    const statistics = await roleManagementService.getRoleStatistics(roleUuid);
+    
+    sendSuccess(res, {
+      message: "Role statistics retrieved successfully",
+      data: statistics
+    });
+  } catch (error) {
     return sendError(res, {
-      status: 400,
-      message: "Permission UUID is required",
-      error: "INVALID_INPUT"
+      status: 404,
+      message: error.message,
+      error: "NOT_FOUND"
     });
   }
-  
-  await roleManagementService.assignPermissionToRole(
-    roleUuid,
-    permissionUuid,
-    req.user.uuid
-  );
-  
-  sendSuccess(res, {
-    message: "Permission assigned successfully"
-  });
-});
-
-/**
- * Remove permission from role
- * DELETE /api/role-management/roles/:roleUuid/permissions/:permissionUuid
- */
-exports.removePermission = asyncHandler(async (req, res) => {
-  const { roleUuid, permissionUuid } = req.params;
-  
-  await roleManagementService.removePermissionFromRole(
-    roleUuid,
-    permissionUuid,
-    req.user.uuid
-  );
-  
-  sendSuccess(res, {
-    message: "Permission removed successfully"
-  });
-});
-
-/**
- * Bulk assign permissions to role
- * POST /api/role-management/roles/:roleUuid/permissions/bulk
- */
-exports.bulkAssignPermissions = asyncHandler(async (req, res) => {
-  const { roleUuid } = req.params;
-  const { permissionUuids } = req.body;
-  
-  if (!Array.isArray(permissionUuids)) {
-    return sendError(res, {
-      status: 400,
-      message: "permissionUuids must be an array",
-      error: "INVALID_INPUT"
-    });
-  }
-  
-  const result = await roleManagementService.assignPermissionsToRole(
-    roleUuid,
-    permissionUuids,
-    req.user.uuid
-  );
-  
-  sendSuccess(res, {
-    message: "Permissions assigned successfully",
-    data: result
-  });
-});
-
-/**
- * Replace all role permissions
- * PUT /api/role-management/roles/:roleUuid/permissions
- */
-exports.replacePermissions = asyncHandler(async (req, res) => {
-  const { roleUuid } = req.params;
-  const { permissionUuids } = req.body;
-  
-  if (!Array.isArray(permissionUuids)) {
-    return sendError(res, {
-      status: 400,
-      message: "permissionUuids must be an array",
-      error: "INVALID_INPUT"
-    });
-  }
-  
-  const result = await roleManagementService.replaceRolePermissions(
-    roleUuid,
-    permissionUuids,
-    req.user.uuid
-  );
-  
-  sendSuccess(res, {
-    message: "Role permissions updated successfully",
-    data: result
-  });
-});
-
-// ============================================================================
-// SCOPE ASSIGNMENT
-// ============================================================================
-
-/**
- * Assign scope to role-permission
- * POST /api/role-management/roles/:roleUuid/permissions/:permissionUuid/scope
- */
-exports.assignScope = asyncHandler(async (req, res) => {
-  const { roleUuid, permissionUuid } = req.params;
-  const { dataScopeUuid, configuration } = req.body;
-  
-  if (!dataScopeUuid) {
-    return sendError(res, {
-      status: 400,
-      message: "Data scope UUID is required",
-      error: "INVALID_INPUT"
-    });
-  }
-  
-  await roleManagementService.assignScopeToRolePermission(
-    roleUuid,
-    permissionUuid,
-    dataScopeUuid,
-    configuration,
-    req.user.uuid
-  );
-  
-  sendSuccess(res, {
-    message: "Data scope assigned successfully"
-  });
-});
-
-/**
- * Remove scope from role-permission
- * DELETE /api/role-management/roles/:roleUuid/permissions/:permissionUuid/scope
- */
-exports.removeScope = asyncHandler(async (req, res) => {
-  const { roleUuid, permissionUuid } = req.params;
-  
-  await roleManagementService.removeScopeFromRolePermission(
-    roleUuid,
-    permissionUuid,
-    req.user.uuid
-  );
-  
-  sendSuccess(res, {
-    message: "Data scope removed successfully"
-  });
 });
 
 // ============================================================================
@@ -381,392 +129,88 @@ exports.assignRoleToUser = asyncHandler(async (req, res) => {
     });
   }
   
-  await roleManagementService.assignRoleToUser(
-    userUuid,
-    roleUuid,
-    req.user.uuid
-  );
-  
-  sendSuccess(res, {
-    message: "Role assigned to user successfully. User must re-login for changes to take effect."
-  });
-});
-
-// ============================================================================
-// USER PERMISSION OVERRIDES
-// ============================================================================
-
-/**
- * Get user's permission overrides
- * GET /api/role-management/users/:userUuid/overrides/permissions
- */
-exports.getUserPermissionOverrides = asyncHandler(async (req, res) => {
-  const { userUuid } = req.params;
-  
-  const overrides = await permissionOverrideService.getUserOverrides(userUuid);
-  
-  sendSuccess(res, {
-    message: "User permission overrides retrieved successfully",
-    data: { overrides }
-  });
-});
-
-/**
- * Add permission override for user
- * POST /api/role-management/users/:userUuid/overrides/permissions
- */
-exports.addPermissionOverride = asyncHandler(async (req, res) => {
-  const { userUuid } = req.params;
-  const { permissionUuid, overrideType, reason, expiresAt } = req.body;
-  
-  if (!permissionUuid || !overrideType) {
+  try {
+    await roleManagementService.assignRoleToUser(
+      userUuid,
+      roleUuid,
+      req.user.uuid
+    );
+    
+    sendSuccess(res, {
+      message: "Role assigned to user successfully. User must re-login for changes to take effect."
+    });
+  } catch (error) {
     return sendError(res, {
-      status: 400,
-      message: "Permission UUID and override type are required",
-      error: "INVALID_INPUT"
+      status: error.message.includes('not found') ? 404 : 403,
+      message: error.message,
+      error: error.message.includes('not found') ? 'NOT_FOUND' : 'FORBIDDEN'
     });
   }
-  
-  const override = await permissionOverrideService.addPermissionOverride(
-    { userUuid, permissionUuid, overrideType, reason, expiresAt },
-    req.user.uuid
-  );
-  
-  sendSuccess(res, {
-    status: 201,
-    message: "Permission override added successfully",
-    data: { override }
-  });
 });
 
 /**
- * Remove permission override
- * DELETE /api/role-management/overrides/permissions/:overrideUuid
+ * Get user's current role
+ * GET /api/role-management/users/:userUuid/role
  */
-exports.removePermissionOverride = asyncHandler(async (req, res) => {
-  const { overrideUuid } = req.params;
-  
-  await permissionOverrideService.removePermissionOverride(
-    overrideUuid,
-    req.user.uuid
-  );
-  
-  sendSuccess(res, {
-    message: "Permission override removed successfully"
-  });
-});
-
-// ============================================================================
-// USER SCOPE OVERRIDES
-// ============================================================================
-
-/**
- * Get user's scope overrides
- * GET /api/role-management/users/:userUuid/overrides/scopes
- */
-exports.getUserScopeOverrides = asyncHandler(async (req, res) => {
+exports.getUserRole = asyncHandler(async (req, res) => {
   const { userUuid } = req.params;
   
-  const overrides = await permissionOverrideService.getUserScopeOverrides(userUuid);
+  const role = await roleManagementService.getUserRole(userUuid);
   
-  sendSuccess(res, {
-    message: "User scope overrides retrieved successfully",
-    data: { overrides }
-  });
-});
-
-/**
- * Add scope override for user
- * POST /api/role-management/users/:userUuid/overrides/scopes
- */
-exports.addScopeOverride = asyncHandler(async (req, res) => {
-  const { userUuid } = req.params;
-  const { permissionUuid, dataScopeUuid, scopeConfiguration, reason, expiresAt } = req.body;
-  
-  if (!permissionUuid || !dataScopeUuid) {
-    return sendError(res, {
-      status: 400,
-      message: "Permission UUID and data scope UUID are required",
-      error: "INVALID_INPUT"
-    });
-  }
-  
-  const override = await permissionOverrideService.addScopeOverride(
-    { userUuid, permissionUuid, dataScopeUuid, scopeConfiguration, reason, expiresAt },
-    req.user.uuid
-  );
-  
-  sendSuccess(res, {
-    status: 201,
-    message: "Scope override added successfully",
-    data: { override }
-  });
-});
-
-/**
- * Remove scope override
- * DELETE /api/role-management/overrides/scopes/:overrideUuid
- */
-exports.removeScopeOverride = asyncHandler(async (req, res) => {
-  const { overrideUuid } = req.params;
-  
-  await permissionOverrideService.removeScopeOverride(
-    overrideUuid,
-    req.user.uuid
-  );
-  
-  sendSuccess(res, {
-    message: "Scope override removed successfully"
-  });
-});
-
-// ============================================================================
-// PERMISSION DELEGATIONS
-// ============================================================================
-
-/**
- * Get user's delegations
- * GET /api/role-management/users/:userUuid/delegations
- */
-exports.getUserDelegations = asyncHandler(async (req, res) => {
-  const { userUuid } = req.params;
-  const { direction } = req.query; // 'sent', 'received', or 'all'
-  
-  const delegations = await permissionOverrideService.getUserDelegations(
-    userUuid,
-    direction || 'all'
-  );
-  
-  sendSuccess(res, {
-    message: "User delegations retrieved successfully",
-    data: { delegations }
-  });
-});
-
-/**
- * Create delegation
- * POST /api/role-management/delegations
- */
-exports.createDelegation = asyncHandler(async (req, res) => {
-  const {
-    fromUserUuid,
-    toUserUuid,
-    permissionUuid,
-    dataScopeUuid,
-    scopeConfiguration,
-    reason,
-    startsAt,
-    expiresAt
-  } = req.body;
-  
-  if (!fromUserUuid || !toUserUuid || !permissionUuid || !startsAt || !expiresAt) {
-    return sendError(res, {
-      status: 400,
-      message: "From user, to user, permission, start date, and expiry date are required",
-      error: "INVALID_INPUT"
-    });
-  }
-  
-  const delegation = await permissionOverrideService.createDelegation(
-    {
-      fromUserUuid,
-      toUserUuid,
-      permissionUuid,
-      dataScopeUuid,
-      scopeConfiguration,
-      reason,
-      startsAt,
-      expiresAt
-    },
-    req.user.uuid
-  );
-  
-  sendSuccess(res, {
-    status: 201,
-    message: "Delegation created successfully",
-    data: { delegation }
-  });
-});
-
-/**
- * Revoke delegation
- * DELETE /api/role-management/delegations/:delegationUuid
- */
-exports.revokeDelegation = asyncHandler(async (req, res) => {
-  const { delegationUuid } = req.params;
-  
-  await permissionOverrideService.revokeDelegation(
-    delegationUuid,
-    req.user.uuid
-  );
-  
-  sendSuccess(res, {
-    message: "Delegation revoked successfully"
-  });
-});
-
-// ============================================================================
-// USER PERMISSION INFO
-// ============================================================================
-
-/**
- * Get user's effective permissions (detailed)
- * GET /api/role-management/users/:userUuid/effective-permissions
- */
-exports.getUserEffectivePermissions = asyncHandler(async (req, res) => {
-  const { userUuid } = req.params;
-  
-  const permissionDetails = await rbacService.getUserPermissionsDetailed(userUuid);
-  
-  sendSuccess(res, {
-    message: "User effective permissions retrieved successfully",
-    data: permissionDetails
-  });
-});
-
-/**
- * Get current user's permissions
- * GET /api/role-management/my-permissions
- */
-exports.getMyPermissions = asyncHandler(async (req, res) => {
-  const permissions = await rbacService.getUserPermissions(req.user.uuid);
-  const role = await rbacService.getUserRole(req.user.uuid);
-  
-  sendSuccess(res, {
-    message: "Your permissions retrieved successfully",
-    data: {
-      role,
-      permissions
-    }
-  });
-});
-
-// ============================================================================
-// AUDIT LOGS
-// ============================================================================
-
-/**
- * Get authorization audit logs
- * GET /api/role-management/audit-logs
- */
-exports.getAuditLogs = asyncHandler(async (req, res) => {
-  const { executeQuery } = require("../utils/dbQuery");
-  const { limit = 100, offset = 0, actionType, actorUserUuid, targetUserUuid } = req.query;
-  
-  let whereClause = [];
-  let params = [];
-  
-  if (actionType) {
-    whereClause.push('action_type = ?');
-    params.push(actionType);
-  }
-  
-  if (actorUserUuid) {
-    whereClause.push('actor_user_uuid = ?');
-    params.push(actorUserUuid);
-  }
-  
-  if (targetUserUuid) {
-    whereClause.push('target_user_uuid = ?');
-    params.push(targetUserUuid);
-  }
-  
-  const where = whereClause.length > 0 ? 'WHERE ' + whereClause.join(' AND ') : '';
-  
-  const [logs] = await executeQuery(
-    `SELECT aal.*, 
-            actor.username as actor_username,
-            target.username as target_username
-     FROM AuthorizationAuditLogs aal
-     LEFT JOIN Users actor ON aal.actor_user_uuid = actor.uuid
-     LEFT JOIN Users target ON aal.target_user_uuid = target.uuid
-     ${where}
-     ORDER BY aal.created_at DESC
-     LIMIT ? OFFSET ?`,
-    [...params, parseInt(limit), parseInt(offset)]
-  );
-  
-  const [countResult] = await executeQuery(
-    `SELECT COUNT(*) as total FROM AuthorizationAuditLogs aal ${where}`,
-    params
-  );
-  
-  sendSuccess(res, {
-    message: "Audit logs retrieved successfully",
-    data: {
-      logs,
-      pagination: {
-        total: countResult[0].total,
-        limit: parseInt(limit),
-        offset: parseInt(offset)
-      }
-    }
-  });
-});
-
-/**
- * Get permissions for a specific role
- * GET /api/role-management/roles/:roleUuid/permissions
- */
-exports.getRolePermissions = asyncHandler(async (req, res) => {
-  const { roleUuid } = req.params;
-  
-  // Get role with permissions from service
-  const roleDetails = await roleManagementService.getRoleWithDetails(roleUuid);
-  
-  if (!roleDetails) {
+  if (!role) {
     return sendError(res, {
       status: 404,
-      message: "Role not found",
+      message: "User not found or has no role assigned",
       error: "NOT_FOUND"
     });
   }
   
   sendSuccess(res, {
-    message: "Role permissions retrieved successfully",
-    data: { permissions: roleDetails.permissions || [] }
+    message: "User role retrieved successfully",
+    data: { role }
   });
 });
 
 /**
- * Get role-specific audit logs
- * GET /api/role-management/roles/:roleUuid/audit-logs
+ * Get current user's role and modules
+ * GET /api/role-management/my-permissions
  */
-exports.getRoleAuditLogs = asyncHandler(async (req, res) => {
-  const { executeQuery } = require("../utils/dbQuery");
-  const { roleUuid } = req.params;
-  const { limit = 50, offset = 0 } = req.query;
+exports.getMyPermissions = asyncHandler(async (req, res) => {
+  const moduleAuthService = require("../services/moduleAuthService");
   
-  const [logs] = await executeQuery(
-    `SELECT aal.*, 
-            actor.username as actor_username,
-            target.username as target_username,
-            r.name as role_name
-     FROM AuthorizationAuditLogs aal
-     LEFT JOIN Users actor ON aal.actor_user_uuid = actor.uuid
-     LEFT JOIN Users target ON aal.target_user_uuid = target.uuid
-     LEFT JOIN Roles r ON aal.metadata->>'$.roleUuid' = r.uuid
-     WHERE aal.metadata->>'$.roleUuid' = ? OR aal.target_role_uuid = ?
-     ORDER BY aal.created_at DESC
-     LIMIT ? OFFSET ?`,
-    [roleUuid, roleUuid, parseInt(limit), parseInt(offset)]
-  );
+  const permissions = await moduleAuthService.getUserPermissions(req.user.uuid);
   
-  const [countResult] = await executeQuery(
-    `SELECT COUNT(*) as total FROM AuthorizationAuditLogs aal 
-     WHERE aal.metadata->>'$.roleUuid' = ? OR aal.target_role_uuid = ?`,
-    [roleUuid, roleUuid]
-  );
+  if (!permissions) {
+    return sendError(res, {
+      status: 404,
+      message: "Unable to load user permissions",
+      error: "NOT_FOUND"
+    });
+  }
   
   sendSuccess(res, {
-    message: "Role audit logs retrieved successfully",
+    message: "Your permissions retrieved successfully",
     data: {
-      logs,
-      pagination: {
-        total: countResult[0].total,
-        limit: parseInt(limit),
-        offset: parseInt(offset)
-      }
+      role: permissions.role,
+      dashboard: permissions.dashboard,
+      modules: permissions.modules
     }
+  });
+});
+
+// ============================================================================
+// PERMISSIONS CHECK
+// ============================================================================
+
+/**
+ * Check if current user can manage roles
+ * GET /api/role-management/can-manage
+ */
+exports.canManageRoles = asyncHandler(async (req, res) => {
+  const canManage = await roleManagementService.canManageRoles(req.user.uuid);
+  
+  sendSuccess(res, {
+    message: "Permission check completed",
+    data: { canManage }
   });
 });

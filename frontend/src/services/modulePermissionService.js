@@ -13,8 +13,13 @@ import apiClient from '../api/apiClient';
  */
 export async function getUserPermissions() {
   try {
-    const response = await apiClient.get('/module-roles/permissions/me');
-    return response.data.data;
+    const response = await apiClient.get('/auth/me');
+    const userData = response.data?.data || response.data;
+    return userData?.permissions || {
+      modules: userData?.modules || [],
+      role: userData?.role || null,
+      dashboard: userData?.dashboard || null,
+    };
   } catch (error) {
     console.error('[ModulePermission] Failed to fetch user permissions:', error);
     throw error;
@@ -23,15 +28,13 @@ export async function getUserPermissions() {
 
 /**
  * Check if user has access to a specific module
- * @param {string} moduleCode - Module code (HOME, EMPLOYEES, ORGANIZATION, etc.)
+ * @param {string} moduleCode - Module code (EMPLOYEE_LIST, DEPARTMENTS, etc.)
  * @returns {Promise<Object|null>} Module access info with scope, or null if no access
  */
 export async function checkModuleAccess(moduleCode) {
   try {
-    const response = await apiClient.get('/module-roles/permissions/check', {
-      params: { moduleCode }
-    });
-    return response.data.data.access;
+    const permissions = await getUserPermissions();
+    return hasModuleAccess(moduleCode, permissions);
   } catch (error) {
     console.error('[ModulePermission] Failed to check module access:', error);
     return null;
@@ -49,7 +52,9 @@ export function hasAnyModuleAccess(moduleCodes, permissions) {
     return false;
   }
   
-  const userModuleCodes = new Set(permissions.modules.map(m => m.code));
+  const userModuleCodes = new Set(
+    permissions.modules.map(m => (typeof m === 'string' ? m : m.code))
+  );
   return moduleCodes.some(code => userModuleCodes.has(code));
 }
 
@@ -64,7 +69,10 @@ export function hasModuleAccess(moduleCode, permissions) {
     return null;
   }
   
-  return permissions.modules.find(m => m.code === moduleCode) || null;
+  return (
+    permissions.modules.find(m => (typeof m === 'string' ? m === moduleCode : m.code === moduleCode)) ||
+    null
+  );
 }
 
 /**

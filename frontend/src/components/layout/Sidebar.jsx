@@ -18,6 +18,7 @@ import {
 import logo from "../../../assets/Logo.png";
 import { useAuth } from "../../context/AuthContext";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
+import { usePermissions } from "../../hooks/usePermissions";
 
 /* Continuous spin lives in index.css as @keyframes continuousSpin */
 const SPIN_STYLE = {
@@ -28,12 +29,17 @@ const SPIN_STYLE = {
 /* 
  * Module-based navigation structure matching requirements
  * Uses existing professional pages - no stubs
+ * 
+ * Module codes must match the Modules table in the database:
+ * EMPLOYEE_LIST, EMPLOYEE_PROFILE, REGISTER_EMPLOYEE, DEPARTMENTS, POSITIONS, LEVELS,
+ * ATTENDANCE_RECORDS, NETWORK_SETTINGS, SHIFTS, LETTERS, LEAVE_REQUESTS, LEAVE_SETTINGS,
+ * ACCOUNTS, AUDIT_LOGS, MY_ATTENDANCE, MY_LETTERS, MY_LEAVES, MY_ACCOUNTS
  */
 const NAV_CONFIG = [
   {
     group: "HOME",
     items: [
-      { label: "Home", icon: LayoutDashboard, to: "/", module: "HOME" },
+      { label: "Home", icon: LayoutDashboard, to: "/", alwaysShow: true },
     ],
   },
   {
@@ -43,33 +49,33 @@ const NAV_CONFIG = [
         label: "Employees",
         icon: Users,
         to: "/employees",
-        module: "EMPLOYEES",
+        modules: ["EMPLOYEE_LIST", "EMPLOYEE_PROFILE", "REGISTER_EMPLOYEE"],
         children: [
-          { label: "Employee List", to: "/employees" },
-          { label: "Employee Profile", to: "/employees/profile" },
-          { label: "Register Employee", to: "/employees/register" },
+          { label: "Employee List", to: "/employees", module: "EMPLOYEE_LIST" },
+          { label: "Employee Profile", to: "/employees/profile", module: "EMPLOYEE_PROFILE" },
+          { label: "Register Employee", to: "/employees/register", module: "REGISTER_EMPLOYEE" },
         ],
       },
       {
         label: "Organization",
         icon: Building2,
         to: "/departments",
-        module: "ORGANIZATION",
+        modules: ["DEPARTMENTS", "POSITIONS", "LEVELS"],
         children: [
-          { label: "Departments", to: "/departments" },
-          { label: "Positions", to: "/positions" },
-          { label: "Levels", to: "/levels" },
+          { label: "Departments", to: "/departments", module: "DEPARTMENTS" },
+          { label: "Positions", to: "/positions", module: "POSITIONS" },
+          { label: "Levels", to: "/levels", module: "LEVELS" },
         ],
       },
       {
         label: "Attendance",
         icon: Clock,
         to: "/attendance",
-        module: "ATTENDANCE",
+        modules: ["ATTENDANCE_RECORDS", "NETWORK_SETTINGS"],
         children: [
-          { label: "Attendance Records", to: "/attendance/manage" },
-          { label: "Attendance Analytics", to: "/attendance-overview" },
-          { label: "Network Settings", to: "/attendance/network-settings" },
+          { label: "Attendance Records", to: "/attendance/manage", module: "ATTENDANCE_RECORDS" },
+          { label: "Attendance Analytics", to: "/attendance-overview", module: "ATTENDANCE_RECORDS" },
+          { label: "Network Settings", to: "/attendance/network-settings", module: "NETWORK_SETTINGS" },
         ],
       },
       {
@@ -84,23 +90,21 @@ const NAV_CONFIG = [
         to: "/letters",
         module: "LETTERS",
         children: [
-          { label: "Letter Templates", to: "/letters/templates" },
-          { label: "Generate Letter", to: "/letters/generate" },
-          { label: "Letter Requests", to: "/letters/requests" },
+          { label: "Letter Templates", to: "/letters/templates", module: "LETTERS" },
+          { label: "Generate Letter", to: "/letters/generate", module: "LETTERS" },
+          { label: "Letter Requests", to: "/letters/requests", module: "LETTERS" },
         ],
       },
       {
         label: "Leave",
         icon: CalendarDays,
         to: "/leave",
-        module: "LEAVE",
+        modules: ["LEAVE_REQUESTS", "LEAVE_SETTINGS"],
         badgeKey: "pending",
         children: [
-          { label: "Leave Requests", to: "/leave/manage" },
-          { label: "Leave Settings", to: "/policies", children: [
-            { label: "Leave Policies", to: "/policies" },
-            { label: "Days Off", to: "/holidays" },
-          ]},
+          { label: "Leave Requests", to: "/leave/manage", module: "LEAVE_REQUESTS" },
+          { label: "Leave Policies", to: "/policies", module: "LEAVE_SETTINGS" },
+          { label: "Days Off", to: "/holidays", module: "LEAVE_SETTINGS" },
         ],
       },
     ],
@@ -108,9 +112,9 @@ const NAV_CONFIG = [
   {
     group: "ADMINISTRATION",
     items: [
-      { label: "Accounts", icon: Users, to: "/accounts", module: "ADMIN" },
-      { label: "Roles & Permissions", icon: Shield, to: "/admin/roles", module: "ADMIN" },
-      { label: "Audit Log", icon: ScrollText, to: "/logs", module: "ADMIN" },
+      { label: "Accounts", icon: Users, to: "/accounts", module: "ACCOUNTS" },
+      { label: "Roles & Permissions", icon: Shield, to: "/admin/roles", module: "ACCOUNTS" },
+      { label: "Audit Log", icon: ScrollText, to: "/logs", module: "AUDIT_LOGS" },
     ],
   },
   {
@@ -154,15 +158,28 @@ function resolveActiveRoute(pathname, navGroups) {
 const Sidebar = ({ collapsed, onToggle, pendingCount = 0, mobileOpen = false, isMobile = false, isTablet = false }) => {
   const location = useLocation();
   const { user } = useAuth();
-  const { hasModule } = useModulePermissions();
+  const { hasModule, hasAnyModule } = useModulePermissions();
+  const { hasPermission } = usePermissions();
 
   const filteredNav = NAV_CONFIG.map(group => ({
     ...group,
-    items: group.items.filter(item => {
-      if (item.alwaysShow) return true;
-      if (item.module) return hasModule(item.module);
-      return true;
-    })
+    items: group.items
+      .filter(item => {
+        if (item.alwaysShow) return true;
+        if (item.permission) return hasPermission(item.permission);
+        if (item.modules) return hasAnyModule(item.modules);
+        if (item.module) return hasModule(item.module);
+        return true;
+      })
+      .map(item => {
+        if (!item.children) return item;
+        const filteredChildren = item.children.filter(child => {
+          if (child.module) return hasModule(child.module);
+          if (child.modules) return hasAnyModule(child.modules);
+          return true;
+        });
+        return { ...item, children: filteredChildren };
+      })
   })).filter(group => group.items.length > 0);
 
   const w = collapsed ? 72 : 240;

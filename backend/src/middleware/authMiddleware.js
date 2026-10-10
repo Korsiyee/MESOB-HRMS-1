@@ -37,7 +37,7 @@ async function authenticateJwt(req, res, next) {
     let payload;
     try {
       payload = jwt.verify(token, JWT_SECRET);
-      console.log('[authMiddleware] ✅ JWT verified, uuid:', payload.uuid, 'token_version:', payload.token_version, 'permissions_version:', payload.permissions_version);
+      console.log('[authMiddleware] ✅ JWT verified, uuid:', payload.uuid, 'role_uuid:', payload.role_uuid);
     } catch (error) {
       console.log('[authMiddleware] ❌ JWT verification failed:', error.message);
       if (error.name === "TokenExpiredError") {
@@ -70,33 +70,6 @@ async function authenticateJwt(req, res, next) {
         status: 401,
         message: "User account has been deactivated.",
         error: "ACCOUNT_DEACTIVATED",
-      });
-    }
-
-    // CRITICAL: Validate token version matches current user token version
-    // This enables immediate token revocation when security actions occur
-    const userTokenVersion = user.token_version || 0;
-    const tokenVersion = payload.token_version || 0;
-    const userPermissionsVersion = user.permissions_version || 1;
-    const tokenPermissionsVersion = payload.permissions_version || 1;
-    
-    console.log('[authMiddleware] Version check - Token:', tokenVersion, 'User DB:', userTokenVersion, '| Permissions - Token:', tokenPermissionsVersion, 'User DB:', userPermissionsVersion);
-    
-    if (tokenVersion !== userTokenVersion) {
-      console.log('[authMiddleware] ❌ TOKEN VERSION MISMATCH - rejecting');
-      return sendError(res, {
-        status: 401,
-        message: "Your session has been terminated. Please login again.",
-        error: "TOKEN_REVOKED",
-      });
-    }
-    
-    // Check permissions version (more granular than token version)
-    if (tokenPermissionsVersion !== userPermissionsVersion) {
-      return sendError(res, {
-        status: 401,
-        message: "Your permissions have changed. Please login again.",
-        error: "PERMISSIONS_CHANGED",
       });
     }
 
@@ -134,10 +107,9 @@ async function authenticateJwt(req, res, next) {
       try {
         const [employees] = await executeQuery(
           `SELECT e.first_name, e.middle_name, e.last_name, e.profile_photo_key, e.mesob_id,
-                  p.department_uuid,
+                  e.department_uuid,
                   a.email
            FROM Employees e
-           LEFT JOIN Positions p ON p.uuid = e.position_uuid
            LEFT JOIN EmployeeAddresses a ON e.uuid = a.employee_uuid AND a.address_type = 'CURRENT'
            WHERE e.uuid = ?`,
           [user.employee_uuid]
@@ -167,14 +139,28 @@ async function authenticateJwt(req, res, next) {
           .join(" ")
       : null;
 
+    // Look up role code from Roles table
+    let roleCode = null;
+    if (user.role_uuid) {
+      try {
+        const [roleRows] = await executeQuery(
+          "SELECT code FROM Roles WHERE uuid = ? LIMIT 1",
+          [user.role_uuid]
+        );
+        roleCode = roleRows[0]?.code || null;
+      } catch (err) {
+        console.error("Error fetching role code:", err);
+      }
+    }
+
     req.user = {
       uuid: user.uuid,
       employee_uuid: user.employee_uuid,
       department_uuid: departmentUuid || null,
       username: user.username,
       email: employeeData?.email || null,
-      role_id: user.role_id, // NEW: Use role_id instead of role ENUM
-      role: user.role, // DEPRECATED: Keep for backward compat during migration, will be removed
+      role_uuid: user.role_uuid,
+      role: roleCode,
       full_name: fullName,
       profile_photo_url: profilePhotoUrl,
       mesob_id: employeeData?.mesob_id || null,

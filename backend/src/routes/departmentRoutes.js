@@ -7,15 +7,15 @@ const {
   deleteDepartment,
 } = require("../controllers/departmentController");
 // Use module-level authorization
-const { requireModule, withScope } = require("../middleware/moduleAuth");
+const { requireModule } = require("../middleware/moduleAuth");
 
 const router = express.Router();
 
 // All department operations require ORGANIZATION module
-router.get("/", requireModule('ORGANIZATION'), withScope(), listDepartments);
-router.get("/:uuid", requireModule('ORGANIZATION'), getDepartment);
-router.post("/", requireModule('ORGANIZATION'), createDepartment);
-router.patch("/:uuid", requireModule('ORGANIZATION'), updateDepartment);
-router.delete("/:uuid", requireModule('ORGANIZATION'), deleteDepartment);
+router.get("/", requireModule('DEPARTMENTS'), listDepartments);
+router.get("/:uuid", requireModule('DEPARTMENTS'), getDepartment);
+router.post("/", requireModule('DEPARTMENTS'), createDepartment);
+router.patch("/:uuid", requireModule('DEPARTMENTS'), updateDepartment);
+router.delete("/:uuid", requireModule('DEPARTMENTS'), deleteDepartment);
 
 module.exports = router;

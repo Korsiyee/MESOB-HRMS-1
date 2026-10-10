@@ -43,6 +43,9 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('userDashboard');
+    localStorage.removeItem('userModules');
     sessionStorage.clear(); // Clear all session storage
     setUser(null);
     setIsAuthenticated(false);
@@ -184,14 +187,38 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Login function
-  const login = useCallback(async (userData, permissions = null) => {
+  const login = useCallback(async (userData, permissions = null, additionalData = {}) => {
     // Fetch fresh user data with occupations from backend
     const freshUserData = await fetchCurrentUser();
     const fullUserData = freshUserData ? { ...userData, ...freshUserData } : userData;
     
-    // Include module permissions if provided
     if (permissions) {
       fullUserData.permissions = permissions;
+    } else if (additionalData.modules) {
+      fullUserData.permissions = {
+        role: additionalData.role,
+        dashboard: additionalData.dashboard,
+        modules: additionalData.modules
+      };
+    }
+    
+    // Include role, dashboard, and modules from static RBAC
+    if (additionalData.role) {
+      fullUserData.role = additionalData.role;
+      localStorage.setItem('userRole', JSON.stringify(additionalData.role));
+    }
+    
+    if (additionalData.dashboard) {
+      fullUserData.dashboard = additionalData.dashboard;
+      localStorage.setItem('userDashboard', additionalData.dashboard);
+    }
+    
+    if (additionalData.modules) {
+      fullUserData.modules = additionalData.modules;
+      localStorage.setItem('userModules', JSON.stringify(additionalData.modules));
+    } else if (fullUserData.permissions?.modules) {
+      fullUserData.modules = fullUserData.permissions.modules;
+      localStorage.setItem('userModules', JSON.stringify(fullUserData.permissions.modules));
     }
     
     setUser(fullUserData);
@@ -201,7 +228,12 @@ export const AuthProvider = ({ children }) => {
     setShowWarning(false);
     setWarningCountdown(60);
 
-    console.log('[AuthContext] Login - User data with permissions:', fullUserData.permissions ? 'loaded' : 'none');
+    console.log('[AuthContext] Login - User data:', {
+      hasPermissions: !!fullUserData.permissions,
+      hasRole: !!fullUserData.role,
+      dashboard: fullUserData.dashboard,
+      moduleCount: fullUserData.modules?.length || 0
+    });
 
     // Broadcast login to other tabs
     if (broadcastChannelRef.current) {
@@ -378,6 +410,18 @@ export const AuthProvider = ({ children }) => {
               ...storedUserData,
               ...freshUserData,
             };
+            if (freshUserData.permissions?.modules && !updatedUserData.modules) {
+              updatedUserData.modules = freshUserData.permissions.modules;
+            } else if (storedUserData.modules && !updatedUserData.modules) {
+              updatedUserData.modules = storedUserData.modules;
+            }
+            if (updatedUserData.modules && !updatedUserData.permissions) {
+              updatedUserData.permissions = {
+                role: updatedUserData.role,
+                dashboard: updatedUserData.dashboard,
+                modules: updatedUserData.modules,
+              };
+            }
             
             setUser(updatedUserData);
             localStorage.setItem('user', JSON.stringify(updatedUserData));
