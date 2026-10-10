@@ -68,6 +68,20 @@ router.get(
   roleManagementController.getRoleUsers
 );
 
+// Get permissions for a specific role
+router.get(
+  '/roles/:roleUuid/permissions',
+  authorize({ permissions: 'Roles.View' }),
+  roleManagementController.getRolePermissions
+);
+
+// Get role-specific audit logs
+router.get(
+  '/roles/:roleUuid/audit-logs',
+  authorize({ permissions: 'Logs.View' }),
+  roleManagementController.getRoleAuditLogs
+);
+
 // ============================================================================
 // PERMISSIONS & RESOURCES
 // ============================================================================

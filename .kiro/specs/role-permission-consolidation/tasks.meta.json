@@ -1,0 +1,249 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Write bug condition exploration test": [
+      {
+        "executionId": "28f3f43b-cd9f-4c01-ace6-b23549996966",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791573941487
+      },
+      {
+        "executionId": "28f3f43b-cd9f-4c01-ace6-b23549996966",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791573962660
+      },
+      {
+        "executionId": "28f3f43b-cd9f-4c01-ace6-b23549996966",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791574433935
+      }
+    ],
+    "2. Write preservation property tests (BEFORE implementing fix)": [
+      {
+        "executionId": "28f3f43b-cd9f-4c01-ace6-b23549996966",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791573941687
+      },
+      {
+        "executionId": "28f3f43b-cd9f-4c01-ace6-b23549996966",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791574438568
+      },
+      {
+        "executionId": "2a55170f-43c3-455a-8078-36b9cfbb69b2",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791574953249
+      }
+    ],
+    "3.1 Remove duplicate backend controllers and routes": [
+      {
+        "executionId": "28f3f43b-cd9f-4c01-ace6-b23549996966",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791573941753
+      },
+      {
+        "executionId": "2a55170f-43c3-455a-8078-36b9cfbb69b2",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791574958797
+      },
+      {
+        "executionId": "2a55170f-43c3-455a-8078-36b9cfbb69b2",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791575070490
+      }
+    ],
+    "3.2 Update backend route registrations in app.js": [
+      {
+        "executionId": "28f3f43b-cd9f-4c01-ace6-b23549996966",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791573941817
+      },
+      {
+        "executionId": "2a55170f-43c3-455a-8078-36b9cfbb69b2",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791575075494
+      },
+      {
+        "executionId": "2a55170f-43c3-455a-8078-36b9cfbb69b2",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791575139141
+      }
+    ],
+    "3.3 Remove duplicate frontend page": [
+      {
+        "executionId": "28f3f43b-cd9f-4c01-ace6-b23549996966",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791573941892
+      },
+      {
+        "executionId": "2a55170f-43c3-455a-8078-36b9cfbb69b2",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791575144715
+      },
+      {
+        "executionId": "2a55170f-43c3-455a-8078-36b9cfbb69b2",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791575195828
+      }
+    ],
+    "3.4 Update frontend routing configuration": [
+      {
+        "executionId": "28f3f43b-cd9f-4c01-ace6-b23549996966",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791573941932
+      },
+      {
+        "executionId": "2a55170f-43c3-455a-8078-36b9cfbb69b2",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791575200649
+      },
+      {
+        "executionId": "2a55170f-43c3-455a-8078-36b9cfbb69b2",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791575308671
+      }
+    ],
+    "3.5 Verify frontend API service uses correct endpoints": [
+      {
+        "executionId": "28f3f43b-cd9f-4c01-ace6-b23549996966",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791573941974
+      },
+      {
+        "executionId": "2a55170f-43c3-455a-8078-36b9cfbb69b2",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791575632626
+      },
+      {
+        "executionId": "2a55170f-43c3-455a-8078-36b9cfbb69b2",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791576359312
+      }
+    ],
+    "3.6 Verify database schema consistency": [
+      {
+        "executionId": "28f3f43b-cd9f-4c01-ace6-b23549996966",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791573942017
+      },
+      {
+        "executionId": "2a55170f-43c3-455a-8078-36b9cfbb69b2",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791575633485
+      },
+      {
+        "executionId": "2a55170f-43c3-455a-8078-36b9cfbb69b2",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791576360319
+      }
+    ],
+    "3.7 Create unified API documentation": [
+      {
+        "executionId": "28f3f43b-cd9f-4c01-ace6-b23549996966",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791573942058
+      },
+      {
+        "executionId": "2a55170f-43c3-455a-8078-36b9cfbb69b2",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791575636838
+      },
+      {
+        "executionId": "2a55170f-43c3-455a-8078-36b9cfbb69b2",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791576360984
+      }
+    ],
+    "3.8 Verify bug condition exploration test now passes": [
+      {
+        "executionId": "28f3f43b-cd9f-4c01-ace6-b23549996966",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791573942104
+      },
+      {
+        "executionId": "2a55170f-43c3-455a-8078-36b9cfbb69b2",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791576367065
+      },
+      {
+        "executionId": "d1daf02e-4d6a-47a2-89ee-18e70d6c71da",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791576568944
+      }
+    ],
+    "3.9 Verify preservation tests still pass": [
+      {
+        "executionId": "28f3f43b-cd9f-4c01-ace6-b23549996966",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791573942144
+      },
+      {
+        "executionId": "d1daf02e-4d6a-47a2-89ee-18e70d6c71da",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791576570508
+      }
+    ],
+    "4.1 Test unified role management UI end-to-end": [
+      {
+        "executionId": "28f3f43b-cd9f-4c01-ace6-b23549996966",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791573942180
+      },
+      {
+        "executionId": "d1daf02e-4d6a-47a2-89ee-18e70d6c71da",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791576571601
+      }
+    ],
+    "4.2 Test permission enforcement after consolidation": [
+      {
+        "executionId": "28f3f43b-cd9f-4c01-ace6-b23549996966",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791573942269
+      },
+      {
+        "executionId": "d1daf02e-4d6a-47a2-89ee-18e70d6c71da",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791576572545
+      }
+    ],
+    "4.3 Verify all other modules still function correctly": [
+      {
+        "executionId": "28f3f43b-cd9f-4c01-ace6-b23549996966",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791573942385
+      },
+      {
+        "executionId": "d1daf02e-4d6a-47a2-89ee-18e70d6c71da",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791576573561
+      }
+    ],
+    "5. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "28f3f43b-cd9f-4c01-ace6-b23549996966",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791573942434
+      },
+      {
+        "executionId": "d1daf02e-4d6a-47a2-89ee-18e70d6c71da",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791576574891
+      }
+    ],
+    "3. Consolidate Role and Permission Management System": [
+      {
+        "executionId": "d1daf02e-4d6a-47a2-89ee-18e70d6c71da",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791576570550
+      }
+    ],
+    "4. Integration testing and validation": [
+      {
+        "executionId": "d1daf02e-4d6a-47a2-89ee-18e70d6c71da",
+        "chatSessionId": "sess_a6254865-a55a-4fc7-a19e-ce01de48acb3",
+        "timestamp": 1791576573606
+      }
+    ]
+  }
+}

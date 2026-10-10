@@ -451,7 +451,7 @@ const ShiftsOverview = ({ activeTab, onTabChange }) => {
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                  {days.map(d => <span key={d} style={{ padding: '2px 8px', borderRadius: 99, background: 'rgba(15,118,110,0.1)', color: C.primary, fontSize: '0.65rem', fontWeight: 700 }}>{d.slice(0, 3)}</span>)}
+                  {days.map(d => <span key={d} style={{ padding: '2px 8px', borderRadius: 99, background: 'rgba(15,118,110,0.1)', color: C.primary, fontSize: '0.65rem', fontWeight: 700 }}>{String(d).slice(0, 3)}</span>)}
                 </div>
               </div>
             );

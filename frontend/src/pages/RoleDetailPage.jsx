@@ -1,8 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Shield, Edit2, Users, FileText } from 'lucide-react';
 import { PermissionGuard } from '../components/PermissionGuard';
 import roleManagementAPI from '../api/roleManagement';
 import { groupPermissionsByResource, formatPermissionName } from '../utils/permissions';
+
+const C = {
+  card: '#EEF1F0',
+  cardBorder: 'rgba(0,80,60,0.09)',
+  shadow: '0 2px 12px rgba(0,60,45,0.07)',
+  primary: '#0F766E',
+  primaryHov: '#14B8A6',
+  textMain: '#1A2E2B',
+  textSub: '#1E4A42',
+  textMuted: '#2E6058',
+  border: 'rgba(0,80,60,0.12)',
+  headerBg: 'linear-gradient(135deg, #0c1e1c 0%, #1e3a37 100%)',
+};
 
 export default function RoleDetailPage() {
   const { roleUuid } = useParams();
@@ -12,7 +26,7 @@ export default function RoleDetailPage() {
   const [users, setUsers] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('permissions'); // permissions, users, audit
+  const [activeTab, setActiveTab] = useState('permissions');
 
   useEffect(() => {
     loadRoleData();
@@ -54,31 +68,18 @@ export default function RoleDetailPage() {
     }
   }, [activeTab]);
 
-  const handleRemoveUser = async (userUuid) => {
-    if (!confirm('Remove this user from the role?')) return;
-
-    try {
-      await roleManagementAPI.removeUserFromRole(roleUuid, userUuid);
-      loadRoleData();
-    } catch (err) {
-      alert(`Failed to remove user: ${err.message}`);
-    }
-  };
-
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading role details...</div>
+      <div style={{ fontFamily: 'Poppins, sans-serif', padding: '100px 0', textAlign: 'center', color: C.textMuted }}>
+        <div style={{ fontSize: '0.95rem' }}>Loading role details...</div>
       </div>
     );
   }
 
   if (!role) {
     return (
-      <div className="p-6">
-        <div className="text-center py-12">
-          <p className="text-gray-500">Role not found</p>
-        </div>
+      <div style={{ fontFamily: 'Poppins, sans-serif', padding: '60px 20px', textAlign: 'center' }}>
+        <p style={{ color: C.textMuted }}>Role not found</p>
       </div>
     );
   }
@@ -86,126 +87,246 @@ export default function RoleDetailPage() {
   const groupedPermissions = groupPermissionsByResource(permissions);
 
   return (
-    <div className="p-6">
+    <div style={{ fontFamily: 'Poppins, sans-serif', padding: '0 0 40px' }}>
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/admin/roles')}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              ← Back
-            </button>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold text-gray-900">{role.name}</h1>
-                {role.is_system_role && (
-                  <span className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-700 rounded">
-                    System Role
-                  </span>
-                )}
-                {!role.is_active && (
-                  <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded">
-                    Inactive
-                  </span>
-                )}
-              </div>
-              <p className="mt-1 text-sm text-gray-500">{role.code}</p>
+      <div style={{ 
+        background: C.headerBg, 
+        borderRadius: 14, 
+        padding: '22px 26px', 
+        marginBottom: 24, 
+        boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 16
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <Shield size={28} color="#E8F0EE" />
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <h1 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700, color: '#E8F0EE' }}>
+                {role.name}
+              </h1>
+              {role.is_system_role && (
+                <span style={{
+                  padding: '4px 10px',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  background: 'rgba(147,51,234,0.2)',
+                  color: '#E9D5FF',
+                  borderRadius: 6
+                }}>
+                  System Role
+                </span>
+              )}
+              {!role.is_active && (
+                <span style={{
+                  padding: '4px 10px',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  background: 'rgba(156,163,175,0.2)',
+                  color: '#D1D5DB',
+                  borderRadius: 6
+                }}>
+                  Inactive
+                </span>
+              )}
             </div>
+            <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: 'rgba(232,240,238,0.65)', fontFamily: 'monospace' }}>
+              {role.code}
+            </p>
           </div>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={() => navigate('/admin/roles')}
+            style={{
+              padding: '10px 18px',
+              background: 'rgba(255,255,255,0.1)',
+              color: '#fff',
+              border: '1px solid rgba(255,255,255,0.2)',
+              borderRadius: 8,
+              fontSize: '0.9rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'Poppins, sans-serif'
+            }}
+          >
+            ← Back
+          </button>
           <PermissionGuard permissions="Roles.Update">
-            {!role.is_system_role && (
-              <button
-                onClick={() => navigate(`/admin/roles/${roleUuid}/edit`)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Edit Role
-              </button>
-            )}
+            <button
+              onClick={() => navigate(`/admin/roles/${roleUuid}/edit`)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '10px 20px',
+                background: C.primary,
+                color: '#fff',
+                border: 'none',
+                borderRadius: 8,
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: 'Poppins, sans-serif'
+              }}
+            >
+              <Edit2 size={18} /> Edit Role
+            </button>
           </PermissionGuard>
         </div>
       </div>
 
-      {/* Role Info Card */}
-      <div className="bg-white border rounded-lg p-6 mb-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div>
-            <p className="text-sm text-gray-500">Hierarchy Level</p>
-            <p className="text-lg font-semibold text-gray-900">{role.hierarchy_level}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Permissions</p>
-            <p className="text-lg font-semibold text-gray-900">{permissions.length}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Assigned Users</p>
-            <p className="text-lg font-semibold text-gray-900">{users.length}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Status</p>
-            <p className="text-lg font-semibold text-gray-900">
-              {role.is_active ? 'Active' : 'Inactive'}
-            </p>
-          </div>
+      {/* Stats Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
+        <div style={{
+          background: C.card,
+          border: `1px solid ${C.cardBorder}`,
+          borderRadius: 12,
+          padding: '20px',
+          boxShadow: C.shadow
+        }}>
+          <p style={{ margin: '0 0 8px', fontSize: '0.85rem', color: C.textMuted, fontWeight: 600 }}>Hierarchy Level</p>
+          <p style={{ margin: 0, fontSize: '1.6rem', fontWeight: 700, color: C.textMain }}>{role.hierarchy_level}</p>
         </div>
-        {role.description && (
-          <div className="mt-4 pt-4 border-t">
-            <p className="text-sm text-gray-500 mb-1">Description</p>
-            <p className="text-gray-700">{role.description}</p>
-          </div>
-        )}
+        <div style={{
+          background: C.card,
+          border: `1px solid ${C.cardBorder}`,
+          borderRadius: 12,
+          padding: '20px',
+          boxShadow: C.shadow
+        }}>
+          <p style={{ margin: '0 0 8px', fontSize: '0.85rem', color: C.textMuted, fontWeight: 600 }}>Permissions</p>
+          <p style={{ margin: 0, fontSize: '1.6rem', fontWeight: 700, color: C.textMain }}>{permissions.length}</p>
+        </div>
+        <div style={{
+          background: C.card,
+          border: `1px solid ${C.cardBorder}`,
+          borderRadius: 12,
+          padding: '20px',
+          boxShadow: C.shadow
+        }}>
+          <p style={{ margin: '0 0 8px', fontSize: '0.85rem', color: C.textMuted, fontWeight: 600 }}>Assigned Users</p>
+          <p style={{ margin: 0, fontSize: '1.6rem', fontWeight: 700, color: C.textMain }}>{users.length}</p>
+        </div>
+        <div style={{
+          background: C.card,
+          border: `1px solid ${C.cardBorder}`,
+          borderRadius: 12,
+          padding: '20px',
+          boxShadow: C.shadow
+        }}>
+          <p style={{ margin: '0 0 8px', fontSize: '0.85rem', color: C.textMuted, fontWeight: 600 }}>Status</p>
+          <p style={{ margin: 0, fontSize: '1.6rem', fontWeight: 700, color: role.is_active ? '#059669' : '#6B7280' }}>
+            {role.is_active ? 'Active' : 'Inactive'}
+          </p>
+        </div>
       </div>
 
+      {role.description && (
+        <div style={{
+          background: C.card,
+          border: `1px solid ${C.cardBorder}`,
+          borderRadius: 12,
+          padding: '20px',
+          marginBottom: 24,
+          boxShadow: C.shadow
+        }}>
+          <p style={{ margin: '0 0 10px', fontSize: '0.85rem', fontWeight: 600, color: C.textMuted }}>Description</p>
+          <p style={{ margin: 0, fontSize: '0.95rem', color: C.textSub, lineHeight: 1.6 }}>{role.description}</p>
+        </div>
+      )}
+
       {/* Tabs */}
-      <div className="mb-4 border-b border-gray-200">
-        <nav className="flex space-x-4">
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 6, background: C.card, borderRadius: 10, padding: 8, border: `1px solid ${C.cardBorder}` }}>
           {[
-            { key: 'permissions', label: `Permissions (${permissions.length})` },
-            { key: 'users', label: `Users (${users.length})` },
-            { key: 'audit', label: 'Audit Log' }
-          ].map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`py-2 px-4 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === tab.key
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
+            { key: 'permissions', label: `Permissions (${permissions.length})`, icon: Shield },
+            { key: 'users', label: `Users (${users.length})`, icon: Users },
+            { key: 'audit', label: 'Audit Log', icon: FileText }
+          ].map(tab => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  padding: '12px 16px',
+                  border: 'none',
+                  borderRadius: 8,
+                  background: activeTab === tab.key ? C.primary : 'transparent',
+                  color: activeTab === tab.key ? '#fff' : C.textSub,
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'Poppins, sans-serif',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <Icon size={18} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Tab Content */}
-      <div className="bg-white border rounded-lg p-6">
+      <div style={{ background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: '24px', boxShadow: C.shadow }}>
         {activeTab === 'permissions' && (
           <div>
-            <h3 className="font-semibold text-gray-900 mb-4">Role Permissions</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: C.textMain }}>Role Permissions</h3>
+              <PermissionGuard permissions="Roles.AssignPermissions">
+                <button
+                  onClick={() => navigate(`/admin/roles/${roleUuid}/edit`)}
+                  style={{
+                    padding: '8px 16px',
+                    background: C.primary,
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 7,
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    fontFamily: 'Poppins, sans-serif'
+                  }}
+                >
+                  Edit Permissions
+                </button>
+              </PermissionGuard>
+            </div>
             {permissions.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No permissions assigned</p>
+              <p style={{ color: C.textMuted, textAlign: 'center', padding: '40px 0' }}>No permissions assigned</p>
             ) : (
-              <div className="space-y-6">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                 {Object.entries(groupedPermissions).map(([resource, perms]) => (
-                  <div key={resource} className="border-b pb-4 last:border-b-0">
-                    <h4 className="font-medium text-gray-900 mb-3">{resource}</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  <div key={resource}>
+                    <h4 style={{ margin: '0 0 12px', fontSize: '1rem', fontWeight: 700, color: C.textMain, paddingBottom: 8, borderBottom: `2px solid ${C.border}` }}>
+                      {resource} <span style={{ fontSize: '0.85rem', fontWeight: 400, color: C.textMuted }}>({perms.length})</span>
+                    </h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
                       {perms.map(perm => (
                         <div
                           key={perm.uuid}
-                          className="flex items-center gap-2 p-2 bg-gray-50 rounded"
+                          style={{
+                            padding: '10px 14px',
+                            background: '#fff',
+                            border: `1px solid ${C.border}`,
+                            borderRadius: 8,
+                            fontSize: '0.85rem',
+                            color: C.textSub,
+                            fontWeight: 500
+                          }}
                         >
-                          <span className="text-sm text-gray-700">
-                            {formatPermissionName(perm.action)}
-                          </span>
-                          {perm.data_scope && (
-                            <span className="text-xs text-gray-500 bg-white px-1.5 py-0.5 rounded">
-                              {perm.data_scope}
-                            </span>
-                          )}
+                          {formatPermissionName(perm.action)}
                         </div>
                       ))}
                     </div>
@@ -218,73 +339,45 @@ export default function RoleDetailPage() {
 
         {activeTab === 'users' && (
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900">Assigned Users</h3>
-              <PermissionGuard permissions="Users.AssignRole">
-                <button
-                  onClick={() => navigate(`/admin/roles/${roleUuid}/assign-users`)}
-                  className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  + Assign Users
-                </button>
-              </PermissionGuard>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: C.textMain }}>Assigned Users</h3>
             </div>
             {users.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No users assigned to this role</p>
+              <p style={{ color: C.textMuted, textAlign: 'center', padding: '40px 0' }}>No users assigned to this role</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Name
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Email
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Employee ID
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Status
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                        Actions
-                      </th>
+              <div style={{ overflow: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(0,0,0,0.02)', borderBottom: `2px solid ${C.border}` }}>
+                      <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: C.textMuted }}>NAME</th>
+                      <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: C.textMuted }}>EMAIL</th>
+                      <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: C.textMuted }}>EMPLOYEE ID</th>
+                      <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: C.textMuted }}>STATUS</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody>
                     {users.map(user => (
-                      <tr key={user.uuid}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <tr key={user.uuid} style={{ borderBottom: `1px solid ${C.border}` }}>
+                        <td style={{ padding: '14px 12px', fontSize: '0.9rem', fontWeight: 600, color: C.textMain }}>
                           {user.full_name || user.username}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td style={{ padding: '14px 12px', fontSize: '0.85rem', color: C.textSub }}>
                           {user.email}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td style={{ padding: '14px 12px', fontSize: '0.85rem', color: C.textSub }}>
                           {user.employee_id || '-'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs font-medium rounded ${
-                            user.is_active
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-gray-100 text-gray-600'
-                          }`}>
+                        <td style={{ padding: '14px 12px' }}>
+                          <span style={{
+                            padding: '4px 10px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            background: user.is_active ? 'rgba(5,150,105,0.12)' : 'rgba(107,114,128,0.12)',
+                            color: user.is_active ? '#059669' : '#6B7280',
+                            borderRadius: 6
+                          }}>
                             {user.is_active ? 'Active' : 'Inactive'}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                          <PermissionGuard permissions="Users.AssignRole">
-                            {!role.is_system_role && (
-                              <button
-                                onClick={() => handleRemoveUser(user.uuid)}
-                                className="text-red-600 hover:text-red-800"
-                              >
-                                Remove
-                              </button>
-                            )}
-                          </PermissionGuard>
                         </td>
                       </tr>
                     ))}
@@ -297,37 +390,47 @@ export default function RoleDetailPage() {
 
         {activeTab === 'audit' && (
           <div>
-            <h3 className="font-semibold text-gray-900 mb-4">Audit Log</h3>
+            <h3 style={{ margin: '0 0 20px', fontSize: '1.1rem', fontWeight: 700, color: C.textMain }}>Audit Log</h3>
             {auditLogs.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No audit logs available</p>
+              <p style={{ color: C.textMuted, textAlign: 'center', padding: '40px 0' }}>No audit logs available</p>
             ) : (
-              <div className="space-y-3">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {auditLogs.map(log => (
                   <div
                     key={log.id}
-                    className="p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                    style={{
+                      padding: '16px',
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 10,
+                      background: '#fff'
+                    }}
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-gray-900">{log.action}</span>
-                          <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">
-                            {log.resource_type}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-600 mb-2">{log.description}</p>
-                        <div className="flex items-center gap-4 text-xs text-gray-500">
-                          <span>By: {log.performed_by_name || log.performed_by}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                      <span style={{ fontSize: '0.9rem', fontWeight: 700, color: C.textMain }}>{log.action}</span>
+                      <span style={{
+                        padding: '2px 8px',
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        background: 'rgba(0,0,0,0.05)',
+                        color: C.textMuted,
+                        borderRadius: 4
+                      }}>
+                        {log.resource_type}
+                      </span>
+                    </div>
+                    {log.description && (
+                      <p style={{ margin: '0 0 10px', fontSize: '0.85rem', color: C.textSub }}>{log.description}</p>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.75rem', color: C.textMuted }}>
+                      <span>By: {log.performed_by_name || log.performed_by}</span>
+                      <span>•</span>
+                      <span>{new Date(log.created_at).toLocaleString()}</span>
+                      {log.ip_address && (
+                        <>
                           <span>•</span>
-                          <span>{new Date(log.created_at).toLocaleString()}</span>
-                          {log.ip_address && (
-                            <>
-                              <span>•</span>
-                              <span>IP: {log.ip_address}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
+                          <span>IP: {log.ip_address}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}

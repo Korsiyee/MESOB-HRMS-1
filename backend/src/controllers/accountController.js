@@ -201,12 +201,13 @@ exports.listAccounts = async (req, res) => {
     const pool = db.promise();
 
     let query = `
-      SELECT u.uuid, u.employee_uuid, u.username, u.role, u.is_active, u.must_change_password,
+      SELECT u.uuid, u.employee_uuid, u.username, u.role_uuid, r.code as role, u.is_active, u.must_change_password,
              u.last_login, u.created_at, u.updated_at,
              e.first_name, e.middle_name, e.last_name, e.mesob_id,
              CONCAT_WS(' ', e.first_name, e.middle_name, e.last_name) as employee_name,
              d.name as department_name, p.title as position_title
       FROM Users u
+      LEFT JOIN Roles r ON r.uuid = u.role_uuid
       LEFT JOIN Employees e ON e.uuid = u.employee_uuid
       LEFT JOIN Positions p ON p.uuid = e.position_uuid
       LEFT JOIN Departments d ON d.uuid = p.department_uuid
@@ -269,13 +270,14 @@ exports.getAccount = async (req, res) => {
     const pool = db.promise();
 
     const [accounts] = await pool.execute(
-      `SELECT u.uuid, u.employee_uuid, u.username, u.role, u.is_active, u.must_change_password,
+      `SELECT u.uuid, u.employee_uuid, u.username, u.role_uuid, r.code as role, u.is_active, u.must_change_password,
               u.last_login, u.created_at, u.updated_at,
               e.first_name, e.middle_name, e.last_name, e.mesob_id, e.hire_date,
               e.status as employee_status, e.profile_photo_key,
               d.uuid as department_uuid, d.name as department_name,
               p.uuid as position_uuid, p.title as position_title
        FROM Users u
+       LEFT JOIN Roles r ON r.uuid = u.role_uuid
        LEFT JOIN Employees e ON e.uuid = u.employee_uuid
        LEFT JOIN Positions p ON p.uuid = e.position_uuid
        LEFT JOIN Departments d ON d.uuid = p.department_uuid
@@ -454,17 +456,22 @@ exports.changeAccountRole = async (req, res) => {
 exports.changeAccountStatus = async (req, res) => {
   try {
     const { uuid } = req.params;
-    const { is_active } = req.body;
+    const { is_active, status } = req.body;
 
-    if (is_active === undefined) {
+    // Handle both formats: is_active (boolean) or status ('ACTIVE'/'INACTIVE')
+    let active;
+    if (is_active !== undefined) {
+      active = Boolean(is_active);
+    } else if (status !== undefined) {
+      active = status === 'ACTIVE' || status === 'active' || status === true || status === 1;
+    } else {
       return sendError(res, {
         status: 400,
-        message: "is_active is required.",
+        message: "is_active or status is required.",
         error: "VALIDATION_ERROR",
       });
     }
 
-    const active = Boolean(is_active);
     const pool = db.promise();
 
     // Check if account exists
@@ -501,9 +508,10 @@ exports.changeAccountStatus = async (req, res) => {
 
     // Fetch updated account
     const [updated] = await pool.execute(
-      `SELECT u.uuid, u.employee_uuid, u.username, u.role_id, u.is_active, u.must_change_password,
+      `SELECT u.uuid, u.employee_uuid, u.username, u.role_uuid, r.code as role, u.is_active, u.must_change_password,
               u.updated_at, e.first_name, e.last_name
        FROM Users u
+       LEFT JOIN Roles r ON r.uuid = u.role_uuid
        LEFT JOIN Employees e ON e.uuid = u.employee_uuid
        WHERE u.uuid = ?`,
       [uuid]
@@ -590,9 +598,10 @@ exports.resetAccountPassword = async (req, res) => {
 
     // Fetch updated account
     const [updated] = await pool.execute(
-      `SELECT u.uuid, u.employee_uuid, u.username, u.role, u.is_active, u.must_change_password,
+      `SELECT u.uuid, u.employee_uuid, u.username, u.role_uuid, r.code as role, u.is_active, u.must_change_password,
               u.updated_at, e.first_name, e.last_name
        FROM Users u
+       LEFT JOIN Roles r ON r.uuid = u.role_uuid
        LEFT JOIN Employees e ON e.uuid = u.employee_uuid
        WHERE u.uuid = ?`,
       [uuid]

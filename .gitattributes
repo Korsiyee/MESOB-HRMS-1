@@ -1,3 +1,0 @@
-# Keep our local database schema during merges
-database/schema.sql merge=ours
-database/seed.sql merge=ours

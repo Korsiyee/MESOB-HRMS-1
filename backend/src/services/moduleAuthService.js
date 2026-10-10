@@ -31,7 +31,7 @@ async function getUserPermissions(userUuid) {
         u.uuid as user_uuid,
         u.username,
         u.employee_uuid,
-        p.department_uuid,
+        e.department_uuid,
         r.uuid as role_uuid,
         r.code as role_code,
         r.name as role_name,

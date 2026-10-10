@@ -146,13 +146,16 @@ exports.listLogs = async (req, res) => {
 
     const [logs] = await pool.execute(query, params);
 
-    // Parse diff_json for each log
+    // Parse old_values_json for each log and add frontend-compatible field names
     const logsWithParsedDiff = logs.map((log) => ({
       ...log,
-      diff: log.diff_json 
-        ? (typeof log.diff_json === 'string' ? JSON.parse(log.diff_json) : log.diff_json)
+      action: log.action_type, // Frontend expects 'action'
+      entity_type: log.resource_type, // Frontend expects 'entity_type'
+      entity_uuid: log.resource_uuid, // Frontend expects 'entity_uuid'
+      diff: log.old_values_json 
+        ? (typeof log.old_values_json === 'string' ? JSON.parse(log.old_values_json) : log.old_values_json)
         : null,
-      diff_json: undefined, // Remove raw JSON from response
+      old_values_json: undefined, // Remove raw JSON from response
     }));
 
     return sendSuccess(res, {
@@ -199,7 +202,8 @@ exports.getLog = async (req, res) => {
         al.created_at,
         u.uuid as actor_user_uuid,
         u.username as actor_username,
-        u.role as actor_role,
+        u.role_uuid as actor_role_uuid,
+        r.code as actor_role,
         e.uuid as actor_employee_uuid,
         e.first_name as actor_first_name,
         e.middle_name as actor_middle_name,
@@ -227,6 +231,7 @@ exports.getLog = async (req, res) => {
         END as entity_name
       FROM AuditLogs al
       LEFT JOIN Users u ON u.uuid = al.actor_user_uuid
+      LEFT JOIN Roles r ON r.uuid = u.role_uuid
       LEFT JOIN Employees e ON e.uuid = u.employee_uuid
       WHERE al.uuid = ?`,
       [uuid]
@@ -242,13 +247,16 @@ exports.getLog = async (req, res) => {
 
     const log = logs[0];
 
-    // Parse diff_json
+    // Parse old_values_json and add frontend-compatible field names
     const logWithParsedDiff = {
       ...log,
-      diff: log.diff_json 
-        ? (typeof log.diff_json === 'string' ? JSON.parse(log.diff_json) : log.diff_json)
+      action: log.action_type, // Frontend expects 'action'
+      entity_type: log.resource_type, // Frontend expects 'entity_type'
+      entity_uuid: log.resource_uuid, // Frontend expects 'entity_uuid'
+      diff: log.old_values_json 
+        ? (typeof log.old_values_json === 'string' ? JSON.parse(log.old_values_json) : log.old_values_json)
         : null,
-      diff_json: undefined, // Remove raw JSON from response
+      old_values_json: undefined, // Remove raw JSON from response
     };
 
     return sendSuccess(res, {
@@ -456,15 +464,15 @@ exports.exportLogs = async (req, res) => {
 
     // Rows
     for (const log of logs) {
-      const diff = log.diff_json 
-        ? JSON.stringify(typeof log.diff_json === 'string' ? JSON.parse(log.diff_json) : log.diff_json)
+      const diff = log.old_values_json 
+        ? JSON.stringify(typeof log.old_values_json === 'string' ? JSON.parse(log.old_values_json) : log.old_values_json)
         : "";
       csvRows.push([
         log.created_at,
         log.action_type || "",
         log.resource_type || "",
         log.entity_name || "",
-        log.entity_uuid || "",
+        log.resource_uuid || "",
         log.actor_username || "",
         log.actor_name || "",
         log.actor_mesob_id || "",

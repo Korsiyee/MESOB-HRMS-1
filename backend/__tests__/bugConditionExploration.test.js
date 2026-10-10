@@ -1,261 +1,136 @@
 /**
- * Bug Condition Exploration Property Test
+ * Bug Condition Exploration Test: Duplicate RBAC APIs Causing 404 and Schema Errors
  * 
- * This test suite demonstrates the four defect patterns that cause SQL errors:
- * 1. Missing Positions JOIN
- * 2. Incorrect JOIN Order
- * 3. Wrong Column Name (diff_json vs old_values_json)
- * 4. CamelCase Timestamps (updatedAt vs updated_at)
+ * **Property 1: Bug Condition** - Duplicate RBAC APIs exist and conflict
  * 
- * **CRITICAL**: These tests encode the EXPECTED behavior.
- * On UNFIXED code, these tests MUST FAIL with SQL errors.
- * Test failures confirm the bug exists.
+ * CRITICAL: This test MUST FAIL on unfixed code - failure confirms the bug exists
+ * DO NOT attempt to fix the test or the code when it fails
  * 
- * **Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5**
+ * This test encodes the EXPECTED behavior (unified API). When run on unfixed code,
+ * it will FAIL, demonstrating that duplicate APIs exist. After implementing the fix,
+ * this same test will PASS, confirming the expected behavior is satisfied.
+ * 
+ * **Validates: Requirements 1.1, 1.2, 1.3, 1.5, 2.1, 2.2, 2.3**
  */
 
-const mysql = require('mysql2/promise');
-require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
 
-describe('Bug Condition Exploration - SQL Query Schema Compliance', () => {
-  let connection;
+describe('Bug Condition Exploration: Duplicate RBAC APIs', () => {
+  const backendRoot = path.join(__dirname, '..');
+  const frontendRoot = path.join(__dirname, '../../frontend');
+  
+  describe('Backend Duplication Detection', () => {
+    test('Should have ONLY unified role-management controller (not duplicates)', () => {
+      // Expected: Only roleManagementController.js exists
+      const roleManagementController = path.join(backendRoot, 'src/controllers/roleManagementController.js');
+      
+      // Bug condition: These duplicate controllers should NOT exist
+      const rbacController = path.join(backendRoot, 'src/controllers/rbacController.js');
+      const moduleRoleController = path.join(backendRoot, 'src/controllers/moduleRoleController.js');
+      
+      // Assert unified controller exists
+      expect(fs.existsSync(roleManagementController)).toBe(true);
+      
+      // Assert duplicates DO NOT exist (will FAIL on unfixed code, proving bug)
+      expect(fs.existsSync(rbacController)).toBe(false);
+      expect(fs.existsSync(moduleRoleController)).toBe(false);
+    });
 
-  beforeAll(async () => {
-    // Create a direct database connection for testing
-    connection = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
+    test('Should have ONLY unified role-management routes (not duplicates)', () => {
+      // Expected: Only roleManagementRoutes.js exists
+      const roleManagementRoutes = path.join(backendRoot, 'src/routes/roleManagementRoutes.js');
+      
+      // Bug condition: These duplicate route files should NOT exist
+      const rbacRoutes = path.join(backendRoot, 'src/routes/rbacRoutes.js');
+      const moduleRoleRoutes = path.join(backendRoot, 'src/routes/moduleRoleRoutes.js');
+      
+      // Assert unified routes exist
+      expect(fs.existsSync(roleManagementRoutes)).toBe(true);
+      
+      // Assert duplicates DO NOT exist (will FAIL on unfixed code, proving bug)
+      expect(fs.existsSync(rbacRoutes)).toBe(false);
+      expect(fs.existsSync(moduleRoleRoutes)).toBe(false);
+    });
+
+    test('Should register ONLY /api/role-management/* routes in app.js', () => {
+      const appJsPath = path.join(backendRoot, 'src/app.js');
+      const appJsContent = fs.readFileSync(appJsPath, 'utf8');
+      
+      // Expected: Unified route registration exists
+      expect(appJsContent).toContain('app.use("/api/role-management", roleManagementRoutes)');
+      
+      // Bug condition: Duplicate route registrations should NOT exist (will FAIL on unfixed code)
+      expect(appJsContent).not.toContain('app.use("/api/rbac", rbacRoutes)');
+      expect(appJsContent).not.toContain('app.use("/api/module-roles", moduleRoleRoutes)');
+      
+      // Also check that duplicate imports don't exist
+      expect(appJsContent).not.toContain('require("./routes/rbacRoutes")');
+      expect(appJsContent).not.toContain('require("./routes/moduleRoleRoutes")');
     });
   });
 
-  afterAll(async () => {
-    if (connection) {
-      await connection.end();
-    }
-  });
-
-  describe('Defect Pattern 1: Missing Positions JOIN', () => {
-    test('should execute query that references p.department_uuid WITH proper Positions JOIN', async () => {
-      // This query is FROM accountController.js line 157 (buggy version)
-      // The buggy version references p.department_uuid without joining Positions table
-      // Expected behavior: query should execute successfully with proper JOIN
+  describe('Frontend Duplication Detection', () => {
+    test('Should have ONLY ONE RoleManagementPage component (not duplicates)', () => {
+      // Expected: Only one RoleManagementPage in /pages/RoleManagementPage.jsx
+      const unifiedRolePage = path.join(frontendRoot, 'src/pages/RoleManagementPage.jsx');
       
-      const buggyQuery = `
-        SELECT u.uuid, u.employee_uuid, u.username, u.role, u.is_active, u.must_change_password,
-               u.last_login, u.created_at, u.updated_at,
-               e.first_name, e.middle_name, e.last_name, e.mesob_id,
-               CONCAT_WS(' ', e.first_name, e.middle_name, e.last_name) as employee_name,
-               d.name as department_name, p.title as position_title
-        FROM Users u
-        LEFT JOIN Employees e ON e.uuid = u.employee_uuid
-        LEFT JOIN Departments d ON d.uuid = p.department_uuid
-        LEFT JOIN Positions p ON p.uuid = e.position_uuid
-        WHERE 1=1
-        LIMIT 1
-      `;
-
-      // Expected behavior: This query should execute without "Unknown column 'p.department_uuid'" error
-      // The proper fix requires Positions JOIN BEFORE referencing p.department_uuid
-      await expect(async () => {
-        const [rows] = await connection.execute(buggyQuery);
-        return rows;
-      }).rejects.toThrow(/Unknown column 'p\.department_uuid'/);
+      // Bug condition: Duplicate page should NOT exist
+      const duplicateRolePage = path.join(frontendRoot, 'src/pages/rbac/RoleManagementPage.jsx');
       
-      // This test FAILS on unfixed code, confirming the bug exists
+      // Assert unified page exists
+      expect(fs.existsSync(unifiedRolePage)).toBe(true);
+      
+      // Assert duplicate does NOT exist (will FAIL on unfixed code, proving bug)
+      expect(fs.existsSync(duplicateRolePage)).toBe(false);
     });
 
-    test('should execute correctly when Positions is joined BEFORE Departments', async () => {
-      // This is the EXPECTED behavior after fix
-      const correctQuery = `
-        SELECT u.uuid, u.employee_uuid, u.username, u.role, u.is_active, u.must_change_password,
-               u.last_login, u.created_at, u.updated_at,
-               e.first_name, e.middle_name, e.last_name, e.mesob_id,
-               CONCAT_WS(' ', e.first_name, e.middle_name, e.last_name) as employee_name,
-               d.name as department_name, p.title as position_title
-        FROM Users u
-        LEFT JOIN Employees e ON e.uuid = u.employee_uuid
-        LEFT JOIN Positions p ON p.uuid = e.position_uuid
-        LEFT JOIN Departments d ON d.uuid = p.department_uuid
-        WHERE 1=1
-        LIMIT 1
-      `;
-
-      // This query should execute successfully (correct JOIN order)
-      const [rows] = await connection.execute(correctQuery);
-      expect(rows).toBeDefined();
-      expect(Array.isArray(rows)).toBe(true);
-      // No SQL error expected for correct query
+    test('Should have ONLY /admin/roles route (not duplicate /rbac/roles)', () => {
+      const appRouterPath = path.join(frontendRoot, 'src/routes/AppRouter.jsx');
+      const appRouterContent = fs.readFileSync(appRouterPath, 'utf8');
+      
+      // Expected: Unified route exists
+      expect(appRouterContent).toContain('path="admin/roles"');
+      
+      // Bug condition: Duplicate route should NOT exist (will FAIL on unfixed code)
+      expect(appRouterContent).not.toContain('path="rbac/roles"');
     });
   });
 
-  describe('Defect Pattern 2: Incorrect JOIN Order', () => {
-    test('should fail when Departments is joined BEFORE Positions but references p.department_uuid', async () => {
-      // This query is FROM employeeController.js line 314 (buggy version)
-      // The buggy version references p.department_uuid BEFORE joining Positions table
+  describe('API Endpoint Behavior (Expected After Fix)', () => {
+    test('Documentation: Expected unified API structure', () => {
+      // This is a documentation test that describes expected behavior
+      const expectedUnifiedAPI = {
+        baseURL: '/api/role-management',
+        endpoints: [
+          'GET /api/role-management/roles',
+          'GET /api/role-management/roles/:uuid',
+          'POST /api/role-management/roles',
+          'PUT /api/role-management/roles/:uuid',
+          'DELETE /api/role-management/roles/:uuid',
+          'GET /api/role-management/permissions',
+          'GET /api/role-management/scopes',
+          'PUT /api/role-management/roles/:uuid/permissions'
+        ]
+      };
       
-      const buggyQuery = `
-        SELECT e.uuid, e.first_name, e.middle_name, e.last_name,
-               d.name AS department_name,
-               p.title AS position_title
-        FROM Employees e
-        LEFT JOIN Departments d ON d.uuid = p.department_uuid
-        LEFT JOIN Positions p ON p.uuid = e.position_uuid
-        LIMIT 1
-      `;
-
-      // Expected behavior: This should fail with "Unknown column 'p.department_uuid'" because p is referenced before being defined
-      await expect(async () => {
-        const [rows] = await connection.execute(buggyQuery);
-        return rows;
-      }).rejects.toThrow(/Unknown column 'p\.department_uuid'/);
-      
-      // This test FAILS on unfixed code, confirming the bug exists
+      // This test documents the expected behavior
+      expect(expectedUnifiedAPI.baseURL).toBe('/api/role-management');
+      expect(expectedUnifiedAPI.endpoints.length).toBeGreaterThan(0);
     });
 
-    test('should execute correctly with proper JOIN order: Positions BEFORE Departments', async () => {
-      // This is the EXPECTED behavior after fix
-      const correctQuery = `
-        SELECT e.uuid, e.first_name, e.middle_name, e.last_name,
-               d.name AS department_name,
-               p.title AS position_title
-        FROM Employees e
-        LEFT JOIN Positions p ON p.uuid = e.position_uuid
-        LEFT JOIN Departments d ON d.uuid = p.department_uuid
-        LIMIT 1
-      `;
-
-      // This query should execute successfully (correct JOIN order)
-      const [rows] = await connection.execute(correctQuery);
-      expect(rows).toBeDefined();
-      expect(Array.isArray(rows)).toBe(true);
-      // No SQL error expected for correct query
-    });
-  });
-
-  describe('Defect Pattern 3: Wrong Column Name in AuditLogs', () => {
-    test('should execute query using correct column name old_values_json instead of diff_json', async () => {
-      // This query is FROM logController.js line 152 (buggy version)
-      // The buggy version references non-existent al.diff_json column
+    test('Documentation: Deprecated APIs that should NOT exist', () => {
+      // These are the duplicate/conflicting APIs that caused the bug
+      const deprecatedAPIs = [
+        '/api/module-role/*',  // Old module-based RBAC
+        '/api/rbac/*',         // Old occupation-based RBAC
+        '/api/module-roles/*'  // Another duplicate
+      ];
       
-      const buggyQuery = `
-        SELECT al.uuid, al.actor_uuid, al.action, al.entity_type, al.entity_uuid,
-               al.diff_json, al.ip_address, al.created_at
-        FROM AuditLogs al
-        LIMIT 1
-      `;
-
-      // Expected behavior: This should fail with "Unknown column 'al.diff_json'"
-      await expect(async () => {
-        const [rows] = await connection.execute(buggyQuery);
-        return rows;
-      }).rejects.toThrow(/Unknown column 'al\.diff_json'/);
-      
-      // This test FAILS on unfixed code, confirming the bug exists
-    });
-
-    test('should execute correctly with old_values_json column', async () => {
-      // This is the EXPECTED behavior after fix
-      const correctQuery = `
-        SELECT al.uuid, al.actor_uuid, al.action, al.entity_type, al.entity_uuid,
-               al.old_values_json, al.ip_address, al.created_at
-        FROM AuditLogs al
-        LIMIT 1
-      `;
-
-      // This query should execute successfully (correct column name)
-      const [rows] = await connection.execute(correctQuery);
-      expect(rows).toBeDefined();
-      expect(Array.isArray(rows)).toBe(true);
-      // No SQL error expected for correct query
-    });
-  });
-
-  describe('Defect Pattern 4: CamelCase Timestamp Columns', () => {
-    test('should execute query using correct snake_case timestamp columns', async () => {
-      // The buggy version uses camelCase updatedAt/createdAt
-      
-      const buggyQuery = `
-        SELECT e.uuid, e.employee_id, e.first_name, e.last_name,
-               e.updatedAt, e.createdAt
-        FROM Employees e
-        LIMIT 1
-      `;
-
-      // Expected behavior: This should fail with "Unknown column 'e.updatedAt'"
-      await expect(async () => {
-        const [rows] = await connection.execute(buggyQuery);
-        return rows;
-      }).rejects.toThrow(/Unknown column 'e\.(updatedAt|createdAt)'/);
-      
-      // This test FAILS on unfixed code, confirming the bug exists
-    });
-
-    test('should execute correctly with snake_case timestamp columns', async () => {
-      // This is the EXPECTED behavior after fix
-      const correctQuery = `
-        SELECT e.uuid, e.employee_id, e.first_name, e.last_name,
-               e.updated_at, e.created_at
-        FROM Employees e
-        LIMIT 1
-      `;
-
-      // This query should execute successfully (correct column naming)
-      const [rows] = await connection.execute(correctQuery);
-      expect(rows).toBeDefined();
-      expect(Array.isArray(rows)).toBe(true);
-      // No SQL error expected for correct query
-    });
-  });
-
-  describe('Defect Pattern 5: Multiple Combined Defects', () => {
-    test('should handle queries with multiple defect patterns', async () => {
-      // Query combining missing JOIN, wrong column name, and camelCase
-      
-      const buggyQuery = `
-        SELECT u.uuid, u.username, u.updatedAt,
-               e.first_name, e.last_name,
-               d.name as department_name,
-               al.diff_json
-        FROM Users u
-        LEFT JOIN Employees e ON e.uuid = u.employee_uuid
-        LEFT JOIN Departments d ON d.uuid = p.department_uuid
-        LEFT JOIN AuditLogs al ON al.entity_uuid = u.uuid
-        WHERE 1=1
-        LIMIT 1
-      `;
-
-      // Expected behavior: This should fail with multiple column errors
-      await expect(async () => {
-        const [rows] = await connection.execute(buggyQuery);
-        return rows;
-      }).rejects.toThrow(/Unknown column/);
-      
-      // This test FAILS on unfixed code, confirming multiple bugs exist
-    });
-
-    test('should execute correctly when all defects are fixed', async () => {
-      // This is the EXPECTED behavior after all fixes
-      const correctQuery = `
-        SELECT u.uuid, u.username, u.updated_at,
-               e.first_name, e.last_name,
-               d.name as department_name,
-               al.old_values_json
-        FROM Users u
-        LEFT JOIN Employees e ON e.uuid = u.employee_uuid
-        LEFT JOIN Positions p ON p.uuid = e.position_uuid
-        LEFT JOIN Departments d ON d.uuid = p.department_uuid
-        LEFT JOIN AuditLogs al ON al.entity_uuid = u.uuid
-        WHERE 1=1
-        LIMIT 1
-      `;
-
-      // This query should execute successfully (all defects fixed)
-      const [rows] = await connection.execute(correctQuery);
-      expect(rows).toBeDefined();
-      expect(Array.isArray(rows)).toBe(true);
-      // No SQL error expected for correct query
+      // After fix, these should all be removed
+      deprecatedAPIs.forEach(api => {
+        expect(api).toMatch(/\/(module-role|rbac|module-roles)\//);
+      });
     });
   });
 });

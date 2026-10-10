@@ -61,7 +61,7 @@ exports.listLetterTemplates = async (req, res) => {
     const [rows] = await pool.execute(`
       SELECT
         uuid,
-        title AS name,
+        template_name AS name,
         type,
         body_template AS content,
         text_content,
@@ -181,7 +181,7 @@ exports.createLetterTemplate = async (req, res) => {
     );
     
     const [rows] = await pool.execute(
-      `SELECT uuid, title AS name, type, body_template AS content, text_content,
+      `SELECT uuid, template_name AS name, type, body_template AS content, text_content,
               pdf_template_key, original_filename, file_size, mime_type,
               created_at, updated_at
        FROM LetterTemplates WHERE uuid = ?`,
@@ -246,7 +246,7 @@ exports.updateLetterTemplate = async (req, res) => {
     }
 
     const [rows] = await pool.execute(
-      `SELECT uuid, title AS name, type, body_template AS content, created_at, updated_at
+      `SELECT uuid, template_name AS name, type, body_template AS content, created_at, updated_at
        FROM LetterTemplates WHERE uuid = ?`,
       [uuid]
     );
@@ -433,7 +433,7 @@ exports.listIssuedLetters = async (req, res) => {
     
     const [rows] = await pool.execute(
       `SELECT il.uuid, il.name, il.type, il.generated_content, il.issued_at,
-              lt.title AS template_name, lt.type AS template_type
+              lt.template_name, lt.type AS template_type
        FROM IssuedLetters il
        LEFT JOIN LetterTemplates lt ON lt.uuid = il.template_uuid
        WHERE il.employee_uuid = ?
@@ -745,9 +745,9 @@ exports.getMyLetterRequests = async (req, res) => {
     const pool = db.promise();
     const [rows] = await pool.execute(
       `SELECT lr.uuid, lr.template_uuid, lr.employee_uuid,
-              lr.generated_content, lr.status, lr.requested_at,
+              lr.body_content, lr.status, lr.requested_at,
               lr.reviewed_at, lr.rejection_reason,
-              lt.title AS template_name, lt.type AS template_type,
+              lt.template_name, lt.type AS template_type,
               CONCAT(u.username) AS reviewed_by_name
        FROM LetterRequests lr
        LEFT JOIN LetterTemplates lt ON lt.uuid = lr.template_uuid
@@ -776,8 +776,8 @@ exports.getPendingLetterRequests = async (req, res) => {
     const pool = db.promise();
     const [rows] = await pool.execute(
       `SELECT lr.uuid, lr.template_uuid, lr.employee_uuid, lr.ref_no,
-              lr.generated_content, lr.status, lr.requested_at,
-              lt.title AS template_name, lt.type AS template_type,
+              lr.body_content, lr.status, lr.requested_at,
+              lt.template_name, lt.type AS template_type,
               e.mesob_id, e.first_name, e.middle_name, e.last_name,
               CONCAT(e.first_name, ' ', COALESCE(e.middle_name, ''), ' ', e.last_name) AS employee_name
        FROM LetterRequests lr
@@ -806,9 +806,9 @@ exports.getAllLetterRequests = async (req, res) => {
     const pool = db.promise();
     const [rows] = await pool.execute(
       `SELECT lr.uuid, lr.template_uuid, lr.employee_uuid,
-              lr.generated_content, lr.status, lr.requested_at,
+              lr.body_content, lr.status, lr.requested_at,
               lr.reviewed_at, lr.rejection_reason,
-              lt.title AS template_name, lt.type AS template_type,
+              lt.template_name, lt.type AS template_type,
               e.mesob_id, e.first_name, e.middle_name, e.last_name,
               CONCAT(e.first_name, ' ', COALESCE(e.middle_name, ''), ' ', e.last_name) AS employee_name,
               CONCAT(u.username) AS reviewed_by_name

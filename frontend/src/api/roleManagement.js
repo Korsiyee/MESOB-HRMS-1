@@ -156,11 +156,11 @@ export const assignBulkPermissions = async (roleUuid, data) => {
 /**
  * Replace all role permissions
  * @param {string} roleUuid - Role UUID
- * @param {Object} data - { permissions: [{ permission_uuid, data_scope }] }
+ * @param {Object} data - { permissionUuids: [...] }
  * @returns {Promise} Replacement confirmation
  */
 export const replaceRolePermissions = async (roleUuid, data) => {
-  return await apiRequest(`/role-management/roles/${roleUuid}/permissions/replace`, {
+  return await apiRequest(`/role-management/roles/${roleUuid}/permissions`, {
     method: 'PUT',
     body: JSON.stringify(data)
   });

@@ -379,7 +379,7 @@ class RequestService {
            lr.totalDays, lr.reason, lr.status, lr.rejectionReason,
            lr.dayPattern, lr.dailyPlan,
                e.first_name, e.middle_name, e.last_name, e.hire_date,
-               p.department_uuid
+               e.department_uuid
         FROM leaveRequests lr
         ${deptJoin}
         WHERE 1=1

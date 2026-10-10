@@ -703,3 +703,70 @@ exports.getAuditLogs = asyncHandler(async (req, res) => {
     }
   });
 });
+
+/**
+ * Get permissions for a specific role
+ * GET /api/role-management/roles/:roleUuid/permissions
+ */
+exports.getRolePermissions = asyncHandler(async (req, res) => {
+  const { roleUuid } = req.params;
+  
+  // Get role with permissions from service
+  const roleDetails = await roleManagementService.getRoleWithDetails(roleUuid);
+  
+  if (!roleDetails) {
+    return sendError(res, {
+      status: 404,
+      message: "Role not found",
+      error: "NOT_FOUND"
+    });
+  }
+  
+  sendSuccess(res, {
+    message: "Role permissions retrieved successfully",
+    data: { permissions: roleDetails.permissions || [] }
+  });
+});
+
+/**
+ * Get role-specific audit logs
+ * GET /api/role-management/roles/:roleUuid/audit-logs
+ */
+exports.getRoleAuditLogs = asyncHandler(async (req, res) => {
+  const { executeQuery } = require("../utils/dbQuery");
+  const { roleUuid } = req.params;
+  const { limit = 50, offset = 0 } = req.query;
+  
+  const [logs] = await executeQuery(
+    `SELECT aal.*, 
+            actor.username as actor_username,
+            target.username as target_username,
+            r.name as role_name
+     FROM AuthorizationAuditLogs aal
+     LEFT JOIN Users actor ON aal.actor_user_uuid = actor.uuid
+     LEFT JOIN Users target ON aal.target_user_uuid = target.uuid
+     LEFT JOIN Roles r ON aal.metadata->>'$.roleUuid' = r.uuid
+     WHERE aal.metadata->>'$.roleUuid' = ? OR aal.target_role_uuid = ?
+     ORDER BY aal.created_at DESC
+     LIMIT ? OFFSET ?`,
+    [roleUuid, roleUuid, parseInt(limit), parseInt(offset)]
+  );
+  
+  const [countResult] = await executeQuery(
+    `SELECT COUNT(*) as total FROM AuthorizationAuditLogs aal 
+     WHERE aal.metadata->>'$.roleUuid' = ? OR aal.target_role_uuid = ?`,
+    [roleUuid, roleUuid]
+  );
+  
+  sendSuccess(res, {
+    message: "Role audit logs retrieved successfully",
+    data: {
+      logs,
+      pagination: {
+        total: countResult[0].total,
+        limit: parseInt(limit),
+        offset: parseInt(offset)
+      }
+    }
+  });
+});

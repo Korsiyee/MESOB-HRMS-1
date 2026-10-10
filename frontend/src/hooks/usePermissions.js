@@ -25,12 +25,12 @@ export function usePermissions() {
   useEffect(() => {
     if (user?.rbac) {
       // New RBAC system
-      setPermissions(user.rbac.permissions || []);
+      const perms = user.rbac.permissions || []; setPermissions(Array.isArray(perms) ? perms : []);
       setRole(user.rbac.role || null);
       setLoading(false);
     } else if (user?.permissions) {
       // Fallback to legacy permissions if available
-      setPermissions(user.permissions || []);
+      const perms = user.permissions || []; setPermissions(Array.isArray(perms) ? perms : []);
       setRole(null);
       setLoading(false);
     } else {
@@ -47,7 +47,7 @@ export function usePermissions() {
    */
   const hasPermission = useCallback((permissionCode) => {
     if (!permissionCode) return false;
-    return permissions.includes(permissionCode);
+    if (!Array.isArray(permissions)) return false; return permissions.includes(permissionCode);
   }, [permissions]);
   
   /**

@@ -34,8 +34,7 @@ import Login                  from '../components/Login';
 import PermissionsManagementPage from '../pages/rbac/PermissionsManagementPage';
 import RoleManagementPage from '../pages/RoleManagementPage';
 import RoleDetailPage from '../pages/RoleDetailPage';
-import CreateRolePage from '../pages/CreateRolePage';
-import EditRolePage from '../pages/EditRolePage';
+import RoleEditPage from '../pages/RoleEditPage';
 
 /* Redirects /employees/me → /employees/:employee_uuid of the logged-in user.
    Falls back to the All Employees list if no employee_uuid is found. */
@@ -177,13 +176,12 @@ const AppRouter = () => (
       
       {/* ── RBAC Management ── */}
       <Route path="rbac/permissions" element={<PermissionsManagementPage />} />
-      <Route path="rbac/roles" element={<RoleManagementPage />} />
       
       {/* ── Role Management Routes ── */}
       <Route path="admin/roles" element={<RoleManagementPage />} />
-      <Route path="admin/roles/new" element={<CreateRolePage />} />
+      <Route path="admin/roles/new" element={<RoleEditPage />} />
       <Route path="admin/roles/:roleUuid" element={<RoleDetailPage />} />
-      <Route path="admin/roles/:roleUuid/edit" element={<EditRolePage />} />
+      <Route path="admin/roles/:roleUuid/edit" element={<RoleEditPage />} />
       
       {/* ── My Account - Everyone can access ── */}
       <Route path="my-account" element={<MyAccountPage />} />

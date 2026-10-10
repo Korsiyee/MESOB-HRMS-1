@@ -33,8 +33,8 @@ async function createRole(roleData, createdBy) {
   await executeQuery(
     `INSERT INTO Roles 
      (uuid, code, name, description, is_system_role, hierarchy_level, is_active, 
-      can_be_deleted, created_by, updated_by)
-     VALUES (?, ?, ?, ?, FALSE, ?, TRUE, TRUE, ?, ?)`,
+      created_by, updated_by)
+     VALUES (?, ?, ?, ?, FALSE, ?, TRUE, ?, ?)`,
     [uuid, code, name, description, hierarchyLevel, createdBy, createdBy]
   );
   
@@ -123,10 +123,6 @@ async function deleteRole(roleUuid, deletedBy) {
     throw new Error('Role not found');
   }
   
-  if (!role.can_be_deleted) {
-    throw new Error('This role cannot be deleted');
-  }
-  
   if (role.is_system_role) {
     throw new Error('Cannot delete system roles');
   }
@@ -211,7 +207,7 @@ async function setRoleActiveStatus(roleUuid, is_active, updatedBy) {
 async function assignPermissionToRole(roleUuid, permissionUuid, grantedBy) {
   // Check if already assigned
   const [existing] = await executeQuery(
-    `SELECT uuid FROM RolePermissions WHERE role_uuid = ? AND permission_uuid = ?`,
+    `SELECT uuid FROM Role_Permissions WHERE role_uuid = ? AND permission_uuid = ?`,
     [roleUuid, permissionUuid]
   );
   
@@ -222,7 +218,7 @@ async function assignPermissionToRole(roleUuid, permissionUuid, grantedBy) {
   const uuid = uuidv4();
   
   await executeQuery(
-    `INSERT INTO RolePermissions (uuid, role_uuid, permission_uuid, granted_by)
+    `INSERT INTO Role_Permissions (uuid, role_uuid, permission_uuid, granted_by)
      VALUES (?, ?, ?, ?)`,
     [uuid, roleUuid, permissionUuid, grantedBy]
   );
@@ -251,7 +247,7 @@ async function assignPermissionToRole(roleUuid, permissionUuid, grantedBy) {
  */
 async function removePermissionFromRole(roleUuid, permissionUuid, revokedBy) {
   await executeQuery(
-    `DELETE FROM RolePermissions WHERE role_uuid = ? AND permission_uuid = ?`,
+    `DELETE FROM Role_Permissions WHERE role_uuid = ? AND permission_uuid = ?`,
     [roleUuid, permissionUuid]
   );
   
@@ -283,7 +279,7 @@ async function assignPermissionsToRole(roleUuid, permissionUuids, grantedBy) {
   
   for (const permissionUuid of permissionUuids) {
     const [existing] = await executeQuery(
-      `SELECT uuid FROM RolePermissions WHERE role_uuid = ? AND permission_uuid = ?`,
+      `SELECT uuid FROM Role_Permissions WHERE role_uuid = ? AND permission_uuid = ?`,
       [roleUuid, permissionUuid]
     );
     
@@ -294,7 +290,7 @@ async function assignPermissionsToRole(roleUuid, permissionUuids, grantedBy) {
     
     const uuid = uuidv4();
     await executeQuery(
-      `INSERT INTO RolePermissions (uuid, role_uuid, permission_uuid, granted_by)
+      `INSERT INTO Role_Permissions (uuid, role_uuid, permission_uuid, granted_by)
        VALUES (?, ?, ?, ?)`,
       [uuid, roleUuid, permissionUuid, grantedBy]
     );
@@ -326,7 +322,7 @@ async function assignPermissionsToRole(roleUuid, permissionUuids, grantedBy) {
 async function replaceRolePermissions(roleUuid, permissionUuids, updatedBy) {
   // Get current permissions
   const [currentPerms] = await executeQuery(
-    `SELECT permission_uuid FROM RolePermissions WHERE role_uuid = ?`,
+    `SELECT permission_uuid FROM Role_Permissions WHERE role_uuid = ?`,
     [roleUuid]
   );
   
@@ -343,7 +339,7 @@ async function replaceRolePermissions(roleUuid, permissionUuids, updatedBy) {
   if (toRemove.length > 0) {
     const placeholders = toRemove.map(() => '?').join(',');
     await executeQuery(
-      `DELETE FROM RolePermissions 
+      `DELETE FROM Role_Permissions 
        WHERE role_uuid = ? AND permission_uuid IN (${placeholders})`,
       [roleUuid, ...toRemove]
     );
@@ -353,7 +349,7 @@ async function replaceRolePermissions(roleUuid, permissionUuids, updatedBy) {
   for (const permissionUuid of toAdd) {
     const uuid = uuidv4();
     await executeQuery(
-      `INSERT INTO RolePermissions (uuid, role_uuid, permission_uuid, granted_by)
+      `INSERT INTO Role_Permissions (uuid, role_uuid, permission_uuid, granted_by)
        VALUES (?, ?, ?, ?)`,
       [uuid, roleUuid, permissionUuid, updatedBy]
     );
@@ -400,7 +396,7 @@ async function assignScopeToRolePermission(
 ) {
   // Check if permission is assigned to role
   const [rolePerms] = await executeQuery(
-    `SELECT uuid FROM RolePermissions WHERE role_uuid = ? AND permission_uuid = ?`,
+    `SELECT uuid FROM Role_Permissions WHERE role_uuid = ? AND permission_uuid = ?`,
     [roleUuid, permissionUuid]
   );
   
@@ -410,7 +406,7 @@ async function assignScopeToRolePermission(
   
   // Check if scope already exists
   const [existing] = await executeQuery(
-    `SELECT uuid FROM RolePermissionScopes 
+    `SELECT uuid FROM Role_Permission_Scopes 
      WHERE role_uuid = ? AND permission_uuid = ?`,
     [roleUuid, permissionUuid]
   );
@@ -420,7 +416,7 @@ async function assignScopeToRolePermission(
   if (existing.length > 0) {
     // Update existing
     await executeQuery(
-      `UPDATE RolePermissionScopes 
+      `UPDATE Role_Permission_Scopes 
        SET data_scope_uuid = ?, scope_configuration = ?, created_by = ?
        WHERE uuid = ?`,
       [dataScopeUuid, configJson, assignedBy, existing[0].uuid]
@@ -429,7 +425,7 @@ async function assignScopeToRolePermission(
     // Create new
     const uuid = uuidv4();
     await executeQuery(
-      `INSERT INTO RolePermissionScopes 
+      `INSERT INTO Role_Permission_Scopes 
        (uuid, role_uuid, permission_uuid, data_scope_uuid, scope_configuration, created_by)
        VALUES (?, ?, ?, ?, ?, ?)`,
       [uuid, roleUuid, permissionUuid, dataScopeUuid, configJson, assignedBy]
@@ -460,7 +456,7 @@ async function assignScopeToRolePermission(
  */
 async function removeScopeFromRolePermission(roleUuid, permissionUuid, removedBy) {
   await executeQuery(
-    `DELETE FROM RolePermissionScopes 
+    `DELETE FROM Role_Permission_Scopes 
      WHERE role_uuid = ? AND permission_uuid = ?`,
     [roleUuid, permissionUuid]
   );
@@ -494,7 +490,7 @@ async function getRoleWithDetails(roleUuid) {
   const [permissions] = await executeQuery(
     `SELECT p.uuid, p.code, p.name, p.action, p.description, p.is_sensitive,
             p.requires_scope, r.name as resource_name, r.code as resource_code
-     FROM RolePermissions rp
+     FROM Role_Permissions rp
      INNER JOIN Permissions p ON rp.permission_uuid = p.uuid
      INNER JOIN Resources r ON p.resource_uuid = r.uuid
      WHERE rp.role_uuid = ?
@@ -506,7 +502,7 @@ async function getRoleWithDetails(roleUuid) {
   const [scopes] = await executeQuery(
     `SELECT rps.permission_uuid, ds.uuid as scope_uuid, ds.code, ds.name, 
             ds.scope_type, rps.scope_configuration
-     FROM RolePermissionScopes rps
+     FROM Role_Permission_Scopes rps
      INNER JOIN DataScopes ds ON rps.data_scope_uuid = ds.uuid
      WHERE rps.role_uuid = ?`,
     [roleUuid]

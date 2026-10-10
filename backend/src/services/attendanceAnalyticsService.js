@@ -94,7 +94,7 @@ async function getDepartmentStats({ startDate, endDate } = {}) {
        SUM(a.status IN ('PRESENT','LATE','HALF_DAY')) AS present_count
      FROM AttendanceSummary a
      INNER JOIN Employees e ON e.uuid = a.employee_uuid
-     INNER JOIN Departments d ON d.uuid = p.department_uuid
+     INNER JOIN Departments d ON d.uuid = e.department_uuid
      WHERE a.date BETWEEN ? AND ?
      GROUP BY d.uuid, d.name
      ORDER BY present_count DESC

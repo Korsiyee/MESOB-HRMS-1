@@ -22,9 +22,7 @@ const syncRoutes = require("./routes/syncRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const faceRecognitionRoutes = require("./routes/faceRecognitionRoutes");
 const networkSettingsRoutes = require("./routes/networkSettingsRoutes");
-const rbacRoutes = require("./routes/rbacRoutes"); // OLD: Occupation-based RBAC (deprecated)
-const roleManagementRoutes = require("./routes/roleManagementRoutes"); // NEW: Module-level permission system
-const moduleRoleRoutes = require("./routes/moduleRoleRoutes"); // Module-level role management
+const roleManagementRoutes = require("./routes/roleManagementRoutes"); // Unified Permission-based RBAC system
 const { authenticateJwt } = require("./middleware/authMiddleware");
 const notFoundHandler = require("./middleware/notFoundHandler");
 const errorHandler = require("./middleware/errorHandler");
@@ -56,9 +54,7 @@ app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/sync", syncRoutes);
 app.use(authenticateJwt);
-app.use("/api/rbac", rbacRoutes); // OLD: Occupation-based (deprecated, keep for backward compatibility)
-app.use("/api/role-management", roleManagementRoutes); // Legacy role management
-app.use("/api/module-roles", moduleRoleRoutes); // NEW: Module-level permission system
+app.use("/api/role-management", roleManagementRoutes); // Unified Permission-based RBAC system
 app.use("/api/employees", employeeRoutes);
 app.use("/api/departments", departmentRoutes);
 app.use("/api/positions", positionRoutes);

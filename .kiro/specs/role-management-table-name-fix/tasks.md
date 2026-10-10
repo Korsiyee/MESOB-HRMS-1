@@ -1,0 +1,152 @@
+# Implementation Plan
+
+- [ ] 1. Write bug condition exploration test
+  - **Property 1: Bug Condition** - SQL Queries with Incorrect Table Names Fail
+  - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
+  - **DO NOT attempt to fix the test or the code when it fails**
+  - **NOTE**: This test encodes the expected behavior - it will validate the fix when it passes after implementation
+  - **GOAL**: Surface counterexamples that demonstrate the bug exists
+  - **Scoped PBT Approach**: For deterministic bugs, scope the property to the concrete failing case(s) to ensure reproducibility
+  - Test that SQL queries referencing `RolePermissions` or `RolePermissionScopes` (without underscores) fail with "Table doesn't exist" errors
+  - Test concrete failing cases from Bug Condition in design:
+    - `SELECT FROM RolePermissions` → MySQL Error: "Table 'mesob_hrms.RolePermissions' doesn't exist"
+    - `INSERT INTO RolePermissions` → MySQL Error: "Table 'mesob_hrms.RolePermissions' doesn't exist"
+    - `SELECT FROM RolePermissionScopes` → MySQL Error: "Table 'mesob_hrms.RolePermissionScopes' doesn't exist"
+  - Access `/role-management` endpoint on UNFIXED code
+  - Call `roleManagementService.getRoleWithDetails()` on UNFIXED code
+  - Call `rbacService.getRolePermissions()` on UNFIXED code
+  - **EXPECTED OUTCOME**: All tests FAIL with "Table doesn't exist" errors (this is correct - it proves the bug exists)
+  - Document counterexamples found:
+    - Specific error messages from MySQL logs
+    - HTTP 500 responses from Role Management page
+    - Stack traces showing query failures
+  - Verify database has correct table names: `SHOW TABLES LIKE '%Permission%'` returns `Role_Permissions` and `Role_Permission_Scopes`
+  - Mark task complete when test is written, run, and failures are documented
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8_
+
+- [ ] 2. Write preservation property tests (BEFORE implementing fix)
+  - **Property 2: Preservation** - Non-Role-Permission Queries Work Unchanged
+  - **IMPORTANT**: Follow observation-first methodology
+  - Observe behavior on UNFIXED code for queries NOT involving `RolePermissions` or `RolePermissionScopes` tables
+  - Test queries for other tables that should be unaffected:
+    - `SELECT * FROM Users` - observe results on unfixed code
+    - `SELECT * FROM Roles` - observe results on unfixed code
+    - `SELECT * FROM Permissions` - observe results on unfixed code
+    - `SELECT * FROM DataScopes` - observe results on unfixed code
+    - `SELECT * FROM Resources` - observe results on unfixed code
+    - `SELECT * FROM Employees` - observe results on unfixed code
+    - `SELECT * FROM Departments` - observe results on unfixed code
+  - Write property-based test: for all queries NOT referencing `RolePermissions` or `RolePermissionScopes`, results are identical before and after fix
+  - Test other application features work identically:
+    - Employee management operations
+    - Attendance management operations
+    - Leave management operations
+    - Department management operations
+    - User authentication and session management
+  - Run tests on UNFIXED code
+  - **EXPECTED OUTCOME**: Tests PASS (this confirms baseline behavior to preserve)
+  - Mark task complete when tests are written, run, and passing on unfixed code
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8_
+
+- [ ] 3. Fix SQL table name references in backend services
+
+  - [ ] 3.1 Fix table references in roleManagementService.js
+    - Replace `RolePermissions` with `Role_Permissions` in all SQL queries
+    - Replace `RolePermissionScopes` with `Role_Permission_Scopes` in all SQL queries
+    - Affected functions (17 total replacements):
+      - `assignPermissionToRole()` - Lines 214, 223: SELECT and INSERT queries
+      - `removePermissionFromRole()` - Line 252: DELETE query
+      - `assignPermissionsToRole()` - Lines 285, 294: SELECT and INSERT queries
+      - `replaceRolePermissions()` - Lines 326, 343, 352: SELECT, DELETE, and INSERT queries
+      - `assignScopeToRolePermission()` - Lines 399, 408, 417, 424: SELECT from both tables, UPDATE and INSERT
+      - `removeScopeFromRolePermission()` - Line 459: DELETE query
+      - `getRoleWithDetails()` - Lines 493, 505: JOIN queries for both tables
+    - Use exact string replacement patterns:
+      - `FROM RolePermissions` → `FROM Role_Permissions`
+      - `JOIN RolePermissions` → `JOIN Role_Permissions`
+      - `INTO RolePermissions` → `INTO Role_Permissions`
+      - `UPDATE RolePermissions` → `UPDATE Role_Permissions`
+      - `DELETE FROM RolePermissions` → `DELETE FROM Role_Permissions`
+      - `FROM RolePermissionScopes` → `FROM Role_Permission_Scopes`
+      - `JOIN RolePermissionScopes` → `JOIN Role_Permission_Scopes`
+      - `INTO RolePermissionScopes` → `INTO Role_Permission_Scopes`
+      - `UPDATE RolePermissionScopes` → `UPDATE Role_Permission_Scopes`
+      - `DELETE FROM RolePermissionScopes` → `DELETE FROM Role_Permission_Scopes`
+    - Verify table aliases (rp, rps) remain unchanged
+    - Verify no syntax errors introduced
+    - _Bug_Condition: isBugCondition(query) = query contains "RolePermissions" or "RolePermissionScopes" without underscores in SQL context_
+    - _Expected_Behavior: All SQL queries use correct table names `Role_Permissions` and `Role_Permission_Scopes` matching database schema_
+    - _Preservation: All non-SQL code, business logic, cache mechanisms, and queries for other tables remain unchanged_
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8_
+
+  - [ ] 3.2 Fix table references in rbacService.js
+    - Replace `RolePermissions` with `Role_Permissions` in all SQL queries
+    - Replace `RolePermissionScopes` with `Role_Permission_Scopes` in all SQL queries
+    - Affected functions (2 total replacements):
+      - `getRolePermissions()` - Line 141: JOIN query with RolePermissions
+      - `getPermissionScope()` - Line 408: SELECT query with RolePermissionScopes
+    - Use exact string replacement patterns (same as 3.1)
+    - Verify table aliases remain unchanged
+    - Verify cache key structures unchanged
+    - _Bug_Condition: isBugCondition(query) = query contains "RolePermissions" or "RolePermissionScopes" without underscores_
+    - _Expected_Behavior: Queries execute successfully against correct database tables_
+    - _Preservation: Cache mechanisms, authorization logic, and non-affected queries remain unchanged_
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8_
+
+  - [ ] 3.3 Fix table references in authorizationService.js
+    - Replace `RolePermissions` with `Role_Permissions` in all SQL queries
+    - Affected functions (3 total replacements):
+      - `getUserPermissions()` - Line 125: Multi-table JOIN including RolePermissions
+      - `getUserPermissionsDetailed()` - Line 151: Multi-table JOIN including RolePermissions
+      - `getRolePermissions()` - Line 391: JOIN query with RolePermissions
+    - Use exact string replacement patterns (same as 3.1)
+    - Verify table aliases remain unchanged
+    - Verify authorization logic unchanged
+    - _Bug_Condition: isBugCondition(query) = query contains "RolePermissions" without underscores_
+    - _Expected_Behavior: Permission check queries execute successfully_
+    - _Preservation: Authorization rules, error handling, and non-permission queries remain unchanged_
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8_
+
+  - [ ] 3.4 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** - SQL Queries Execute Successfully
+    - **IMPORTANT**: Re-run the SAME test from task 1 - do NOT write a new test
+    - The test from task 1 encodes the expected behavior
+    - When this test passes, it confirms the expected behavior is satisfied
+    - Run bug condition exploration test from step 1 on FIXED code
+    - Access `/role-management` endpoint - should load without 500 error
+    - Call `roleManagementService.getRoleWithDetails()` - should return role details
+    - Call `rbacService.getRolePermissions()` - should return permissions array
+    - Verify NO "Table doesn't exist" errors in logs
+    - Test all affected queries execute successfully:
+      - SELECT from Role_Permissions returns results
+      - INSERT into Role_Permissions succeeds
+      - UPDATE Role_Permission_Scopes succeeds
+      - DELETE from Role_Permissions succeeds
+    - **EXPECTED OUTCOME**: All tests PASS (confirms bug is fixed)
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8_
+
+  - [ ] 3.5 Verify preservation tests still pass
+    - **Property 2: Preservation** - Non-Affected Operations Unchanged
+    - **IMPORTANT**: Re-run the SAME tests from task 2 - do NOT write new tests
+    - Run preservation property tests from step 2 on FIXED code
+    - Verify all queries for other tables produce identical results:
+      - Users, Roles, Permissions, DataScopes, Resources, Employees, Departments
+    - Test other application features work identically:
+      - Employee management operations
+      - Attendance management operations
+      - Leave management operations
+      - Department management operations
+      - User authentication and session management
+    - **EXPECTED OUTCOME**: All tests PASS (confirms no regressions)
+    - Confirm all preservation tests still pass after fix (no regressions)
+    - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8_
+
+- [ ] 4. Checkpoint - Ensure all tests pass
+  - Run complete test suite
+  - Verify Role Management page loads successfully
+  - Verify all CRUD operations for roles, permissions, and scopes work
+  - Verify cache invalidation still works correctly
+  - Verify authorization checks execute without errors
+  - Check application logs for any remaining "Table doesn't exist" errors (should be none)
+  - Confirm all tests pass
+  - Ask the user if questions arise

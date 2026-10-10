@@ -122,7 +122,7 @@ async function getUserPermissions(userId) {
     `SELECT DISTINCT p.code
      FROM Users u
      JOIN Roles r ON u.role_uuid = r.uuid
-     JOIN RolePermissions rp ON r.uuid = rp.role_uuid
+     JOIN Role_Permissions rp ON r.uuid = rp.role_uuid
      JOIN Permissions p ON rp.permission_uuid = p.uuid
      WHERE u.uuid = ? 
        AND r.is_active = TRUE
@@ -148,7 +148,7 @@ async function getUserPermissionsDetailed(userId) {
     `SELECT DISTINCT p.id, p.uuid, p.code, p.resource, p.action, p.description, p.requires_scope
      FROM Users u
      JOIN Roles r ON u.role_uuid = r.uuid
-     JOIN RolePermissions rp ON r.uuid = rp.role_uuid
+     JOIN Role_Permissions rp ON r.uuid = rp.role_uuid
      JOIN Permissions p ON rp.permission_uuid = p.uuid
      WHERE u.uuid = ? 
        AND r.is_active = TRUE
@@ -388,7 +388,7 @@ async function getAllPermissions(resourceFilter = null) {
 async function getRolePermissions(roleId) {
   const [rows] = await executeQuery(
     `SELECT p.id, p.uuid, p.code, p.resource, p.action, p.description, p.requires_scope
-     FROM RolePermissions rp
+     FROM Role_Permissions rp
      JOIN Permissions p ON rp.permission_id = p.id
      WHERE rp.role_id = ? AND p.is_active = TRUE
      ORDER BY p.resource, p.action`,
