@@ -66,7 +66,29 @@ const MyAccountPage = () => {
   const handlePasswordUpdate = async (e) => {
     e.preventDefault();
     if (passwords.newPwd !== passwords.confirm) { showMsg('error','New passwords do not match.'); return; }
-    if (passwords.newPwd.length < 8) { showMsg('error','Password must be at least 8 characters.'); return; }
+    
+    // Validate password complexity
+    if (passwords.newPwd.length < 8) { 
+      showMsg('error','Password must be at least 8 characters.'); 
+      return; 
+    }
+    if (!/[A-Z]/.test(passwords.newPwd)) {
+      showMsg('error','Password must contain at least one uppercase letter.');
+      return;
+    }
+    if (!/[a-z]/.test(passwords.newPwd)) {
+      showMsg('error','Password must contain at least one lowercase letter.');
+      return;
+    }
+    if (!/[0-9]/.test(passwords.newPwd)) {
+      showMsg('error','Password must contain at least one number.');
+      return;
+    }
+    if (!/[^A-Za-z0-9]/.test(passwords.newPwd)) {
+      showMsg('error','Password must contain at least one symbol.');
+      return;
+    }
+    
     setUpdating(true);
     try {
       await AuthApi.changePassword(passwords.current, passwords.newPwd);
@@ -173,7 +195,7 @@ const MyAccountPage = () => {
                   <input type="password" value={passwords.current} onChange={e=>setPasswords(p=>({...p,current:e.target.value}))} required style={fieldStyle}
                     onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:22 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:14 }}>
                   <div>
                     <label style={labelStyle}>New Password</label>
                     <input type="password" value={passwords.newPwd} onChange={e=>setPasswords(p=>({...p,newPwd:e.target.value}))} required style={fieldStyle}
@@ -185,6 +207,37 @@ const MyAccountPage = () => {
                       onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
                   </div>
                 </div>
+
+                {/* Password validation checklist */}
+                {passwords.newPwd && (
+                  <div style={{ marginBottom:18, padding:'12px 16px', background:'rgba(0,0,0,0.02)', borderRadius:10, border:`1px solid ${C.border}` }}>
+                    <p style={{ margin:'0 0 8px', fontSize:'0.72rem', fontWeight:700, color:C.textSub, textTransform:'uppercase', letterSpacing:'0.05em' }}>Password Requirements:</p>
+                    {[
+                      { label: 'At least 8 characters', met: passwords.newPwd.length >= 8 },
+                      { label: 'One uppercase letter', met: /[A-Z]/.test(passwords.newPwd) },
+                      { label: 'One lowercase letter', met: /[a-z]/.test(passwords.newPwd) },
+                      { label: 'One number', met: /[0-9]/.test(passwords.newPwd) },
+                      { label: 'One symbol (!@#$...)', met: /[^A-Za-z0-9]/.test(passwords.newPwd) },
+                    ].map(rule => (
+                      <div key={rule.label} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                        <span style={{ fontSize:'0.8rem', fontWeight:700, color: rule.met ? '#059669' : '#DC2626', flexShrink:0 }}>
+                          {rule.met ? '✓' : '✗'}
+                        </span>
+                        <span style={{ fontSize:'0.72rem', color: rule.met ? '#059669' : '#DC2626', textDecoration: rule.met ? 'line-through' : 'none', opacity: rule.met ? 0.7 : 1 }}>
+                          {rule.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Password mismatch warning */}
+                {passwords.confirm && passwords.newPwd !== passwords.confirm && (
+                  <div style={{ marginBottom:14, padding:'10px 14px', background:'rgba(220,38,38,0.08)', borderRadius:8, border:'1px solid rgba(220,38,38,0.2)' }}>
+                    <p style={{ margin:0, fontSize:'0.72rem', color:'#DC2626', fontWeight:600 }}>⚠️ Passwords do not match</p>
+                  </div>
+                )}
+
                 <button type="submit" disabled={updating} style={{ padding:'10px 22px', borderRadius:8, background:updating?'#8AADA6':C.primary, color:'#fff', border:'none', fontWeight:600, fontSize:'0.78rem', cursor:updating?'not-allowed':'pointer', display:'inline-flex', alignItems:'center', gap:8, fontFamily:'Poppins,sans-serif', transition:'background 0.15s' }}
                   onMouseEnter={e=>{ if(!updating) e.currentTarget.style.background=C.primaryHov; }}
                   onMouseLeave={e=>{ if(!updating) e.currentTarget.style.background=C.primary; }}>
@@ -192,10 +245,10 @@ const MyAccountPage = () => {
                 </button>
               </form>
 
-              <div style={{ marginTop:24, padding:'12px 16px', background:'rgba(245,158,11,0.08)', borderRadius:10, border:'1px solid rgba(245,158,11,0.2)', display:'flex', gap:10 }}>
-                <KeyRound size={18} color='#B45309' style={{ flexShrink:0, marginTop:1 }}/>
-                <p style={{ margin:0, fontSize:'0.75rem', color:'#92400E', lineHeight:1.6 }}>
-                  <strong>Security Tip:</strong> Use a strong, unique password with at least 12 characters including uppercase letters, numbers and symbols.
+              <div style={{ marginTop:24, padding:'12px 16px', background:'rgba(15,118,110,0.08)', borderRadius:10, border:'1px solid rgba(15,118,110,0.2)', display:'flex', gap:10 }}>
+                <KeyRound size={18} color={C.primary} style={{ flexShrink:0, marginTop:1 }}/>
+                <p style={{ margin:0, fontSize:'0.75rem', color:C.textSub, lineHeight:1.6 }}>
+                  <strong>Security Tip:</strong> Use a strong, unique password with at least 8 characters including uppercase letters, lowercase letters, numbers and symbols.
                 </p>
               </div>
             </div>

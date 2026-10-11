@@ -122,6 +122,43 @@ exports.changePassword = asyncHandler(async (req, res) => {
     );
   }
 
+  // Validate new password complexity
+  if (!newPassword || newPassword.length < 8) {
+    throw new ApiError(
+      "Password must be at least 8 characters long.",
+      400,
+      "VALIDATION_ERROR",
+    );
+  }
+  if (!/[A-Z]/.test(newPassword)) {
+    throw new ApiError(
+      "Password must contain at least one uppercase letter.",
+      400,
+      "VALIDATION_ERROR",
+    );
+  }
+  if (!/[a-z]/.test(newPassword)) {
+    throw new ApiError(
+      "Password must contain at least one lowercase letter.",
+      400,
+      "VALIDATION_ERROR",
+    );
+  }
+  if (!/[0-9]/.test(newPassword)) {
+    throw new ApiError(
+      "Password must contain at least one number.",
+      400,
+      "VALIDATION_ERROR",
+    );
+  }
+  if (!/[^A-Za-z0-9]/.test(newPassword)) {
+    throw new ApiError(
+      "Password must contain at least one symbol.",
+      400,
+      "VALIDATION_ERROR",
+    );
+  }
+
   const user = await AuthService.findUserByUuid(req.user.uuid);
   if (!user || !user.is_active) {
     throw new ApiError("User not found.", 404, "NOT_FOUND");

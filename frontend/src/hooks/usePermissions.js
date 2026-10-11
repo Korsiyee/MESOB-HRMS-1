@@ -110,7 +110,7 @@ export function usePermissions() {
    * @returns {boolean}
    */
   const isDepartmentHead = useCallback(() => {
-    return role?.code === 'DEPARTMENT_HEAD';
+    return role?.code === 'DEPT_HEAD';
   }, [role]);
   
   /**

@@ -45,7 +45,29 @@ const ResetPasswordModal = ({ account, onClose, showMsg }) => {
 
   const handleReset = async () => {
     if (!newPwd.trim()) { showMsg('error','New password is required.'); return; }
-    if (newPwd.length < 8) { showMsg('error','Password must be at least 8 characters.'); return; }
+    
+    // Validate password complexity (8 chars minimum)
+    if (newPwd.length < 8) { 
+      showMsg('error','Password must be at least 8 characters.'); 
+      return; 
+    }
+    if (!/[A-Z]/.test(newPwd)) {
+      showMsg('error','Password must contain at least one uppercase letter.');
+      return;
+    }
+    if (!/[a-z]/.test(newPwd)) {
+      showMsg('error','Password must contain at least one lowercase letter.');
+      return;
+    }
+    if (!/[0-9]/.test(newPwd)) {
+      showMsg('error','Password must contain at least one number.');
+      return;
+    }
+    if (!/[^A-Za-z0-9]/.test(newPwd)) {
+      showMsg('error','Password must contain at least one symbol.');
+      return;
+    }
+    
     if (newPwd !== confirmPwd) { showMsg('error','Passwords do not match.'); return; }
     setSaving(true);
     try {
@@ -88,7 +110,7 @@ const ResetPasswordModal = ({ account, onClose, showMsg }) => {
             <div>
               <label style={labelStyle}>New Password *</label>
               <div style={{ position:'relative' }}>
-                <input type={showNew?'text':'password'} value={newPwd} onChange={e=>setNewPwd(e.target.value)} placeholder="Min 8 characters" style={{ ...inputStyle, paddingRight:38 }}
+                <input type={showNew?'text':'password'} value={newPwd} onChange={e=>setNewPwd(e.target.value)} placeholder="Min 8 characters with uppercase, lowercase, number, symbol" style={{ ...inputStyle, paddingRight:38 }}
                   onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
                 <button type="button" onClick={()=>setShowNew(v=>!v)} style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:C.textMuted, display:'flex', padding:0 }}>
                   {showNew ? <EyeOff size={15}/> : <Eye size={15}/>}
@@ -128,11 +150,9 @@ const CreateAccountModal = ({ onClose, onCreated, showMsg, existingAccounts = []
   const [searching,   setSearching]       = useState(false);
   const [dropOpen,    setDropOpen]        = useState(false);
   const [selectedEmp, setSelectedEmp]     = useState(null);
-  const [username,    setUsername]        = useState('');
-  const [password,    setPassword]        = useState('');
-  const [showPwd,     setShowPwd]         = useState(false);
   const [role,        setRole]            = useState('EMPLOYEE');
   const [saving,      setSaving]          = useState(false);
+  const [createdAccount, setCreatedAccount] = useState(null);
   const dropRef = React.useRef(null);
 
   const roles = [
@@ -171,56 +191,77 @@ const CreateAccountModal = ({ onClose, onCreated, showMsg, existingAccounts = []
     return () => clearTimeout(timer);
   }, [mesobSearch]);
 
-  /* when employee selected — auto-fill username and role */
+  /* when employee selected — auto-fill role */
   const handleSelectEmp = (emp) => {
     setSelectedEmp(emp);
     setMesobSearch(emp.mesob_id);
     setDropOpen(false);
-
-    // Ethiopian naming: first_name = Abel, middle_name = Kebede (father's name)
-    // Username format: abelkebede@mesob.et
-    const first  = (emp.first_name  || '').toLowerCase().replace(/\s+/g, '');
-    const father = (emp.middle_name || emp.last_name || '').toLowerCase().replace(/\s+/g, '');
-    setUsername(`${first}${father}@mesob.et`);
 
     // Auto-fill role: look up from existing accounts by employee_uuid
     const existingAcc = existingAccounts.find(a => a.employee_uuid === emp.uuid);
     setRole(existingAcc?.role || 'EMPLOYEE');
   };
 
-  /* password validation rules */
-  const pwdRules = [
-    { label: 'At least 12 characters',          met: password.length >= 12 },
-    { label: 'At least one uppercase letter',    met: /[A-Z]/.test(password) },
-    { label: 'At least one lowercase letter',    met: /[a-z]/.test(password) },
-    { label: 'At least one number',              met: /[0-9]/.test(password) },
-    { label: 'At least one symbol (!@#$…)',      met: /[^A-Za-z0-9]/.test(password) },
-  ];
-  const pwdOk = pwdRules.every(r => r.met);
-
-  const pwdStrength = () => {
-    if (!password) return null;
-    const score = pwdRules.filter(r => r.met).length;
-    if (score <= 1) return { label:'Weak',   color:'#DC2626', w:'20%'  };
-    if (score === 2) return { label:'Fair',   color:'#D97706', w:'40%'  };
-    if (score === 3) return { label:'Good',   color:'#0F766E', w:'65%'  };
-    if (score === 4) return { label:'Almost', color:'#059669', w:'85%'  };
-    return              { label:'Strong', color:'#059669', w:'100%' };
-  };
-  const strength = pwdStrength();
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedEmp) { showMsg('error', 'Please select an employee by Mesob ID.'); return; }
-    if (!pwdOk) { showMsg('error', 'Password must be at least 12 characters with uppercase, number, and symbol.'); return; }
     setSaving(true);
     try {
-      await AccountApi.createAccount({ employee_uuid: selectedEmp.uuid, username, password, role });
-      showMsg('success', 'Account created successfully.');
-      onCreated();
-    } catch(err) { showMsg('error', err.message || 'Failed to create account.'); }
-    finally { setSaving(false); }
+      const result = await AccountApi.createAccount({ employee_uuid: selectedEmp.uuid, role });
+      // Server returns the created account with auto-generated username and default password
+      setCreatedAccount(result.data);
+    } catch(err) { 
+      showMsg('error', err.message || 'Failed to create account.'); 
+      setSaving(false);
+    }
   };
+
+  // If account was created, show success screen with credentials
+  if (createdAccount) {
+    return (
+      <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:20 }}>
+        <div style={{ background:C.card, borderRadius:14, width:'100%', maxWidth:480, padding:28, boxShadow:'0 25px 50px rgba(0,0,0,0.3)', border:`1px solid ${C.cardBorder}` }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+            <h2 style={{ margin:0, fontSize:'1.05rem', fontWeight:700, color:C.textMain }}>Account Created Successfully</h2>
+            <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:C.textMuted, display:'flex' }}><X size={18}/></button>
+          </div>
+
+          <div style={{ padding:'16px', borderRadius:10, background:'rgba(15,118,110,0.08)', border:`1px solid rgba(15,118,110,0.2)`, marginBottom:20 }}>
+            <p style={{ margin:0, fontSize:'0.85rem', color:C.primary, fontWeight:600 }}>✓ Account created for {selectedEmp.first_name} {selectedEmp.last_name}</p>
+            <p style={{ margin:'8px 0 0', fontSize:'0.8rem', color:C.textSub }}>
+              Please share these credentials securely with the user. They can change their password after first login.
+            </p>
+          </div>
+
+          {/* Display credentials */}
+          <div style={{ marginBottom:20 }}>
+            <div style={{ marginBottom:14 }}>
+              <label style={{ ...labelStyle, marginBottom:6 }}>Username</label>
+              <div style={{ padding:'10px 14px', background:'#fff', borderRadius:8, border:`1px solid ${C.border}`, fontFamily:'monospace', fontSize:'0.9rem', fontWeight:700, color:C.textMain }}>
+                {createdAccount.username}
+              </div>
+            </div>
+            <div>
+              <label style={{ ...labelStyle, marginBottom:6 }}>Default Password</label>
+              <div style={{ padding:'10px 14px', background:'#fff', borderRadius:8, border:`1px solid ${C.border}`, fontFamily:'monospace', fontSize:'0.9rem', fontWeight:700, color:C.textMain }}>
+                {createdAccount.default_password}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ padding:'12px 16px', borderRadius:8, background:'rgba(245,158,11,0.08)', border:`1px solid rgba(245,158,11,0.2)`, marginBottom:20 }}>
+            <p style={{ margin:0, fontSize:'0.75rem', color:'#B45309', fontWeight:500 }}>
+              ⚠️ <strong>Important:</strong> Username cannot be changed. Password meets security requirements (8+ characters with uppercase, lowercase, number, and symbol).
+            </p>
+          </div>
+
+          <div style={{ display:'flex', justifyContent:'flex-end' }}>
+            <GreenBtn onClick={() => { onCreated(); onClose(); }}>Done</GreenBtn>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:20 }}>
@@ -230,6 +271,14 @@ const CreateAccountModal = ({ onClose, onCreated, showMsg, existingAccounts = []
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:22 }}>
           <h2 style={{ margin:0, fontSize:'1.05rem', fontWeight:700, color:C.textMain }}>Create User Account</h2>
           <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:C.textMuted, display:'flex' }}><X size={18}/></button>
+        </div>
+
+        {/* Info banner about auto-generation */}
+        <div style={{ padding:'12px 16px', borderRadius:10, background:'rgba(15,118,110,0.08)', border:`1px solid ${C.primary}`, marginBottom:20 }}>
+          <p style={{ margin:0, fontSize:'0.8rem', color:C.textSub, lineHeight:1.5 }}>
+            <strong style={{ color:C.primary }}>Auto-Generated Credentials:</strong><br/>
+            Username will be generated as <code style={{ background:'rgba(0,0,0,0.08)', padding:'2px 6px', borderRadius:4, fontFamily:'monospace' }}>firstname.lastname</code> and default password will be set to <code style={{ background:'rgba(0,0,0,0.08)', padding:'2px 6px', borderRadius:4, fontFamily:'monospace' }}>Mesob@2026</code>
+          </p>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -260,7 +309,7 @@ const CreateAccountModal = ({ onClose, onCreated, showMsg, existingAccounts = []
                     {[selectedEmp.first_name, selectedEmp.middle_name, selectedEmp.last_name].filter(Boolean).join(' ')}
                   </span>
                 </div>
-                <button type="button" onClick={() => { setSelectedEmp(null); setMesobSearch(''); setUsername(''); }} style={{ background:'none', border:'none', cursor:'pointer', color:C.textMuted, fontSize:'0.7rem', fontWeight:600 }}>✕</button>
+                <button type="button" onClick={() => { setSelectedEmp(null); setMesobSearch(''); }} style={{ background:'none', border:'none', cursor:'pointer', color:C.textMuted, fontSize:'0.7rem', fontWeight:600 }}>✕</button>
               </div>
             )}
             {/* dropdown results */}
@@ -284,65 +333,6 @@ const CreateAccountModal = ({ onClose, onCreated, showMsg, existingAccounts = []
             )}
           </div>
 
-          {/* ── Username ── */}
-          <div style={{ marginBottom:14 }}>
-            <label style={labelStyle}>Username *</label>
-            <input
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              placeholder="e.g. abelkebede@mesob.et"
-              required
-              style={inputStyle}
-              onFocus={e => e.target.style.borderColor = C.primary}
-              onBlur={e  => e.target.style.borderColor = C.border}
-            />
-          </div>
-
-          {/* ── Password ── */}
-          <div style={{ marginBottom:14 }}>
-            <label style={labelStyle}>Initial Password *</label>
-            <div style={{ position:'relative' }}>
-              <input
-                type={showPwd ? 'text' : 'password'}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="Min 12 chars, uppercase, number, symbol"
-                required
-                style={{ ...inputStyle, paddingRight:38 }}
-                onFocus={e => e.target.style.borderColor = C.primary}
-                onBlur={e  => e.target.style.borderColor = C.border}
-              />
-              <button type="button" onClick={() => setShowPwd(v => !v)}
-                style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:C.textMuted, display:'flex', padding:0 }}>
-                {showPwd ? <EyeOff size={15}/> : <Eye size={15}/>}
-              </button>
-            </div>
-            {/* strength bar */}
-            {password && strength && (
-              <div style={{ marginTop:6 }}>
-                <div style={{ height:4, borderRadius:99, background:'rgba(0,0,0,0.08)', overflow:'hidden' }}>
-                  <div style={{ height:'100%', width:strength.w, background:strength.color, borderRadius:99, transition:'width 0.3s' }}/>
-                </div>
-                <span style={{ fontSize:'0.65rem', color:strength.color, fontWeight:600 }}>{strength.label}</span>
-              </div>
-            )}
-            {/* live validation checklist */}
-            {password && (
-              <div style={{ marginTop:8, padding:'10px 14px', background:'rgba(0,0,0,0.03)', borderRadius:8, border:`1px solid ${C.border}` }}>
-                {pwdRules.map(rule => (
-                  <div key={rule.label} style={{ display:'flex', alignItems:'center', gap:7, marginBottom:4, lineHeight:1 }}>
-                    <span style={{ fontSize:'0.75rem', fontWeight:700, color: rule.met ? '#059669' : '#DC2626', flexShrink:0 }}>
-                      {rule.met ? '✓' : '✗'}
-                    </span>
-                    <span style={{ fontSize:'0.72rem', color: rule.met ? '#059669' : '#DC2626', textDecoration: rule.met ? 'line-through' : 'none', opacity: rule.met ? 0.7 : 1 }}>
-                      {rule.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
           {/* ── Role ── */}
           <div style={{ marginBottom:22 }}>
             <label style={labelStyle}>Role</label>
@@ -353,7 +343,7 @@ const CreateAccountModal = ({ onClose, onCreated, showMsg, existingAccounts = []
 
           <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
             <button type="button" onClick={onClose} style={{ padding:'9px 18px', borderRadius:8, border:`1px solid ${C.border}`, background:'transparent', color:C.textSub, fontWeight:600, fontSize:'0.78rem', cursor:'pointer', fontFamily:'Poppins,sans-serif' }}>Cancel</button>
-            <GreenBtn type="submit" disabled={saving || !selectedEmp || !pwdOk}>
+            <GreenBtn type="submit" disabled={saving || !selectedEmp}>
               {saving ? 'Creating…' : 'Create Account'}
             </GreenBtn>
           </div>
@@ -410,7 +400,7 @@ const AccountsPage = () => {
   };
 
   const roleColor = (role) => {
-    const m = { SUPER_ADMIN:['rgba(124,58,237,0.1)','#7C3AED'], HR_ADMIN:['rgba(245,158,11,0.1)','#B45309'], HR_OFFICER:['rgba(37,99,235,0.1)','#1D4ED8'], DEPARTMENT_HEAD:['rgba(15,118,110,0.1)',C.primary], EMPLOYEE:['rgba(0,80,60,0.07)',C.textMuted] };
+    const m = { SUPER_ADMIN:['rgba(124,58,237,0.1)','#7C3AED'], HR_ADMIN:['rgba(245,158,11,0.1)','#B45309'], HR_OFFICER:['rgba(37,99,235,0.1)','#1D4ED8'], DEPT_HEAD:['rgba(15,118,110,0.1)',C.primary], EMPLOYEE:['rgba(0,80,60,0.07)',C.textMuted] };
     return m[role] || m.EMPLOYEE;
   };
 

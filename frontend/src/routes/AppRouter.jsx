@@ -29,6 +29,7 @@ import PoliciesPage           from '../pages/PoliciesPage';
 import HolidaysPage           from '../pages/HolidaysPage';
 import NetworkSettingsPage    from '../pages/NetworkSettingsPage';
 import MyAccountPage          from '../pages/MyAccountPage';
+import MyDashboardPage        from '../pages/MyDashboardPage';
 import PlaceholderPage        from '../pages/PlaceholderPage';
 import Login                  from '../components/Login';
 
@@ -80,8 +81,12 @@ const LoginRoute = () => {
 
 /* Permission-based Attendance Routing Component */
 const AttendanceRouter = () => {
-  const canManageAll = usePermission('attendance', 'manage_all');
-  const canManageDept = usePermission('attendance', 'manage_department');
+  const { allowed: canManageAll, loading: loadingAll } = usePermission('attendance', 'manage_all');
+  const { allowed: canManageDept, loading: loadingDept } = usePermission('attendance', 'manage_department');
+
+  if (loadingAll || loadingDept) {
+    return <LoadingScreen />;
+  }
 
   // Users with manage_all see full overview
   if (canManageAll) {
@@ -104,7 +109,11 @@ const MyAttendanceRouter = () => {
 
 /* Permission-based Letters Routing Component */
 const LettersRouter = () => {
-  const canManageLetters = usePermission('letters', 'manage');
+  const { allowed: canManageLetters, loading } = usePermission('letters', 'manage');
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
 
   // Users with letters.manage see management interface
   if (canManageLetters) {
@@ -182,6 +191,7 @@ const AppRouter = () => (
 
       
       {/* ── My Account - Everyone can access ── */}
+      <Route path="my-dashboard" element={<MyDashboardPage />} />
       <Route path="my-account" element={<MyAccountPage />} />
       <Route path="notifications" element={<NotificationsPage />} />
     </Route>

@@ -18,31 +18,128 @@ const VALID_ROLE_CODES = [
 ];
 
 /**
+ * Helper function to validate password complexity
+ * Password must be 8+ characters with at least one uppercase, lowercase, number, and symbol
+ */
+function validatePassword(password) {
+  if (!password || password.length < 8) {
+    return { valid: false, message: "Password must be at least 8 characters long." };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, message: "Password must contain at least one uppercase letter." };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, message: "Password must contain at least one lowercase letter." };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, message: "Password must contain at least one number." };
+  }
+  if (!/[^A-Za-z0-9]/.test(password)) {
+    return { valid: false, message: "Password must contain at least one symbol." };
+  }
+  return { valid: true };
+}
+
+/**
+ * Helper function to generate unique username from employee name
+ * Format: firstname.lastname (lowercase, no spaces)
+ * If duplicate, appends number (e.g., john.doe2, john.doe3)
+ */
+async function generateUniqueUsername(firstName, lastName, pool) {
+  // Normalize names: lowercase, remove spaces and special characters
+  const first = (firstName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const last = (lastName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  
+  if (!first || !last) {
+    throw new Error("Employee must have valid first and last names.");
+  }
+
+  let baseUsername = `${first}.${last}`;
+  let username = baseUsername;
+  let counter = 2;
+
+  // Check for existing username and increment until unique
+  while (true) {
+    const existingUser = await findUserByUsername(username);
+    if (!existingUser) {
+      return username;
+    }
+    username = `${baseUsername}${counter}`;
+    counter++;
+  }
+}
+
+/**
  * Create a new user account
  * POST /api/accounts
+ * Username and password are auto-generated
  */
 exports.createAccount = async (req, res) => {
   try {
     const {
       employee_uuid,
-      username,
-      password,
       role_uuid,
       role,
       is_active = true,
       must_change_password = false,
     } = req.body;
 
-    // Validation
-    if (!employee_uuid || !username || !password) {
+    // Validation - only employee_uuid is required now
+    if (!employee_uuid) {
       return sendError(res, {
         status: 400,
-        message: "employee_uuid, username, and password are required.",
+        message: "employee_uuid is required.",
         error: "VALIDATION_ERROR",
       });
     }
 
     const pool = db.promise();
+
+    // Check if employee exists and get name
+    const [employees] = await pool.execute(
+      "SELECT uuid, first_name, last_name FROM Employees WHERE uuid = ?",
+      [employee_uuid]
+    );
+
+    if (!employees.length) {
+      return sendError(res, {
+        status: 404,
+        message: "Employee not found.",
+        error: "EMPLOYEE_NOT_FOUND",
+      });
+    }
+
+    const employee = employees[0];
+
+    // Check if employee already has an account
+    const [existingAccounts] = await pool.execute(
+      "SELECT uuid FROM Users WHERE employee_uuid = ?",
+      [employee_uuid]
+    );
+
+    if (existingAccounts.length) {
+      return sendError(res, {
+        status: 409,
+        message: "Employee already has a user account.",
+        error: "ACCOUNT_EXISTS",
+      });
+    }
+
+    // Auto-generate unique username from employee name
+    const username = await generateUniqueUsername(employee.first_name, employee.last_name, pool);
+
+    // Set default password: Mesob@2026
+    const defaultPassword = "Mesob@2026";
+
+    // Validate password (should always pass with our default)
+    const passwordValidation = validatePassword(defaultPassword);
+    if (!passwordValidation.valid) {
+      return sendError(res, {
+        status: 500,
+        message: `Default password validation failed: ${passwordValidation.message}`,
+        error: "PASSWORD_VALIDATION_ERROR",
+      });
+    }
 
     // Determine target role UUID
     let targetRoleUuid = role_uuid;
@@ -85,46 +182,8 @@ exports.createAccount = async (req, res) => {
       }
     }
 
-    // Check if username already exists
-    const existingUser = await findUserByUsername(username);
-    if (existingUser) {
-      return sendError(res, {
-        status: 409,
-        message: "Username already exists.",
-        error: "USERNAME_EXISTS",
-      });
-    }
-
-    // Check if employee exists
-    const [employees] = await pool.execute(
-      "SELECT uuid, first_name, last_name FROM Employees WHERE uuid = ?",
-      [employee_uuid]
-    );
-
-    if (!employees.length) {
-      return sendError(res, {
-        status: 404,
-        message: "Employee not found.",
-        error: "EMPLOYEE_NOT_FOUND",
-      });
-    }
-
-    // Check if employee already has an account
-    const [existingAccounts] = await pool.execute(
-      "SELECT uuid FROM Users WHERE employee_uuid = ?",
-      [employee_uuid]
-    );
-
-    if (existingAccounts.length) {
-      return sendError(res, {
-        status: 409,
-        message: "Employee already has a user account.",
-        error: "ACCOUNT_EXISTS",
-      });
-    }
-
     // Create password hash
-    const password_hash = await generatePasswordHash(password);
+    const password_hash = await generatePasswordHash(defaultPassword);
     const userUuid = randomUUID();
 
     // Insert new user
@@ -156,7 +215,7 @@ exports.createAccount = async (req, res) => {
       [userUuid]
     );
 
-    console.log(`[Account] Created new user ${newUser[0].username}`);
+    console.log(`[Account] Created new user ${newUser[0].username} with auto-generated credentials`);
 
     // Audit log
     await safeLogEvent({
@@ -170,8 +229,11 @@ exports.createAccount = async (req, res) => {
 
     return sendSuccess(res, {
       status: 201,
-      message: "User account created successfully.",
-      data: newUser[0],
+      message: "User account created successfully. Default password is Mesob@2026",
+      data: {
+        ...newUser[0],
+        default_password: defaultPassword, // Include in response for admin to share with user
+      },
     });
   } catch (error) {
     console.error("createAccount error:", error);
@@ -526,11 +588,13 @@ exports.resetAccountPassword = async (req, res) => {
       });
     }
 
-    if (new_password.length < 6) {
+    // Validate password complexity
+    const passwordValidation = validatePassword(new_password);
+    if (!passwordValidation.valid) {
       return sendError(res, {
         status: 400,
-        message: "Password must be at least 6 characters long.",
-        error: "PASSWORD_TOO_SHORT",
+        message: passwordValidation.message,
+        error: "PASSWORD_VALIDATION_ERROR",
       });
     }
 

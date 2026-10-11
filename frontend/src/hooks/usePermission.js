@@ -12,7 +12,7 @@
  * The backend ALWAYS enforces authorization - never trust frontend permissions.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/apiClient';
 
@@ -84,7 +84,7 @@ export function usePermission(action, resource, options = {}) {
     };
   }, [action, resource, isAuthenticated, skip, user?.uuid]);
 
-  return { allowed, loading, error };
+  return useMemo(() => ({ allowed, loading, error }), [allowed, loading, error]);
 }
 
 /**
@@ -153,7 +153,7 @@ export function useAnyPermission(permissions) {
     };
   }, [JSON.stringify(permissions), isAuthenticated]);
 
-  return { allowed, loading, error };
+  return useMemo(() => ({ allowed, loading, error }), [allowed, loading, error]);
 }
 
 /**
@@ -222,7 +222,7 @@ export function useAllPermissions(permissions) {
     };
   }, [JSON.stringify(permissions), isAuthenticated]);
 
-  return { allowed, loading, error };
+  return useMemo(() => ({ allowed, loading, error }), [allowed, loading, error]);
 }
 
 export default usePermission;

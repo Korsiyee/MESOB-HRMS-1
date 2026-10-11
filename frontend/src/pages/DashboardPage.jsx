@@ -37,6 +37,13 @@ const DonutRing = ({ pct = 80 }) => {
 const DashboardPage = () => {
   const { user } = useAuth();
   
+  // ✅ IMPORTANT: Call ALL hooks at the top level BEFORE any conditional returns
+  // to comply with React's Rules of Hooks
+  const { allowed: canViewOrgStats } = usePermission('dashboard', 'view_organization');
+  const { allowed: canViewDeptStats } = usePermission('dashboard', 'view_department');
+  const { stats, departments, attendanceData, recentActivity, upcomingHolidays, leaveBalance, loading, error, refetch } = useDashboard();
+  const { isMobile, isTablet, r } = useResponsive();
+  
   // Primary: Use dashboard value from static RBAC (provided at login)
   const dashboard = user?.dashboard || localStorage.getItem('userDashboard');
   
@@ -51,8 +58,6 @@ const DashboardPage = () => {
   
   // dashboard === 'hr' or default for HR_OFFICER, HR_ADMIN, SUPER_ADMIN
   // Fallback to permission-based routing for backward compatibility
-  const canViewOrgStats = usePermission('dashboard', 'view_organization');
-  const canViewDeptStats = usePermission('dashboard', 'view_department');
 
   // If no org-wide view, check for department view
   if (!canViewOrgStats && canViewDeptStats) {
@@ -65,13 +70,10 @@ const DashboardPage = () => {
   }
 
   // Admin / HR with dashboard.view_organization → analytics dashboard
-  const { stats, departments, attendanceData, recentActivity, upcomingHolidays, leaveBalance, loading, error, refetch } = useDashboard();
 
   const attendancePct = stats.totalEmployees > 0
     ? Math.round((stats.presentToday / stats.totalEmployees) * 100)
     : 80;
-
-  const { isMobile, isTablet, r } = useResponsive();
 
   // Palette for consistency
   const C = {

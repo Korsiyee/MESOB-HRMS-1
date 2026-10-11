@@ -49,7 +49,13 @@ async function getUserPermissions(userUuid) {
     const userData = rows[0];
     
     // Get modules from STATIC configuration based on role
+    console.log(`[ModuleAuth] getUserPermissions for user ${userUuid}:`, {
+      username: userData.username,
+      role_code: userData.role_code,
+      role_name: userData.role_name
+    });
     const moduleCodesForRole = getModulesForRole(userData.role_code);
+    console.log(`[ModuleAuth] Module codes from static mapping for role ${userData.role_code}:`, moduleCodesForRole);
     
     // Get full module details from database
     const modules = [];
@@ -64,6 +70,13 @@ async function getUserPermissions(userUuid) {
       
       modules.push(...moduleRows);
     }
+
+    console.log(`[ModuleAuth] Final permissions for ${userData.username}:`, {
+      role: userData.role_code,
+      dashboard: getDashboardForRole(userData.role_code),
+      module_count: modules.length,
+      modules: modules.map(m => m.code)
+    });
 
     return {
       user: {

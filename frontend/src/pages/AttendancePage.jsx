@@ -594,7 +594,7 @@ const CorrectModal = ({ record, onClose, onSaved, showMsg }) => {
 const AttendancePage = () => {
   const { user } = useAuth();
   const dialog = useDialog();
-  const canManageAll = usePermission('attendance', 'manage_all');
+  const { allowed: canManageAll, loading: permLoading } = usePermission('attendance', 'manage_all');
   const employeeUuid = user?.employee_uuid;
 
   const [records,     setRecords]     = useState([]);
@@ -656,6 +656,7 @@ const AttendancePage = () => {
   }, [filters.departmentUuid, allPositions, filters.positionUuid]);
 
   const load = useCallback(async () => {
+    if (permLoading) return;
     setLoading(true);
     try {
       const params = {
@@ -688,7 +689,7 @@ const AttendancePage = () => {
       setMeta({ total: 0, totalPages: 1 });
     }
     finally { setLoading(false); }
-  }, [filters.search, filters.departmentUuid, filters.positionUuid, filters.status, filters.startDate, filters.endDate, filters.page, filters.pageSize, canManageAll, employeeUuid]);
+  }, [filters.search, filters.departmentUuid, filters.positionUuid, filters.status, filters.startDate, filters.endDate, filters.page, filters.pageSize, canManageAll, employeeUuid, permLoading]);
 
   useEffect(() => { load(); }, [load]);
 

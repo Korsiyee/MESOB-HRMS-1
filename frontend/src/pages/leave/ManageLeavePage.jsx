@@ -265,8 +265,8 @@ const ManageLeavePage = () => {
   const userUuid = user?.uuid || "";
   
   // Permission-based access control
-  const canApproveHR = usePermission('leave', 'approve_hr');
-  const canApproveDept = usePermission('leave', 'approve_department');
+  const { allowed: canApproveHR } = usePermission('leave', 'approve_hr');
+  const { allowed: canApproveDept } = usePermission('leave', 'approve_department');
 
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
