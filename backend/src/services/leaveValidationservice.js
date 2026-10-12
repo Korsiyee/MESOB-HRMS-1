@@ -20,10 +20,10 @@ class LeaveValidationService {
       const policyQuery = `
         SELECT eligibilityMonths 
         FROM leavePolicies 
-        WHERE leaveType = ?
+        WHERE UPPER(leaveType) = ?
       `;
 
-      const [policyRows] = await db.promise().execute(policyQuery, [leaveType]);
+      const [policyRows] = await db.promise().execute(policyQuery, [String(leaveType || '').toUpperCase()]);
 
       if (policyRows.length === 0) {
         return {
@@ -152,21 +152,30 @@ class LeaveValidationService {
    */
   static async validateLeaveTypeSpecifics(leaveType, requestData) {
     try {
-      switch (leaveType) {
-        case "Annual":
+      const normalized = String(leaveType || '').trim().toUpperCase();
+      switch (normalized) {
+        case "ANNUAL":
           return this.validateAnnualLeave(requestData);
 
-        case "Paternity":
+        case "PATERNITY":
           return this.validatePaternityLeave(requestData);
 
-        case "Sick":
+        case "SICK":
           return this.validateSickLeave(requestData);
 
-        case "Maternity":
+        case "MATERNITY":
           return this.validateMaternityLeave(requestData);
 
-        default:
-          return { valid: false, message: "Invalid leave type" };
+        default: {
+          const [rows] = await db.promise().execute(
+            "SELECT baseDays, maxDays FROM leavePolicies WHERE UPPER(leaveType) = ?",
+            [normalized]
+          );
+          if (rows.length > 0) {
+            return { valid: true, message: `${leaveType} leave requirements met` };
+          }
+          return { valid: false, message: `Invalid leave type: ${leaveType}` };
+        }
       }
     } catch (error) {
       console.error("Error validating leave type specifics:", error);

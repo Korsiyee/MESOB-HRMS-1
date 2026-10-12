@@ -3,6 +3,9 @@ const {
   isValidFullName,
   isValidIsoDate,
   isValidUuid,
+  isValidEthiopianPhone,
+  normalizeEthiopianPhone,
+  isValidEmail,
 } = require("../utils/validation");
 
 const GENDERS = new Set(["MALE", "FEMALE"]);
@@ -154,6 +157,35 @@ function validateEmployeeCreate(payload) {
         message: "Invalid address type.",
       });
     }
+    
+    // Validate phone numbers (primary and secondary)
+    if (address?.phone_primary) {
+      if (!isValidEthiopianPhone(address.phone_primary)) {
+        invalid.push({
+          field: `addresses[${index}].phone_primary`,
+          message: "Primary phone must be a valid 10-digit Ethiopian phone number (e.g., 0912345678).",
+        });
+      }
+    }
+    
+    if (address?.phone_secondary) {
+      if (!isValidEthiopianPhone(address.phone_secondary)) {
+        invalid.push({
+          field: `addresses[${index}].phone_secondary`,
+          message: "Secondary phone must be a valid 10-digit Ethiopian phone number (e.g., 0912345678).",
+        });
+      }
+    }
+    
+    // Validate email
+    if (address?.email) {
+      if (!isValidEmail(address.email)) {
+        invalid.push({
+          field: `addresses[${index}].email`,
+          message: "Invalid email address format.",
+        });
+      }
+    }
   });
 
   return { missing, invalid };
@@ -263,6 +295,35 @@ function validateEmployeeUpdate(payload) {
         field: `addresses[${index}].address_type`,
         message: "Invalid address type.",
       });
+    }
+    
+    // Validate phone numbers (primary and secondary)
+    if (address?.phone_primary) {
+      if (!isValidEthiopianPhone(address.phone_primary)) {
+        invalid.push({
+          field: `addresses[${index}].phone_primary`,
+          message: "Primary phone must be a valid 10-digit Ethiopian phone number (e.g., 0912345678).",
+        });
+      }
+    }
+    
+    if (address?.phone_secondary) {
+      if (!isValidEthiopianPhone(address.phone_secondary)) {
+        invalid.push({
+          field: `addresses[${index}].phone_secondary`,
+          message: "Secondary phone must be a valid 10-digit Ethiopian phone number (e.g., 0912345678).",
+        });
+      }
+    }
+    
+    // Validate email
+    if (address?.email) {
+      if (!isValidEmail(address.email)) {
+        invalid.push({
+          field: `addresses[${index}].email`,
+          message: "Invalid email address format.",
+        });
+      }
     }
   });
 

@@ -54,17 +54,19 @@ async function insertNotification({
   const uuid = randomUUID();
   await executeQuery(
     `INSERT INTO Notifications
-       (uuid, user_uuid, sender_uuid, sender_role, notification_type,
-        title, message, redirect_url, entity_type, entity_uuid, is_read, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NOW())`,
+       (uuid, user_uuid, sender_uuid, sender_role, notification_type, type,
+        title, message, redirect_url, link_url, entity_type, entity_uuid, is_read, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NOW())`,
     [
       uuid,
       recipientUuid,
       senderUuid || null,
       senderRole || null,
       type,
+      type,
       title,
       message,
+      redirectUrl || null,
       redirectUrl || null,
       entityType || null,
       entityUuid || null,
@@ -109,12 +111,60 @@ async function notifyLeaveSubmitted({
   const daysLabel = totalDays != null ? `${Number(totalDays).toFixed(1)} day(s)` : "—";
   const dateRange = `${fmtDate(startDate)} to ${fmtDate(endDate)}`;
 
-  if (senderRole === "DEPT_HEAD") {
-    // Dept head's own request → HR_ADMIN + SUPER_ADMIN
-    const hrAdmins = await getUsersByRole("HR_ADMIN");
+  if (senderRole === "HR_ADMIN") {
+    // HR Admin's request is automatically approved
+    await insertNotification({
+      recipientUuid: senderUserUuid,
+      senderUuid: senderUserUuid,
+      senderRole,
+      type: "LEAVE_HR_APPROVED",
+      title: "Leave Request Automatically Approved",
+      message: `Your ${leaveType} leave request for ${daysLabel} (${dateRange}) has been automatically approved.`,
+      redirectUrl: "/leave/my-requests",
+      entityType: "LEAVE_REQUEST",
+      entityUuid: requestUuid,
+    });
+
     const superAdmins = await getUsersByRole("SUPER_ADMIN");
-    const recipients = [...new Set([...hrAdmins, ...superAdmins])];
-    await fanOut(recipients, {
+    await fanOut(superAdmins.filter(u => u !== senderUserUuid), {
+      senderUuid: senderUserUuid,
+      senderRole,
+      type: "LEAVE_HR_APPROVED",
+      title: "HR Admin Leave Auto-Approved",
+      message: `${employeeFullName} (HR Admin) submitted and auto-approved a ${leaveType} leave request for ${daysLabel} (${dateRange}).`,
+      redirectUrl: "/leave/manage",
+      entityType: "LEAVE_REQUEST",
+      entityUuid: requestUuid,
+    });
+    return;
+  }
+
+  if (senderRole === "HR_OFFICER" || senderRole === "SUPER_ADMIN") {
+    // HR Officer or Super Admin request → goes directly to HR Admin + other HR Officers
+    const hrAdmins = await getUsersByRole("HR_ADMIN");
+    const hrOfficers = await getUsersByRole("HR_OFFICER");
+    const superAdmins = await getUsersByRole("SUPER_ADMIN");
+    const recipients = [...new Set([...hrAdmins, ...hrOfficers, ...superAdmins])];
+    await fanOut(recipients.filter(u => u !== senderUserUuid), {
+      senderUuid: senderUserUuid,
+      senderRole,
+      type: "LEAVE_REQUEST_SUBMITTED",
+      title: `New Leave Request from ${senderRole === 'SUPER_ADMIN' ? 'Super Admin' : 'HR Officer'}`,
+      message: `${employeeFullName} (${senderRole === 'SUPER_ADMIN' ? 'Super Admin' : 'HR Officer'}${departmentName ? ` — ${departmentName}` : ""}) submitted a ${leaveType} leave request for ${daysLabel} (${dateRange}) pending HR approval.`,
+      redirectUrl: "/leave/manage",
+      entityType: "LEAVE_REQUEST",
+      entityUuid: requestUuid,
+    });
+    return;
+  }
+
+  if (senderRole === "DEPT_HEAD" || senderRole === "DEPARTMENT_HEAD") {
+    // Dept head's own request → HR_ADMIN + HR_OFFICER + SUPER_ADMIN
+    const hrAdmins = await getUsersByRole("HR_ADMIN");
+    const hrOfficers = await getUsersByRole("HR_OFFICER");
+    const superAdmins = await getUsersByRole("SUPER_ADMIN");
+    const recipients = [...new Set([...hrAdmins, ...hrOfficers, ...superAdmins])];
+    await fanOut(recipients.filter(u => u !== senderUserUuid), {
       senderUuid: senderUserUuid,
       senderRole,
       type: "LEAVE_REQUEST_SUBMITTED",
@@ -127,33 +177,17 @@ async function notifyLeaveSubmitted({
     return;
   }
 
-  if (senderRole === "HR_ADMIN" || senderRole === "HR_OFFICER") {
-    // HR's own request → SUPER_ADMIN
-    const superAdmins = await getUsersByRole("SUPER_ADMIN");
-    await fanOut(superAdmins, {
-      senderUuid: senderUserUuid,
-      senderRole,
-      type: "LEAVE_REQUEST_SUBMITTED",
-      title: "New Leave Request from HR",
-      message: `${employeeFullName} (HR${departmentName ? ` — ${departmentName}` : ""}) submitted a ${leaveType} leave request for ${daysLabel} (${dateRange}).`,
-      redirectUrl: "/leave/manage",
-      entityType: "LEAVE_REQUEST",
-      entityUuid: requestUuid,
-    });
-    return;
-  }
-
   // Regular employee → notify their assigned department head
   const recipients = [];
   if (departmentHeadUserUuid) {
     recipients.push(departmentHeadUserUuid);
   } else {
-    // Fall back: notify all dept heads (shouldn't normally happen)
+    // Fall back: notify all dept heads
     const allDeptHeads = await getUsersByRole("DEPT_HEAD");
     recipients.push(...allDeptHeads);
   }
 
-  await fanOut(recipients, {
+  await fanOut(recipients.filter(u => u !== senderUserUuid), {
     senderUuid: senderUserUuid,
     senderRole: senderRole || "EMPLOYEE",
     type: "LEAVE_REQUEST_SUBMITTED",
@@ -166,7 +200,7 @@ async function notifyLeaveSubmitted({
 }
 
 /**
- * Department Head approves → notify HR_ADMIN + SUPER_ADMIN.
+ * Department Head approves → notify HR_ADMIN + HR_OFFICER + SUPER_ADMIN.
  */
 async function notifyDepartmentApproved({
   senderUserUuid,
@@ -184,8 +218,9 @@ async function notifyDepartmentApproved({
   const dateRange = `${fmtDate(startDate)} to ${fmtDate(endDate)}`;
 
   const hrAdmins = await getUsersByRole("HR_ADMIN");
+  const hrOfficers = await getUsersByRole("HR_OFFICER");
   const superAdmins = await getUsersByRole("SUPER_ADMIN");
-  const recipients = [...new Set([...hrAdmins, ...superAdmins])];
+  const recipients = [...new Set([...hrAdmins, ...hrOfficers, ...superAdmins])];
 
   await fanOut(recipients, {
     senderUuid: senderUserUuid,
@@ -327,7 +362,7 @@ async function notifyHRRejected({
 ──────────────────────────────────────────────────────────── */
 
 /**
- * Any role submits a letter request → notify HR_ADMIN + SUPER_ADMIN.
+ * Any role submits a letter request → notify HR_ADMIN + HR_OFFICER + SUPER_ADMIN.
  */
 async function notifyLetterSubmitted({
   senderUserUuid,
@@ -338,8 +373,9 @@ async function notifyLetterSubmitted({
   requestUuid,
 }) {
   const hrAdmins = await getUsersByRole("HR_ADMIN");
+  const hrOfficers = await getUsersByRole("HR_OFFICER");
   const superAdmins = await getUsersByRole("SUPER_ADMIN");
-  const recipients = [...new Set([...hrAdmins, ...superAdmins])];
+  const recipients = [...new Set([...hrAdmins, ...hrOfficers, ...superAdmins])];
 
   const rolePart =
     senderRole === "DEPT_HEAD"
@@ -435,16 +471,22 @@ async function getNotificationsForUser(userUuid, { limit = 50, offset = 0 } = {}
   const safeLimit  = Math.min(Math.max(1, parseInt(limit,  10) || 50), 100);
   const safeOffset = Math.max(0, parseInt(offset, 10) || 0);
   const [rows] = await db.promise().execute(
-    `SELECT n.uuid, n.notification_type, n.title, n.message, n.redirect_url,
+    `SELECT n.uuid, 
+            COALESCE(n.notification_type, n.type) AS notification_type,
+            n.type,
+            n.title, n.message, 
+            COALESCE(n.redirect_url, n.link_url) AS redirect_url,
+            n.link_url,
             n.entity_type, n.entity_uuid, n.is_read, n.created_at,
             n.sender_role,
             CONCAT(e.first_name, ' ',
                    CASE WHEN e.middle_name IS NOT NULL AND e.middle_name != ''
                         THEN CONCAT(e.middle_name, ' ') ELSE '' END,
                    e.last_name) AS sender_name,
-            u.role AS sender_user_role
+            r.code AS sender_user_role
      FROM Notifications n
      LEFT JOIN Users u ON u.uuid = n.sender_uuid
+     LEFT JOIN Roles r ON r.uuid = u.role_uuid
      LEFT JOIN Employees e ON e.uuid = u.employee_uuid
      WHERE n.user_uuid = ?
      ORDER BY n.created_at DESC

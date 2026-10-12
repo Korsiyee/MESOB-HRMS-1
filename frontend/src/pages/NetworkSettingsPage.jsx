@@ -4,6 +4,7 @@ import { RefreshCw, Plus, Pencil, Trash2, X, Wifi, Shield, AlertCircle } from 'l
 import { useDialog } from '../context/DialogContext';
 import { PermissionGuard } from '../components/PermissionGuard';
 import { usePermissions } from '../hooks/usePermissions';
+import { useAuth } from '../context/AuthContext';
 
 /* ── Palette ── */
 const C = {
@@ -83,10 +84,31 @@ const NetworkSettingModal = ({ setting, onClose, onSaved, showMsg }) => {
       return;
     }
 
-    // Basic IP/CIDR validation
-    const ipPattern = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;
-    if (!ipPattern.test(ipRange.trim())) {
-      showMsg('error', 'Invalid IP address or CIDR notation. Example: 192.168.1.100 or 192.168.1.0/24');
+    // Comprehensive IPv4 / CIDR validation
+    const trimmed = ipRange.trim();
+    const parts = trimmed.split('/');
+    let isValid = parts.length <= 2;
+    if (isValid) {
+      const octets = parts[0].split('.');
+      if (octets.length !== 4) {
+        isValid = false;
+      } else {
+        for (const oct of octets) {
+          if (!/^\d{1,3}$/.test(oct) || Number(oct) < 0 || Number(oct) > 255) {
+            isValid = false;
+            break;
+          }
+        }
+      }
+      if (isValid && parts.length === 2) {
+        if (!/^\d{1,2}$/.test(parts[1]) || Number(parts[1]) < 0 || Number(parts[1]) > 32) {
+          isValid = false;
+        }
+      }
+    }
+
+    if (!isValid) {
+      showMsg('error', 'Invalid IP address or CIDR notation. Must be a valid IPv4 address (e.g., 192.168.1.100) or CIDR block (e.g., 10.0.0.0/24 with prefix 0-32).');
       return;
     }
 
@@ -506,15 +528,27 @@ const NetworkSettingsPage = () => {
 };
 
 // Wrap with permission guard to enforce RBAC
-// Allow access if user has NetworkSettings.View permission OR is an admin (SUPER_ADMIN/HR_ADMIN)
+// Allow access if user has NETWORK_SETTINGS module, NetworkSettings.View permission, OR is an admin (SUPER_ADMIN/HR_ADMIN)
 const ProtectedNetworkSettingsPage = () => {
-  const { hasPermission, isAdmin } = usePermissions();
+  const { hasPermission, isAdmin, isSuperAdmin, loading } = usePermissions();
+  const { user } = useAuth();
   
-  if (!hasPermission('NetworkSettings.View') && !isAdmin()) {
+  if (loading) {
+    return (
+      <div style={{ padding: '48px 20px', textAlign: 'center', fontFamily: 'Poppins,sans-serif', color: '#64748B' }}>
+        Loading network settings…
+      </div>
+    );
+  }
+
+  const roleCode = user?.role?.code || (typeof user?.role === 'string' ? user?.role : null);
+  const userIsSuperAdmin = roleCode === 'SUPER_ADMIN' || (typeof isSuperAdmin === 'function' ? isSuperAdmin() : Boolean(isSuperAdmin));
+  
+  if (!userIsSuperAdmin) {
     return (
       <div style={{ padding: '40px 20px', textAlign: 'center', fontFamily: 'Poppins,sans-serif' }}>
         <p style={{ fontSize: '1.1rem', color: '#DC2626', fontWeight: 600 }}>Access Denied</p>
-        <p style={{ fontSize: '0.9rem', color: '#64748B' }}>You don't have permission to manage network settings.</p>
+        <p style={{ fontSize: '0.9rem', color: '#64748B' }}>Only Super Admin has access to Network Settings.</p>
       </div>
     );
   }

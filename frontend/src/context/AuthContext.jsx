@@ -410,23 +410,35 @@ export const AuthProvider = ({ children }) => {
               ...storedUserData,
               ...freshUserData,
             };
-            if (freshUserData.permissions?.modules && !updatedUserData.modules) {
+            // Always synchronize latest modules and role permissions from backend
+            if (freshUserData.modules) {
+              updatedUserData.modules = freshUserData.modules;
+            } else if (freshUserData.permissions?.modules) {
               updatedUserData.modules = freshUserData.permissions.modules;
-            } else if (storedUserData.modules && !updatedUserData.modules) {
-              updatedUserData.modules = storedUserData.modules;
             }
-            if (updatedUserData.modules && !updatedUserData.permissions) {
-              updatedUserData.permissions = {
-                role: updatedUserData.role,
-                dashboard: updatedUserData.dashboard,
-                modules: updatedUserData.modules,
-              };
+            if (freshUserData.role) {
+              updatedUserData.role = freshUserData.role;
+            }
+            if (freshUserData.dashboard) {
+              updatedUserData.dashboard = freshUserData.dashboard;
+            }
+            if (freshUserData.permissions) {
+              updatedUserData.permissions = freshUserData.permissions;
             }
             
             setUser(updatedUserData);
             localStorage.setItem('user', JSON.stringify(updatedUserData));
+            if (updatedUserData.modules) {
+              localStorage.setItem('userModules', JSON.stringify(updatedUserData.modules));
+            }
+            if (updatedUserData.role) {
+              localStorage.setItem('userRole', JSON.stringify(updatedUserData.role));
+            }
+            if (updatedUserData.dashboard) {
+              localStorage.setItem('userDashboard', updatedUserData.dashboard);
+            }
             
-            console.log('[AuthContext] User data refreshed with occupations:', updatedUserData.occupations?.length || 0);
+            console.log('[AuthContext] User data refreshed with latest modules and permissions:', updatedUserData.modules?.length || 0);
           } else {
             // Fallback to stored data if fetch fails
             setUser(storedUserData);

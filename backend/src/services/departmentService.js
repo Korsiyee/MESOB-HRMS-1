@@ -34,10 +34,10 @@ async function listDepartments({ tree = false } = {}) {
   // Normalise numeric fields
   const normalised = rows.map(r => ({
     ...r,
-    member_count:     Number(r.member_count     || 0),
-    male_count:       Number(r.male_count       || 0),
-    female_count:     Number(r.female_count     || 0),
-    position_count:   Number(r.position_count   || 0),
+    member_count: Number(r.member_count || 0),
+    male_count: Number(r.male_count || 0),
+    female_count: Number(r.female_count || 0),
+    position_count: Number(r.position_count || 0),
     filled_positions: Number(r.filled_positions || 0),
   }));
 
@@ -98,10 +98,10 @@ async function getDepartmentByUuid(uuid) {
   if (rows[0]) {
     return {
       ...rows[0],
-      member_count:     Number(rows[0].member_count     || 0),
-      male_count:       Number(rows[0].male_count       || 0),
-      female_count:     Number(rows[0].female_count     || 0),
-      position_count:   Number(rows[0].position_count   || 0),
+      member_count: Number(rows[0].member_count || 0),
+      male_count: Number(rows[0].male_count || 0),
+      female_count: Number(rows[0].female_count || 0),
+      position_count: Number(rows[0].position_count || 0),
       filled_positions: Number(rows[0].filled_positions || 0),
     };
   }
@@ -386,10 +386,54 @@ async function deleteDepartment(uuid) {
     );
   }
 
+  const [positions] = await executeQuery(
+    "SELECT COUNT(*) AS count FROM Positions WHERE department_uuid = ?",
+    [String(uuid).trim()],
+  );
+  if (Number(positions[0]?.count || 0) > 0) {
+    throw new ApiError(
+      "Cannot delete department with assigned positions. Please reassign or delete positions first.",
+      409,
+      "HAS_POSITIONS",
+    );
+  }
+
   await executeQuery("DELETE FROM Departments WHERE uuid = ?", [
     String(uuid).trim(),
   ]);
   return true;
+}
+
+
+/**
+ * Check if an employee is designated as the head of their department
+ * @param {string} employeeUuid - UUID of the employee
+ * @param {string} [departmentUuid] - Optional department UUID to check against specifically
+ * @returns {Promise<boolean>} True if employee is designated as head of their department
+ */
+async function isEmployeeDesignatedDeptHead(employeeUuid, departmentUuid = null) {
+  if (!employeeUuid) return false;
+
+  let deptUuid = departmentUuid ? String(departmentUuid).trim() : null;
+  if (!deptUuid) {
+    const [empRows] = await executeQuery(
+      "SELECT department_uuid FROM Employees WHERE uuid = ? LIMIT 1",
+      [String(employeeUuid).trim()]
+    );
+    if (empRows.length > 0 && empRows[0].department_uuid) {
+      deptUuid = empRows[0].department_uuid;
+    }
+  }
+
+  if (!deptUuid) {
+    return false;
+  }
+
+  const [deptRows] = await executeQuery(
+    "SELECT uuid FROM Departments WHERE head_employee_uuid = ? AND uuid = ? LIMIT 1",
+    [String(employeeUuid).trim(), deptUuid]
+  );
+  return deptRows.length > 0;
 }
 
 module.exports = {
@@ -399,4 +443,5 @@ module.exports = {
   createDepartment,
   updateDepartment,
   deleteDepartment,
+  isEmployeeDesignatedDeptHead,
 };

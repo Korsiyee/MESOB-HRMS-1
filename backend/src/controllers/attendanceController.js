@@ -232,36 +232,46 @@ exports.deleteAttendanceByEmployeeAndDate = asyncHandler(async (req, res) => {
 
 /* ─── Analytics: overview summary ─── */
 exports.getOverviewSummary = asyncHandler(async (req, res) => {
-  const { startDate, endDate } = req.query || {};
-  const data = await Analytics.getOverviewSummary({ startDate, endDate });
+  const { startDate, endDate, departmentUuid } = req.query || {};
+  const scope = await assertEmployeeListAccess(req.user, req.moduleAccess);
+  const resolvedDept = scope.scope === "department" ? scope.departmentUuid : departmentUuid;
+  const data = await Analytics.getOverviewSummary({ startDate, endDate, departmentUuid: resolvedDept });
   return sendSuccess(res, { status: 200, data });
 });
 
 /* ─── Analytics: trend ─── */
 exports.getAttendanceTrend = asyncHandler(async (req, res) => {
-  const { startDate, endDate, groupBy } = req.query || {};
-  const data = await Analytics.getAttendanceTrend({ startDate, endDate, groupBy });
+  const { startDate, endDate, groupBy, departmentUuid } = req.query || {};
+  const scope = await assertEmployeeListAccess(req.user, req.moduleAccess);
+  const resolvedDept = scope.scope === "department" ? scope.departmentUuid : departmentUuid;
+  const data = await Analytics.getAttendanceTrend({ startDate, endDate, groupBy, departmentUuid: resolvedDept });
   return sendSuccess(res, { status: 200, data });
 });
 
 /* ─── Analytics: department stats ─── */
 exports.getDepartmentStats = asyncHandler(async (req, res) => {
-  const { startDate, endDate } = req.query || {};
-  const data = await Analytics.getDepartmentStats({ startDate, endDate });
+  const { startDate, endDate, departmentUuid } = req.query || {};
+  const scope = await assertEmployeeListAccess(req.user, req.moduleAccess);
+  const resolvedDept = scope.scope === "department" ? scope.departmentUuid : departmentUuid;
+  const data = await Analytics.getDepartmentStats({ startDate, endDate, departmentUuid: resolvedDept });
   return sendSuccess(res, { status: 200, data });
 });
 
 /* ─── Analytics: top employees ─── */
 exports.getTopEmployees = asyncHandler(async (req, res) => {
-  const { startDate, endDate, limit } = req.query || {};
-  const data = await Analytics.getTopEmployees({ startDate, endDate, limit });
+  const { startDate, endDate, limit, departmentUuid } = req.query || {};
+  const scope = await assertEmployeeListAccess(req.user, req.moduleAccess);
+  const resolvedDept = scope.scope === "department" ? scope.departmentUuid : departmentUuid;
+  const data = await Analytics.getTopEmployees({ startDate, endDate, limit, departmentUuid: resolvedDept });
   return sendSuccess(res, { status: 200, data });
 });
 
 /* ─── Analytics: recent corrections ─── */
 exports.getRecentCorrections = asyncHandler(async (req, res) => {
-  const { limit } = req.query || {};
-  const data = await Analytics.getRecentCorrections({ limit });
+  const { limit, departmentUuid } = req.query || {};
+  const scope = await assertEmployeeListAccess(req.user, req.moduleAccess);
+  const resolvedDept = scope.scope === "department" ? scope.departmentUuid : departmentUuid;
+  const data = await Analytics.getRecentCorrections({ limit, departmentUuid: resolvedDept });
   return sendSuccess(res, { status: 200, data });
 });
 

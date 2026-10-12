@@ -138,10 +138,17 @@ async function listEmployees(filters = {}) {
       d.name  AS department_name,
       p.title AS position_title,
       cur_lvl.level_uuid,
-      cur_lvl.level_name
+      cur_lvl.level_name,
+      u.uuid  AS user_uuid,
+      u.username,
+      u.role_uuid,
+      r.name  AS role_name,
+      r.code  AS role_code
     FROM Employees e
     LEFT JOIN Positions   p ON p.uuid = e.position_uuid
     LEFT JOIN Departments d ON d.uuid = COALESCE(e.department_uuid, p.department_uuid)
+    LEFT JOIN Users       u ON u.employee_uuid = e.uuid
+    LEFT JOIN Roles       r ON r.uuid = u.role_uuid
     LEFT JOIN (
       SELECT elh.employee_uuid, elh.level_uuid, l.name AS level_name
       FROM EmployeeLevelHistory elh
@@ -388,10 +395,17 @@ async function getEmployeeByUuid(employeeUuid, options = {}) {
         d.name AS department_name,
         p.title AS position_title,
         cur_lvl.level_uuid,
-        cur_lvl.level_name
+        cur_lvl.level_name,
+        u.uuid AS user_uuid,
+        u.username,
+        u.role_uuid,
+        r.name AS role_name,
+        r.code AS role_code
       FROM Employees e
       LEFT JOIN Positions p ON p.uuid = e.position_uuid
       LEFT JOIN Departments d ON d.uuid = COALESCE(e.department_uuid, p.department_uuid)
+      LEFT JOIN Users u ON u.employee_uuid = e.uuid
+      LEFT JOIN Roles r ON r.uuid = u.role_uuid
       LEFT JOIN (
         SELECT elh.employee_uuid, elh.level_uuid, l.name AS level_name
         FROM EmployeeLevelHistory elh

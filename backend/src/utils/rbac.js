@@ -47,6 +47,8 @@ async function assertEmployeeReadAccess(user, employee, moduleAccess = null) {
   }
 }
 
+const { executeQuery } = require("./dbQuery");
+
 /**
  * Assert user has permission to list employees
  * Returns scope filter for query construction
@@ -59,6 +61,55 @@ async function assertEmployeeReadAccess(user, employee, moduleAccess = null) {
 async function assertEmployeeListAccess(user, moduleAccess = null) {
   if (!user) {
     throw new ApiError("Not authenticated.", 401, "UNAUTHORIZED");
+  }
+
+  // Extract role code (handle both string and object formats)
+  const roleCode = typeof user.role === 'string' 
+    ? user.role 
+    : (user.role?.code || user.role?.name || user.raw_role);
+  
+  console.log('[RBAC] assertEmployeeListAccess - user:', user.username, 'role:', roleCode, 'department_uuid:', user.department_uuid);
+
+  // Super Admin has organization-wide access
+  if (roleCode === 'SUPER_ADMIN') {
+    console.log('[RBAC] Super Admin - granting organization-wide access');
+    return { scope: "all" };
+  }
+
+  // Department heads are strictly limited to their own department
+  const isDeptHead = ['DEPT_HEAD', 'DEPARTMENT_HEAD', 'MANAGER'].includes(roleCode);
+  if (isDeptHead) {
+    let deptUuid = user.department_uuid;
+    
+    // Try to get department from Departments table (where user is head)
+    if (!deptUuid && user.employee_uuid) {
+      const [deptRows] = await executeQuery(
+        "SELECT uuid FROM Departments WHERE head_employee_uuid = ? LIMIT 1",
+        [user.employee_uuid]
+      );
+      if (deptRows.length > 0) {
+        deptUuid = deptRows[0].uuid;
+      }
+    }
+    
+    // Try to get department from Employees table (where user belongs)
+    if (!deptUuid && user.employee_uuid) {
+      const [empRows] = await executeQuery(
+        "SELECT department_uuid FROM Employees WHERE uuid = ? LIMIT 1",
+        [user.employee_uuid]
+      );
+      if (empRows.length > 0 && empRows[0].department_uuid) {
+        deptUuid = empRows[0].department_uuid;
+      }
+    }
+
+    if (!deptUuid) {
+      console.error('[RBAC] DEPT_HEAD user has no department assignment:', user.username);
+      throw new ApiError("Department head requires department assignment.", 403, "FORBIDDEN");
+    }
+    
+    console.log('[RBAC] DEPT_HEAD - restricting to department:', deptUuid);
+    return { scope: "department", departmentUuid: deptUuid };
   }
 
   // If no moduleAccess, assume middleware already validated

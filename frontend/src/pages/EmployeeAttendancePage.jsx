@@ -24,6 +24,23 @@ const STATUS_STYLES = {
   WEEKEND:  { bg:'rgba(0,80,60,0.08)',    color:C.textMuted, icon: Calendar },
 };
 
+// Helper function to format decimal hours to "Xhr Ymin" format
+const formatHoursToHrMin = (decimalHours) => {
+  if (decimalHours === null || decimalHours === undefined) return '';
+  
+  const totalMinutes = Math.round(decimalHours * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  
+  if (hours > 0 && minutes > 0) {
+    return `${hours}hr ${minutes}min`;
+  } else if (hours > 0) {
+    return `${hours}hr`;
+  } else {
+    return `${minutes}min`;
+  }
+};
+
 const StatusBadge = ({ status }) => {
   const s = STATUS_STYLES[status] || STATUS_STYLES.ABSENT;
   const Icon = s.icon;
@@ -314,19 +331,19 @@ const EmployeeAttendancePage = () => {
                         {r.check_out ? new Date(r.check_out).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' }) : '—'}
                       </td>
                       <td style={{ padding:'12px', fontSize:'0.76rem', fontWeight:600, borderBottom:`1px solid rgba(0,80,60,0.05)`, color: r.worked_hours !== null && r.worked_hours !== undefined ? C.textMain : C.textMuted }}>
-                        {r.worked_hours !== null && r.worked_hours !== undefined ? `${r.worked_hours}h` : '—'}
+                        {r.worked_hours !== null && r.worked_hours !== undefined ? formatHoursToHrMin(r.worked_hours) : '—'}
                       </td>
                       <td style={{ padding:'12px', fontSize:'0.76rem', fontWeight:600, borderBottom:`1px solid rgba(0,80,60,0.05)` }}>
                         {r.overtime_hours !== null && r.overtime_hours !== undefined && r.overtime_hours > 0 ? (
                           <span style={{ color:'#059669', background:'rgba(5,150,105,0.1)', padding:'3px 8px', borderRadius:4, display:'inline-block' }}>
-                            +{r.overtime_hours}h
+                            +{formatHoursToHrMin(r.overtime_hours)}
                           </span>
                         ) : <span style={{ color:C.textMuted }}>—</span>}
                       </td>
                       <td style={{ padding:'12px', fontSize:'0.76rem', fontWeight:600, borderBottom:`1px solid rgba(0,80,60,0.05)` }}>
                         {r.missing_hours !== null && r.missing_hours !== undefined && r.missing_hours > 0 ? (
                           <span style={{ color:'#DC2626', background:'rgba(220,38,38,0.08)', padding:'3px 8px', borderRadius:4, display:'inline-block' }}>
-                            -{r.missing_hours}h
+                            -{formatHoursToHrMin(r.missing_hours)}
                           </span>
                         ) : <span style={{ color:C.textMuted }}>—</span>}
                       </td>

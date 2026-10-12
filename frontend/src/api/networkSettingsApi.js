@@ -17,5 +17,6 @@ export const NetworkSettingsApi = {
   get:    (uuid)       => request(`/network-settings/${encodeURIComponent(uuid)}`),
   create: (body)       => request('/network-settings', {method:'POST', body:JSON.stringify(body)}),
   update: (uuid, body) => request(`/network-settings/${encodeURIComponent(uuid)}`, {method:'PATCH', body:JSON.stringify(body)}),
+  toggle: (uuid)       => request(`/network-settings/${encodeURIComponent(uuid)}/toggle`, {method:'PATCH'}),
   delete: (uuid)       => request(`/network-settings/${encodeURIComponent(uuid)}`, {method:'DELETE'}),
 };

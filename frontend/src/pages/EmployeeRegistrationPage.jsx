@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Check, Upload, Users, Plus, Trash2, FileText, Camera } from "lucide-react";
+import { ArrowLeft, Check, Upload, Users, Plus, Trash2, FileText, Camera, AlertCircle } from "lucide-react";
 import { EmployeeApi } from "../api/employeeApi";
 import { LevelApi } from "../api/levelApi";
 import { RbacApi } from "../api/rbacApi";
@@ -8,6 +8,12 @@ import { getAllRoles } from "../api/roleManagement";
 import PrettyDatePicker from "../components/PrettyDatePicker";
 import FaceCaptureModal from "../components/FaceCaptureModal";
 import { FaceRecognitionApi } from "../api/faceRecognitionApi";
+import { 
+  isValidEthiopianPhone, 
+  isValidEmail, 
+  isValidFullName,
+  validateField 
+} from "../utils/validation";
 
 /* Simple UUID v4 generator (no external dep) */
 function genUuid() {
@@ -68,10 +74,23 @@ const lbl = {
 };
 const req = { color: "#dc2626" };
 
-const Field = ({ label, required, children }) => (
+const Field = ({ label, required, children, error }) => (
   <div>
     <label style={lbl}>{label} {required && <span style={req}>**</span>}</label>
     {children}
+    {error && (
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: 4, 
+        marginTop: 4, 
+        fontSize: '0.7rem', 
+        color: '#dc2626' 
+      }}>
+        <AlertCircle size={11} />
+        <span>{error}</span>
+      </div>
+    )}
   </div>
 );
 
@@ -255,7 +274,7 @@ const Step1 = ({ data, onChange, photoFile, onPhotoChange, idDocs, onIdDocChange
 };
 
 /* ── Step 2: Address Information ── */
-const Step2 = ({ data, onChange }) => (
+const Step2 = ({ data, onChange, errors = {} }) => (
   <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
     {["PERMANENT", "CURRENT"].map(type => {
       // For PERMANENT address, all fields are required except kebele and phone_secondary
@@ -266,9 +285,9 @@ const Step2 = ({ data, onChange }) => (
         { key: "woreda", label: "Woreda", required: isPermanent },
         { key: "kebele", label: "Kebele", required: false },
         { key: "house_number", label: "House Number", required: isPermanent },
-        { key: "phone_primary", label: "Phone (Primary)", required: isPermanent },
-        { key: "phone_secondary", label: "Phone (Secondary)", required: false },
-        { key: "email", label: "Email", required: isPermanent },
+        { key: "phone_primary", label: "Phone (Primary)", required: isPermanent, validate: 'phone' },
+        { key: "phone_secondary", label: "Phone (Secondary)", required: false, validate: 'phone' },
+        { key: "email", label: "Email", required: isPermanent, validate: 'email' },
       ];
 
       return (
@@ -277,17 +296,34 @@ const Step2 = ({ data, onChange }) => (
             {type === "PERMANENT" ? "Permanent" : "Current"} Address
           </h3>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-            {fields.map(({ key, label, required }) => (
-              <Field key={key} label={label} required={required}>
-                <input
-                  value={data[type]?.[key] || ""}
-                  onChange={e => onChange(type, key, e.target.value)}
-                  style={fld}
-                  type={key === "email" ? "email" : "text"}
-                  placeholder={required ? `${label} **` : label}
-                />
-              </Field>
-            ))}
+            {fields.map(({ key, label, required, validate }) => {
+              const fieldKey = `${type}.${key}`;
+              const error = errors[fieldKey];
+              
+              return (
+                <Field key={key} label={label} required={required} error={error}>
+                  <input
+                    value={data[type]?.[key] || ""}
+                    onChange={e => onChange(type, key, e.target.value)}
+                    style={{
+                      ...fld,
+                      borderColor: error ? '#dc2626' : C.border,
+                      ...(error && { background: '#fef2f2' })
+                    }}
+                    type={key === "email" ? "email" : "text"}
+                    placeholder={
+                      required 
+                        ? `${label} **` 
+                        : validate === 'phone' 
+                          ? '0912345678' 
+                          : validate === 'email'
+                            ? 'email@example.com'
+                            : label
+                    }
+                  />
+                </Field>
+              );
+            })}
           </div>
         </div>
       );
@@ -341,20 +377,6 @@ const Step3 = ({ data, onChange, departments, positions, levels, roles }) => (
             {levels.map(l => <option key={l.uuid} value={l.uuid}>{l.name}</option>)}
           </select>
         </Field>
-        <Field label="User Role">
-          <select value={data.role_uuid} onChange={e => onChange("role_uuid", e.target.value)} style={fld}>
-            <option value="">Select Role (Optional)</option>
-            {(roles || []).length === 0 ? (
-              <option value="" disabled>Loading roles or no permission...</option>
-            ) : (
-              (roles || []).map(r => <option key={r.uuid} value={r.uuid}>{r.name}</option>)
-            )}
-          </select>
-          <p style={{ fontSize: "0.7rem", color: C.textMuted, margin: "4px 0 0", fontStyle: "italic" }}>
-            Assigns system access role to this employee's account
-            {roles && roles.length === 0 && " (Requires HR Admin or Super Admin permission to assign roles)"}
-          </p>
-        </Field>
         <Field label="Hire Date" required>
           <PrettyDatePicker 
             value={data.hire_date} 
@@ -365,6 +387,51 @@ const Step3 = ({ data, onChange, departments, positions, levels, roles }) => (
         <Field label="Prior Gov. Service (years)">
           <input type="number" step="0.5" min="0" value={data.prior_gov_service} onChange={e => onChange("prior_gov_service", e.target.value)} style={fld} />
         </Field>
+      </div>
+
+      {/* Optional System User Account Section */}
+      <div style={{ marginTop: 20, padding: "16px 18px", background: "rgba(15,118,110,0.05)", borderRadius: 10, border: `1px solid ${C.border}` }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontWeight: 600, color: C.textMain, fontSize: "0.85rem" }}>
+          <input
+            type="checkbox"
+            checked={Boolean(data.create_account)}
+            onChange={e => onChange("create_account", e.target.checked)}
+            style={{ width: 18, height: 18, accentColor: C.primary, cursor: "pointer" }}
+          />
+          <span>Create System User Account for this Employee</span>
+        </label>
+        <p style={{ margin: "4px 0 0 28px", fontSize: "0.72rem", color: C.textMuted }}>
+          Optionally generate system login credentials so this employee can log into Mesob HRMS.
+        </p>
+
+        {data.create_account && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 16 }}>
+            <Field label="System Access Role">
+              <select value={data.role_uuid} onChange={e => onChange("role_uuid", e.target.value)} style={fld}>
+                <option value="">Default (Employee)</option>
+                {(roles || []).map(r => <option key={r.uuid} value={r.uuid}>{r.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Custom Username (Optional)">
+              <input
+                type="text"
+                placeholder="Auto: firstname.lastname"
+                value={data.username || ""}
+                onChange={e => onChange("username", e.target.value)}
+                style={fld}
+              />
+            </Field>
+            <Field label="Initial Password (Optional)">
+              <input
+                type="text"
+                placeholder="Default: Mesob@2026"
+                value={data.password || ""}
+                onChange={e => onChange("password", e.target.value)}
+                style={fld}
+              />
+            </Field>
+          </div>
+        )}
       </div>
     </div>
   </div>
@@ -721,6 +788,7 @@ const Step6 = ({ personal, address, financial, photoFile }) => {
         <Row label="Account Number" value={financial.bank_account_number} />
         <Row label="TIN Number" value={financial.tin_number} />
         <Row label="Hire Date" value={financial.hire_date} />
+        <Row label="System Account" value={financial.create_account ? `Enabled (Username: ${financial.username || "Auto-generated"})` : "No system account"} />
       </div>
     </div>
   );
@@ -746,6 +814,7 @@ const EmployeeRegistrationPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
 
   /* ── Form state ── */
   const [personal, setPersonal] = useState({
@@ -758,7 +827,8 @@ const EmployeeRegistrationPage = () => {
   const [financial, setFinancial] = useState({
     bank_name: "", bank_account_number: "", tin_number: "", pension_code: "",
     department_uuid: "", position_uuid: "", level_uuid: "",
-    hire_date: "", prior_gov_service: 0, role_uuid: "",  // Added role_uuid
+    hire_date: "", prior_gov_service: 0, role_uuid: "",
+    create_account: false, username: "", password: "",
   });
   const [extraInfo, setExtraInfo] = useState({
     "Education": [{}],
@@ -766,6 +836,7 @@ const EmployeeRegistrationPage = () => {
     "Training & Certifications": [{}],
   });
   const [createdEmployeeUuid, setCreatedEmployeeUuid] = useState(null);
+  const [createdAccountInfo, setCreatedAccountInfo] = useState(null);
   const [faceRegistered, setFaceRegistered] = useState(false);
   const [draftLoaded, setDraftLoaded] = useState(false);
 
@@ -844,7 +915,24 @@ const EmployeeRegistrationPage = () => {
     setPersonal(p => ({ ...p, [key]: val }));
   };
 
-  const handleAddressChange = (type, key, val) => setAddress(p => ({ ...p, [type]: { ...p[type], [key]: val } }));
+  const handleAddressChange = (type, key, val) => {
+    setAddress(p => ({ ...p, [type]: { ...p[type], [key]: val } }));
+    
+    // Real-time validation for phone and email fields
+    const fieldKey = `${type}.${key}`;
+    if (key.includes('phone') || key === 'email') {
+      const error = validateField(key, val, { required: type === 'PERMANENT' && key !== 'phone_secondary' });
+      setValidationErrors(prev => {
+        const updated = { ...prev };
+        if (error) {
+          updated[fieldKey] = error;
+        } else {
+          delete updated[fieldKey];
+        }
+        return updated;
+      });
+    }
+  };
 
   const handleFinancialChange = (key, val) => {
     // Validate future dates immediately for hire_date
@@ -910,6 +998,7 @@ const EmployeeRegistrationPage = () => {
 
   const goNext = async () => {
     setError("");
+    setValidationErrors({});
     
     // Step 0: Personal Information validation
     if (step === 0) {
@@ -918,8 +1007,7 @@ const EmployeeRegistrationPage = () => {
         return;
       }
       // Validate mother_name contains at least 2 name parts
-      const motherNameParts = personal.mother_name.trim().split(/\s+/).filter(part => part.length > 0);
-      if (motherNameParts.length < 2) {
+      if (!isValidFullName(personal.mother_name)) {
         setError("Please enter the mother's full name (at least first and last name).");
         return;
       }
@@ -944,11 +1032,76 @@ const EmployeeRegistrationPage = () => {
       const perm = address.PERMANENT || {};
       const requiredFields = ["region", "zone", "woreda", "house_number", "phone_primary", "email"];
       const missingFields = [];
+      const errors = {};
       
+      // Check required fields
       for (const field of requiredFields) {
         if (!perm[field] || String(perm[field]).trim() === "") {
           missingFields.push(field.replace(/_/g, " "));
+          errors[`PERMANENT.${field}`] = `${field.replace(/_/g, " ")} is required`;
         }
+      }
+      
+      // Validate phone primary format
+      if (perm.phone_primary && perm.phone_primary.trim()) {
+        if (!isValidEthiopianPhone(perm.phone_primary)) {
+          errors['PERMANENT.phone_primary'] = 'Must be 10 digits (e.g., 0912345678)';
+          if (!missingFields.includes('phone primary')) {
+            missingFields.push('invalid phone primary format');
+          }
+        }
+      }
+      
+      // Validate phone secondary format if provided
+      if (perm.phone_secondary && perm.phone_secondary.trim()) {
+        if (!isValidEthiopianPhone(perm.phone_secondary)) {
+          errors['PERMANENT.phone_secondary'] = 'Must be 10 digits (e.g., 0912345678)';
+          missingFields.push('invalid phone secondary format');
+        }
+      }
+      
+      // Validate email format
+      if (perm.email && perm.email.trim()) {
+        if (!isValidEmail(perm.email)) {
+          errors['PERMANENT.email'] = 'Invalid email format';
+          if (!missingFields.includes('email')) {
+            missingFields.push('invalid email format');
+          }
+        }
+      }
+      
+      // Validate CURRENT address if any field is filled
+      const curr = address.CURRENT || {};
+      const hasCurrentData = Object.values(curr).some(v => v && String(v).trim());
+      
+      if (hasCurrentData) {
+        // Validate current address phone if provided
+        if (curr.phone_primary && curr.phone_primary.trim()) {
+          if (!isValidEthiopianPhone(curr.phone_primary)) {
+            errors['CURRENT.phone_primary'] = 'Must be 10 digits (e.g., 0912345678)';
+            missingFields.push('invalid current phone primary');
+          }
+        }
+        
+        if (curr.phone_secondary && curr.phone_secondary.trim()) {
+          if (!isValidEthiopianPhone(curr.phone_secondary)) {
+            errors['CURRENT.phone_secondary'] = 'Must be 10 digits (e.g., 0912345678)';
+            missingFields.push('invalid current phone secondary');
+          }
+        }
+        
+        if (curr.email && curr.email.trim()) {
+          if (!isValidEmail(curr.email)) {
+            errors['CURRENT.email'] = 'Invalid email format';
+            missingFields.push('invalid current email');
+          }
+        }
+      }
+      
+      if (Object.keys(errors).length > 0) {
+        setValidationErrors(errors);
+        setError(`Please correct the following: ${missingFields.join(", ")}.`);
+        return;
       }
       
       if (missingFields.length > 0) {
@@ -1013,7 +1166,10 @@ const EmployeeRegistrationPage = () => {
         ...(orNull(financial.department_uuid)  && { department_uuid:  financial.department_uuid }),
         ...(orNull(financial.position_uuid)    && { position_uuid:    financial.position_uuid }),
         ...(orNull(financial.level_uuid)       && { level_uuid:       financial.level_uuid }),
-        ...(orNull(financial.role_uuid)        && { role_uuid:        financial.role_uuid }),  // Added role_uuid
+        ...(orNull(financial.role_uuid)        && { role_uuid:        financial.role_uuid }),
+        create_account: Boolean(financial.create_account || financial.role_uuid),
+        ...(orNull(financial.username)         && { username:         financial.username.trim() }),
+        ...(orNull(financial.password)         && { password:         financial.password.trim() }),
         ...(bankName && bankAccount ? { bank_name: bankName, bank_account_number: bankAccount } : {}),
         ...(orNull(financial.tin_number)   && { tin_number:   financial.tin_number.trim() }),
         ...(orNull(financial.pension_code) && { pension_code: financial.pension_code.trim() }),
@@ -1035,6 +1191,9 @@ const EmployeeRegistrationPage = () => {
       }
 
       setCreatedEmployeeUuid(newUuid);
+      if (res?.data?.account_created) {
+        setCreatedAccountInfo(res.data);
+      }
 
       // Upload photo - critical for profile picture
       if (photoFile && newUuid) {
@@ -1109,8 +1268,11 @@ const EmployeeRegistrationPage = () => {
     // Clear the draft UUID from localStorage after successful submission
     localStorage.removeItem('employeeRegistrationDraftUuid');
     
-    setSuccess("Employee registered successfully!");
-    setTimeout(() => navigate(createdEmployeeUuid ? `/employees/${createdEmployeeUuid}` : "/employees/all"), 1500);
+    const successMsg = createdAccountInfo?.account_created
+      ? `Employee registered successfully with user account (${createdAccountInfo.username})!`
+      : "Employee registered successfully!";
+    setSuccess(successMsg);
+    setTimeout(() => navigate(createdEmployeeUuid ? `/employees/${createdEmployeeUuid}` : "/employees/all"), 1800);
   };
 
   return (
@@ -1192,7 +1354,7 @@ const EmployeeRegistrationPage = () => {
             onIdDocChange={handleIdDocChange}
           />
         )}
-        {step === 1 && <Step2 data={address} onChange={handleAddressChange} />}
+        {step === 1 && <Step2 data={address} onChange={handleAddressChange} errors={validationErrors} />}
         {step === 2 && (
           <Step3
             data={financial}

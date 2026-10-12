@@ -26,16 +26,16 @@ function validatePassword(password) {
     return { valid: false, message: "Password must be at least 8 characters long." };
   }
   if (!/[A-Z]/.test(password)) {
-    return { valid: false, message: "Password must contain at least one uppercase letter." };
+    return { valid: false, message: "Password must contain at least one uppercase letter (A-Z)." };
   }
   if (!/[a-z]/.test(password)) {
-    return { valid: false, message: "Password must contain at least one lowercase letter." };
+    return { valid: false, message: "Password must contain at least one lowercase letter (a-z)." };
   }
   if (!/[0-9]/.test(password)) {
-    return { valid: false, message: "Password must contain at least one number." };
+    return { valid: false, message: "Password must contain at least one number (0-9)." };
   }
-  if (!/[^A-Za-z0-9]/.test(password)) {
-    return { valid: false, message: "Password must contain at least one symbol." };
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password) && !/[^A-Za-z0-9]/.test(password)) {
+    return { valid: false, message: "Password must contain at least one special character (e.g., !, @, #, or $)." };
   }
   return { valid: true };
 }
@@ -179,6 +179,26 @@ exports.createAccount = async (req, res) => {
           message: "Invalid role_uuid.",
           error: "VALIDATION_ERROR",
         });
+      }
+    }
+
+    // Constraint check for Department Head
+    const [targetRoleRows] = await pool.execute(
+      "SELECT code FROM Roles WHERE uuid = ? LIMIT 1",
+      [targetRoleUuid]
+    );
+    if (targetRoleRows.length > 0) {
+      const code = targetRoleRows[0].code;
+      if (code === 'DEPT_HEAD' || code === 'DEPARTMENT_HEAD') {
+        const { isEmployeeDesignatedDeptHead } = require("../services/departmentService");
+        const isHead = employee_uuid && (await isEmployeeDesignatedDeptHead(employee_uuid));
+        if (!isHead) {
+          return sendError(res, {
+            status: 400,
+            message: "An employee can only be assigned the Department Head role if they are currently designated as the head of their department.",
+            error: "NOT_DESIGNATED_DEPT_HEAD",
+          });
+        }
       }
     }
 
@@ -404,7 +424,7 @@ exports.changeAccountRole = async (req, res) => {
 
     // Check if account exists and get current role
     const [existing] = await pool.execute(
-      "SELECT uuid, role_uuid, username FROM Users WHERE uuid = ?",
+      "SELECT uuid, role_uuid, username, employee_uuid FROM Users WHERE uuid = ?",
       [uuid]
     );
 
@@ -431,6 +451,19 @@ exports.changeAccountRole = async (req, res) => {
     
     const oldRoleInfo = oldRoleRows.length ? oldRoleRows[0] : null;
     const newRoleInfo = newRoleRows.length ? newRoleRows[0] : null;
+
+    // Constraint check for Department Head
+    if (newRoleInfo?.code === 'DEPT_HEAD' || newRoleInfo?.code === 'DEPARTMENT_HEAD') {
+      const { isEmployeeDesignatedDeptHead } = require("../services/departmentService");
+      const isHead = targetUser.employee_uuid && (await isEmployeeDesignatedDeptHead(targetUser.employee_uuid));
+      if (!isHead) {
+        return sendError(res, {
+          status: 400,
+          message: "An employee can only be assigned the Department Head role if they are currently designated as the head of their department.",
+          error: "NOT_DESIGNATED_DEPT_HEAD",
+        });
+      }
+    }
 
     // Update role
     await pool.execute(

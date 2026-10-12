@@ -41,6 +41,12 @@ function requireModule(moduleCode, options = {}) {
         });
       }
 
+      // Super Admin always has full access to all modules
+      if (req.user?.role === 'SUPER_ADMIN' || req.user?.raw_role === 'SUPER_ADMIN') {
+        req.moduleAccess = { code: moduleCode, name: moduleCode, category: 'ALL' };
+        return next();
+      }
+
       // Get user's module access
       const moduleAccess = await moduleAuthService.checkModuleAccess(
         req.user.uuid,
@@ -102,6 +108,12 @@ function requireAnyModule(moduleCodes) {
           message: 'Not authenticated',
           error: 'UNAUTHORIZED'
         });
+      }
+
+      // Super Admin always has full access to all modules
+      if (req.user?.role === 'SUPER_ADMIN' || req.user?.raw_role === 'SUPER_ADMIN') {
+        req.moduleAccess = { code: moduleCodes[0], name: moduleCodes[0], category: 'ALL' };
+        return next();
       }
 
       // Check each module

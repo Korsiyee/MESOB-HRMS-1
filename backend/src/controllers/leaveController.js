@@ -172,7 +172,9 @@ exports.getAggregatedBalances = async (req, res) => {
       `SELECT year FROM budgetYears WHERE status = 'ACTIVE' ORDER BY year DESC LIMIT 1`
     );
 
-    const currentYear = budgetYear?.[0]?.year || new Date().getFullYear();
+    const { getCurrentEthiopianBudgetYear } = require("../services/calendarService");
+    const ethYear = Number((await getCurrentEthiopianBudgetYear()).year);
+    const currentYear = budgetYear?.[0]?.year || ethYear;
 
     // Aggregate all active employee balances for current year
     const [results] = await db.promise().execute(

@@ -51,29 +51,43 @@ const Sk = ({h=14,w="100%"}) => (
   <div style={{height:h,width:w,borderRadius:4,background:"linear-gradient(90deg,#d4dbd9 25%,#e2e8e7 50%,#d4dbd9 75%)",backgroundSize:"200% 100%",animation:"skshimmer 1.3s infinite"}}/>
 );
 const Card = ({title,icon:Icon,children,style={}}) => (
-  <div style={{background:CARD_BG,borderRadius:12,border:`1px solid ${BORDER}`,overflow:"hidden",...style}}>
-    {title&&<div style={{background:DARK,padding:"10px 16px",display:"flex",alignItems:"center",gap:8}}>
-      {Icon&&<Icon size={15} color="rgba(255,255,255,0.8)"/>}
+  <div style={{background:"linear-gradient(145deg, #FFFFFF 0%, #F5F8F7 100%)",borderRadius:16,border:`1px solid ${BORDER}`,boxShadow:"0 4px 20px -2px rgba(0,50,40,0.06), 0 2px 6px -1px rgba(0,0,0,0.03)",overflow:"hidden",...style}}>
+    {title&&<div style={{background:DARK,padding:"12px 18px",display:"flex",alignItems:"center",gap:8}}>
+      {Icon&&<Icon size={16} color="rgba(255,255,255,0.85)"/>}
       <span style={{fontSize:13,fontWeight:700,color:"#fff",fontFamily:"Poppins,sans-serif"}}>{title}</span>
     </div>}
-    <div style={{padding:16}}>{children}</div>
+    <div style={{padding:18}}>{children}</div>
   </div>
 );
 const InfoRow = ({label,value,loading}) => (
-  <div style={{display:"flex",gap:12,padding:"7px 0",borderBottom:`1px solid ${BORDER}`}}>
+  <div style={{display:"flex",gap:12,padding:"8px 0",borderBottom:`1px solid ${BORDER}`}}>
     <span style={{fontSize:12,color:MUTED,fontWeight:500,minWidth:130,flexShrink:0}}>{label}</span>
-    {loading?<Sk h={12} w={120}/>:<span style={{fontSize:13,color:TEXT,fontWeight:500}}>{value||"—"}</span>}
+    {loading?<Sk h={12} w={120}/>:<span style={{fontSize:13,color:TEXT,fontWeight:600}}>{value||"—"}</span>}
   </div>
 );
 const KpiBox = ({label,value,color,bg,icon:Icon,loading}) => (
-  <div style={{flex:1,background:bg||"#fff",borderRadius:12,border:`1px solid ${BORDER}`,padding:"16px 18px",display:"flex",flexDirection:"column",gap:8}}>
+  <div style={{
+    flex:1,
+    background: "linear-gradient(145deg, #FFFFFF 0%, #F5F8F7 100%)",
+    borderRadius:16,
+    border:`1px solid ${BORDER}`,
+    padding:"18px 20px",
+    display:"flex",
+    flexDirection:"column",
+    gap:10,
+    boxShadow:"0 4px 18px -2px rgba(0,50,40,0.05), 0 2px 6px -1px rgba(0,0,0,0.03)",
+    transition:"transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease",
+  }}
+  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 12px 28px -4px rgba(0,50,40,0.12)'; }}
+  onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 18px -2px rgba(0,50,40,0.05), 0 2px 6px -1px rgba(0,0,0,0.03)'; }}
+  >
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-      <div style={{width:36,height:36,borderRadius:9,background:`${color}20`,display:"flex",alignItems:"center",justifyContent:"center"}}>
-        <Icon size={18} color={color}/>
+      <div style={{width:38,height:38,borderRadius:11,background:`${color}18`,border:`1px solid ${color}30`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <Icon size={19} color={color}/>
       </div>
     </div>
-    {loading?<Sk h={26} w={50}/>:<div style={{fontSize:26,fontWeight:800,color:color||TEXT,fontFamily:"Poppins,sans-serif"}}>{value??0}</div>}
-    <div style={{fontSize:11,fontWeight:600,color:MUTED,textTransform:"uppercase"}}>{label}</div>
+    {loading?<Sk h={28} w={60}/>:<div style={{fontSize:28,fontWeight:800,color:color||TEXT,fontFamily:"Poppins,sans-serif",letterSpacing:"-0.02em"}}>{value??0}</div>}
+    <div style={{fontSize:11,fontWeight:700,color:MUTED,textTransform:"uppercase",letterSpacing:"0.04em"}}>{label}</div>
   </div>
 );
 
@@ -209,7 +223,10 @@ const DeptHeadDashboardPage = () => {
         <div>
           <h1 style={{margin:0,fontSize:22,fontWeight:700,color:"#fff"}}>Department Head Dashboard</h1>
           <p style={{margin:"3px 0 0",fontSize:12,color:"rgba(255,255,255,0.65)"}}>
-            {deptStats?.department_name || "Your Department"} — Welcome, {myProfile?.first_name || user?.username || "—"}
+            {deptStats?.department_name || "Your Department"} — Welcome, {(() => {
+              const name = myProfile?.first_name || user?.username?.split(/[\s.]+/)[0] || "—";
+              return name === "—" ? name : name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+            })()}
           </p>
         </div>
         <button onClick={load} style={{background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.25)",color:"#fff",padding:"8px 16px",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>

@@ -2,19 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 /**
- * Permission Hook - RBAC System
+ * Permission Hook - RBAC & Module System
  * 
- * Provides database-driven permission checking for UI components.
- * Uses the new RBAC system with Resource.Action format.
- * 
- * Features:
- * - Single permission check
- * - Multiple permission check (OR/AND logic)
- * - Role information
- * - Loading state
- * - Automatic updates when user permissions change
- * 
- * @returns {Object} Permission checking functions and user role info
+ * Provides unified role and permission checking for UI components.
+ * Supports static modules, RBAC resource.action format, and local storage fallback.
  */
 export function usePermissions() {
   const { user } = useAuth();
@@ -23,107 +14,131 @@ export function usePermissions() {
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    if (user?.rbac) {
-      // New RBAC system
-      const perms = user.rbac.permissions || []; setPermissions(Array.isArray(perms) ? perms : []);
-      setRole(user.rbac.role || null);
-      setLoading(false);
-    } else if (user?.permissions) {
-      // Fallback to legacy permissions if available
-      const perms = user.permissions || []; setPermissions(Array.isArray(perms) ? perms : []);
-      setRole(null);
-      setLoading(false);
+    // Resolve role from user, rbac, or localStorage
+    let userRole = null;
+    if (user?.role) {
+      userRole = typeof user.role === 'string' ? { code: user.role, name: user.role } : user.role;
+    } else if (user?.rbac?.role) {
+      userRole = user.rbac.role;
     } else {
-      setPermissions([]);
-      setRole(null);
-      setLoading(false);
+      try {
+        const storedRole = localStorage.getItem('userRole');
+        if (storedRole) userRole = JSON.parse(storedRole);
+      } catch {}
     }
+    setRole(userRole);
+
+    // Resolve permissions/modules
+    let perms = [];
+    if (user?.rbac?.permissions) {
+      perms = user.rbac.permissions;
+    } else if (user?.modules) {
+      perms = user.modules.map(m => typeof m === 'string' ? m : m.code);
+    } else if (user?.permissions?.modules) {
+      perms = user.permissions.modules.map(m => typeof m === 'string' ? m : m.code);
+    } else if (Array.isArray(user?.permissions)) {
+      perms = user.permissions;
+    } else {
+      try {
+        const storedModules = localStorage.getItem('userModules');
+        if (storedModules) {
+          const parsed = JSON.parse(storedModules);
+          perms = parsed.map(m => typeof m === 'string' ? m : m.code);
+        }
+      } catch {}
+    }
+
+    setPermissions(Array.isArray(perms) ? perms : []);
+    setLoading(false);
   }, [user]);
   
   /**
-   * Check if user has a specific permission
-   * @param {string} permissionCode - Permission code (e.g., 'Employees.View')
-   * @returns {boolean}
+   * Check if user has a specific permission or module code
+   * Supports both 'NETWORK_SETTINGS' and 'NetworkSettings.View'
    */
   const hasPermission = useCallback((permissionCode) => {
     if (!permissionCode) return false;
-    if (!Array.isArray(permissions)) return false; return permissions.includes(permissionCode);
-  }, [permissions]);
+    if (role?.code === 'SUPER_ADMIN' || role === 'SUPER_ADMIN') return true;
+    if (!Array.isArray(permissions)) return false;
+    const normalized = permissionCode.toUpperCase();
+    if (permissions.includes(permissionCode) || permissions.includes(normalized)) {
+      return true;
+    }
+    if (permissionCode.includes('.')) {
+      const resource = permissionCode.split('.')[0].toUpperCase();
+      return permissions.includes(resource);
+    }
+    return false;
+  }, [permissions, role]);
   
   /**
    * Check if user has ANY of the specified permissions (OR logic)
-   * @param {string[]} permissionCodes - Array of permission codes
-   * @returns {boolean}
    */
   const hasAnyPermission = useCallback((permissionCodes) => {
     if (!permissionCodes || permissionCodes.length === 0) return true;
-    return permissionCodes.some(code => permissions.includes(code));
-  }, [permissions]);
+    return permissionCodes.some(code => hasPermission(code));
+  }, [hasPermission]);
   
   /**
    * Check if user has ALL of the specified permissions (AND logic)
-   * @param {string[]} permissionCodes - Array of permission codes
-   * @returns {boolean}
    */
   const hasAllPermissions = useCallback((permissionCodes) => {
     if (!permissionCodes || permissionCodes.length === 0) return true;
-    return permissionCodes.every(code => permissions.includes(code));
-  }, [permissions]);
+    return permissionCodes.every(code => hasPermission(code));
+  }, [hasPermission]);
   
   /**
    * Check if user has a specific role
-   * @param {string} roleCode - Role code (e.g., 'SUPER_ADMIN', 'HR_ADMIN')
-   * @returns {boolean}
    */
   const hasRole = useCallback((roleCode) => {
-    return role?.code === roleCode;
+    const currentCode = role?.code || (typeof role === 'string' ? role : null);
+    if (!currentCode) return false;
+    if (roleCode === 'DEPT_HEAD' || roleCode === 'DEPARTMENT_HEAD') {
+      return currentCode === 'DEPT_HEAD' || currentCode === 'DEPARTMENT_HEAD';
+    }
+    return currentCode === roleCode;
   }, [role]);
   
   /**
    * Check if user has ANY of the specified roles
-   * @param {string[]} roleCodes - Array of role codes
-   * @returns {boolean}
    */
   const hasAnyRole = useCallback((roleCodes) => {
     if (!roleCodes || roleCodes.length === 0) return true;
-    return roleCodes.includes(role?.code);
-  }, [role]);
+    return roleCodes.some(code => hasRole(code));
+  }, [hasRole]);
   
   /**
    * Check if user is Super Admin
-   * @returns {boolean}
    */
   const isSuperAdmin = useCallback(() => {
-    return role?.code === 'SUPER_ADMIN';
+    return role?.code === 'SUPER_ADMIN' || role === 'SUPER_ADMIN';
   }, [role]);
   
   /**
    * Check if user is HR Admin
-   * @returns {boolean}
    */
   const isHRAdmin = useCallback(() => {
-    return role?.code === 'HR_ADMIN';
+    return role?.code === 'HR_ADMIN' || role === 'HR_ADMIN';
   }, [role]);
   
   /**
    * Check if user is Department Head
-   * @returns {boolean}
    */
   const isDepartmentHead = useCallback(() => {
-    return role?.code === 'DEPT_HEAD';
+    const currentCode = role?.code || (typeof role === 'string' ? role : null);
+    return currentCode === 'DEPT_HEAD' || currentCode === 'DEPARTMENT_HEAD';
   }, [role]);
   
   /**
    * Check if user has admin-level access (Super Admin or HR Admin)
-   * @returns {boolean}
    */
   const isAdmin = useCallback(() => {
-    return role?.code === 'SUPER_ADMIN' || role?.code === 'HR_ADMIN';
+    const currentCode = role?.code || (typeof role === 'string' ? role : null);
+    return currentCode === 'SUPER_ADMIN' || currentCode === 'HR_ADMIN';
   }, [role]);
   
   /**
    * Get user's role information
-   * @returns {Object|null} Role object with code, name, hierarchy_level, etc.
    */
   const getRole = useCallback(() => {
     return role;
@@ -131,7 +146,6 @@ export function usePermissions() {
   
   /**
    * Get all user permissions
-   * @returns {string[]} Array of permission codes
    */
   const getAllPermissions = useCallback(() => {
     return permissions;
@@ -139,15 +153,11 @@ export function usePermissions() {
   
   /**
    * Check if user can perform action on resource
-   * Convenience method that constructs permission code
-   * @param {string} resource - Resource name (e.g., 'Employees')
-   * @param {string} action - Action name (e.g., 'View', 'Create')
-   * @returns {boolean}
    */
   const can = useCallback((resource, action) => {
     const permissionCode = `${resource}.${action}`;
-    return permissions.includes(permissionCode);
-  }, [permissions]);
+    return hasPermission(permissionCode);
+  }, [hasPermission]);
   
   return { 
     permissions, 
@@ -167,3 +177,5 @@ export function usePermissions() {
     loading 
   };
 }
+
+export default usePermissions;

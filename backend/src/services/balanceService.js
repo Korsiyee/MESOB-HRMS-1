@@ -59,10 +59,10 @@ async function computeCarryForwardDays(conn, employeeUuid, currentBudgetYear) {
 
   const [rows] = await conn.execute(
     `
-      SELECT COALESCE(SUM(lp.postponedDays), 0) AS carriedForward
+      SELECT COALESCE(SUM(lp.postponed_days), 0) AS carriedForward
       FROM leavePostponements lp
       INNER JOIN employeeLeaveBalances lb
-        ON lb.uuid = lp.leaveBalanceUuid
+        ON lb.uuid = lp.leave_balance_uuid
       WHERE lp.employee_uuid = ?
         AND lp.status = 'APPROVED'
         AND lb.budgetYear IN (${placeholders})
@@ -95,8 +95,8 @@ async function ensureAutomaticPostponements(
       INSERT INTO leavePostponements (
         uuid,
         employee_uuid,
-        leaveBalanceUuid,
-        postponedDays,
+        leave_balance_uuid,
+        postponed_days,
         reason,
         status
       )
@@ -109,7 +109,7 @@ async function ensureAutomaticPostponements(
         'APPROVED'
       FROM employeeLeaveBalances lb
       LEFT JOIN leavePostponements lp
-        ON lp.leaveBalanceUuid = lb.uuid
+        ON lp.leave_balance_uuid = lb.uuid
        AND lp.status = 'APPROVED'
       WHERE lb.employee_uuid = ?
         AND lb.budgetYear IN (${placeholders})
@@ -139,13 +139,22 @@ async function upsertCurrentYearBalance(conn, employeeUuid, currentBudgetYear) {
     );
   }
 
-  const annualPolicy = await getAnnualPolicy(conn);
+  let annualPolicy = await getAnnualPolicy(conn);
   if (!annualPolicy) {
-    throw new ApiError(
-      "Annual leave policy is not configured.",
-      422,
-      "VALIDATION_ERROR",
+    const [polRows] = await conn.execute(
+      `SELECT baseDays, incrementPerYear, maxDays FROM leavePolicies WHERE LOWER(leaveType) = 'annual' LIMIT 1`
     );
+    if (polRows && polRows[0]) {
+      annualPolicy = polRows[0];
+    } else {
+      const polUuid = randomUUID();
+      await conn.execute(
+        `INSERT INTO leavePolicies (uuid, leaveType, baseDays, incrementPerYear, maxDays, eligibilityMonths, useBudgetYear)
+         VALUES (?, 'Annual', 16, 1.00, 30, 0, 1)`,
+        [polUuid]
+      );
+      annualPolicy = { baseDays: 16, incrementPerYear: 1, maxDays: 30 };
+    }
   }
 
   const hireDate = parseAsUtcDate(employee.hire_date);
@@ -181,31 +190,56 @@ async function upsertCurrentYearBalance(conn, employeeUuid, currentBudgetYear) {
     currentBudgetYear,
   );
 
+  // Calculate usedDays from approved annual leave requests within current budget year
+  let usedDays = 0;
+  try {
+    const budgetYearInfo = await getCurrentEthiopianBudgetYear();
+    const [requestRows] = await conn.execute(
+      `
+        SELECT COALESCE(SUM(totalDays), 0) AS totalUsed
+        FROM leaveRequests
+        WHERE employee_uuid = ?
+          AND LOWER(leaveType) = 'annual'
+          AND status = 'APPROVED'
+          AND startDate >= ? AND startDate <= ?
+      `,
+      [employeeUuid, budgetYearInfo.startDate, budgetYearInfo.endDate]
+    );
+    usedDays = normalizeDays(requestRows[0]?.totalUsed);
+  } catch (err) {
+    console.warn("[BalanceService] Could not calculate used days from leaveRequests:", err.message);
+  }
+
   const [existingRows] = await conn.execute(
     `
       SELECT uuid, usedDays, entitledDays
       FROM employeeLeaveBalances
-      WHERE employee_uuid = ? AND budgetYear = ?
+      WHERE employee_uuid = ? AND budgetYear = ? AND (leaveType = 'Annual' OR leaveType IS NULL OR leaveType = '')
       LIMIT 1
     `,
     [employeeUuid, currentBudgetYear],
   );
 
+  // If no approved requests were found, preserve any existing recorded usedDays
+  if (usedDays === 0 && existingRows.length > 0 && Number(existingRows[0].usedDays) > 0) {
+    usedDays = normalizeDays(existingRows[0].usedDays);
+  }
+
+  const remainingDays = calculateRemainingDays(
+    entitledDays,
+    carriedForwardDays,
+    usedDays,
+  );
+
   if (existingRows.length === 0) {
     const balanceUuid = randomUUID();
-    const usedDays = 0;
-    const remainingDays = calculateRemainingDays(
-      entitledDays,
-      carriedForwardDays,
-      usedDays,
-    );
-
     await conn.execute(
       `
         INSERT INTO employeeLeaveBalances (
           uuid,
           employee_uuid,
           budgetYear,
+          leaveType,
           entitledDays,
           carriedForwardDays,
           usedDays,
@@ -213,7 +247,7 @@ async function upsertCurrentYearBalance(conn, employeeUuid, currentBudgetYear) {
           status,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', CURRENT_DATE)
+        VALUES (?, ?, ?, 'Annual', ?, ?, ?, ?, 'ACTIVE', CURRENT_DATE)
       `,
       [
         balanceUuid,
@@ -227,24 +261,19 @@ async function upsertCurrentYearBalance(conn, employeeUuid, currentBudgetYear) {
     );
   } else {
     const existing = existingRows[0];
-    const usedDays = normalizeDays(existing.usedDays);
-    const remainingDays = calculateRemainingDays(
-      entitledDays,
-      carriedForwardDays,
-      usedDays,
-    );
-
     await conn.execute(
       `
         UPDATE employeeLeaveBalances
         SET entitledDays = ?,
             carriedForwardDays = ?,
+            usedDays = ?,
             remainingDays = ?,
+            leaveType = 'Annual',
             status = 'ACTIVE',
             updated_at = CURRENT_DATE
         WHERE uuid = ?
       `,
-      [entitledDays, carriedForwardDays, remainingDays, existing.uuid],
+      [entitledDays, carriedForwardDays, usedDays, remainingDays, existing.uuid],
     );
   }
 }
@@ -261,6 +290,8 @@ async function fetchBalance(employeeUuid, budgetYear = null) {
 
   const query = `
     SELECT
+      uuid,
+      leaveType,
       entitledDays,
       carriedForwardDays,
       usedDays,
@@ -279,6 +310,8 @@ async function fetchBalance(employeeUuid, budgetYear = null) {
 
   const row = rows[0];
   return {
+    uuid: row.uuid,
+    leaveType: row.leaveType,
     entitledDays: Number(row.entitledDays),
     carriedForward: Number(row.carriedForwardDays),
     usedDays: Number(row.usedDays),

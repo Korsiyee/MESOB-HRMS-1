@@ -22,6 +22,7 @@ const syncRoutes = require("./routes/syncRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const faceRecognitionRoutes = require("./routes/faceRecognitionRoutes");
 const networkSettingsRoutes = require("./routes/networkSettingsRoutes");
+const roleManagementRoutes = require("./routes/roleManagementRoutes");
 const { authenticateJwt } = require("./middleware/authMiddleware");
 const notFoundHandler = require("./middleware/notFoundHandler");
 const errorHandler = require("./middleware/errorHandler");
@@ -71,6 +72,7 @@ app.use("/api/logs", logsRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/face-recognition", faceRecognitionRoutes);
 app.use("/api/network-settings", networkSettingsRoutes);
+app.use("/api/role-management", roleManagementRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

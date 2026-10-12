@@ -56,19 +56,41 @@ async function getUserPermissions(userUuid) {
     });
     const moduleCodesForRole = getModulesForRole(userData.role_code);
     console.log(`[ModuleAuth] Module codes from static mapping for role ${userData.role_code}:`, moduleCodesForRole);
+    console.log(`[ModuleAuth] Number of modules: ${moduleCodesForRole.length}`);
     
     // Get full module details from database
     const modules = [];
     if (moduleCodesForRole.length > 0) {
-      const placeholders = moduleCodesForRole.map(() => '?').join(',');
-      const [moduleRows] = await db.promise().query(`
-        SELECT uuid, code, name, category, icon, display_order
-        FROM Modules
-        WHERE code IN (${placeholders}) AND is_active = TRUE
-        ORDER BY display_order
-      `, moduleCodesForRole);
-      
-      modules.push(...moduleRows);
+      try {
+        const placeholders = moduleCodesForRole.map(() => '?').join(',');
+        const [moduleRows] = await db.promise().query(`
+          SELECT uuid, code, name, category, icon, display_order
+          FROM Modules
+          WHERE code IN (${placeholders}) AND is_active = TRUE
+          ORDER BY display_order
+        `, moduleCodesForRole);
+        
+        if (moduleRows && moduleRows.length > 0) {
+          modules.push(...moduleRows);
+        }
+      } catch (err) {
+        console.warn('[ModuleAuth] Could not query Modules table, using static mapping:', err.message);
+      }
+
+      // If database Modules table is missing any static modules, synthesize them so access is never lost
+      const existingCodes = new Set(modules.map(m => m.code));
+      moduleCodesForRole.forEach((code, idx) => {
+        if (!existingCodes.has(code)) {
+          modules.push({
+            uuid: `static-${code.toLowerCase()}`,
+            code,
+            name: code.replace(/_/g, ' '),
+            category: 'GENERAL',
+            icon: 'Layers',
+            display_order: (idx + 1) * 10,
+          });
+        }
+      });
     }
 
     console.log(`[ModuleAuth] Final permissions for ${userData.username}:`, {
@@ -113,6 +135,12 @@ async function checkModuleAccess(userUuid, moduleCode) {
     
     if (!permissions) {
       return null;
+    }
+
+    // Super Admin has access to all modules
+    if (permissions.role?.code === 'SUPER_ADMIN') {
+      const module = permissions.modules.find(m => m.code === moduleCode);
+      return module || { code: moduleCode, name: moduleCode, category: 'ADMIN' };
     }
 
     // Find the module
@@ -216,10 +244,22 @@ async function updateRolePermissions(roleUuid, moduleUuids) {
   return;
 }
 
+async function hasModule(userUuid, moduleCode) {
+  try {
+    const mod = await checkModuleAccess(userUuid, moduleCode);
+    return Boolean(mod);
+  } catch (error) {
+    console.error('[ModuleAuth] Error in hasModule:', error);
+    return false;
+  }
+}
+
 module.exports = {
   getUserPermissions,
   checkModuleAccess,
+  hasModule,
   getAllModules,
   getRolePermissions,
   updateRolePermissions // Kept for backward compatibility but does nothing
 };
+

@@ -1,4 +1,4 @@
-﻿// kenat is an ESM-only package — use dynamic import() from CommonJS
+// kenat is an ESM-only package — use dynamic import() from CommonJS
 let _kenatPromise;
 function getKenat() {
   if (!_kenatPromise) {
@@ -107,7 +107,7 @@ async function toGregorian(year, month, day) {
  * @returns {Promise<string>} Gregorian date in YYYY-MM-DD format
  */
 async function getFiscalYearStartDate(budgetYear) {
-  return toGregorian(budgetYear, 11, 1); // Hamle 1
+  return toGregorian(budgetYear - 1, 11, 1); // Hamle 1 of previous Ethiopian year
 }
 
 /**

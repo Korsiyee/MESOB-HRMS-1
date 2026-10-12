@@ -136,6 +136,13 @@ const createRequest = async (req, res) => {
       });
     }
 
+    const poolDb = require("../config/db").db.promise();
+    const [policyRows] = await poolDb.execute(
+      "SELECT leaveType FROM leavePolicies WHERE UPPER(leaveType) = ? LIMIT 1",
+      [String(leaveType || '').trim().toUpperCase()]
+    );
+    const resolvedLeaveType = policyRows[0]?.leaveType || leaveType;
+
     if (!isHalfStepPositiveNumber(parsedNumberOfDays)) {
       return sendError(res, {
         status: 400,
@@ -356,7 +363,7 @@ const createRequest = async (req, res) => {
 
     const typeValidation =
       await LeaveValidationService.validateLeaveTypeSpecifics(
-        leaveType,
+        resolvedLeaveType,
         requestData,
       );
     if (!typeValidation.valid) {
@@ -368,69 +375,51 @@ const createRequest = async (req, res) => {
     }
 
     // Approval workflow routing
+    const requester_role = req.user?.raw_role || (typeof req.user?.role === 'object' ? req.user?.role?.code : req.user?.role) || 'EMPLOYEE';
     let initialStatus = "PENDING_DEPARTMENT"; // Default: Employee → Dept Head → HR
     let departmentHeadId = null;
     let isDeptHeadRequest = false;
-    
-    // Check if requester is HR staff or Department Head
-    const isHRStaff = ["HR_OFFICER", "HR_ADMIN", "SUPER_ADMIN"].includes(requester_role);
-    const isDeptHead = requester_role === "DEPT_HEAD";
-    
-    if (isHRStaff || isDeptHead) {
-      // Get the employee's department to determine routing
+
+    // Role-specific workflow rules:
+    // 1. HR Admin -> automatically approved
+    // 2. HR Officer -> goes directly to HR Admin to be approved (skip Dept Head)
+    // 3. Super Admin -> goes directly to HR Admin to be approved (skip Dept Head)
+    // 4. Dept Head -> goes directly to HR Admin to be approved (skip Dept Head)
+    // 5. Standard Employee -> goes to Dept Head
+    if (requester_role === "HR_ADMIN") {
+      initialStatus = "APPROVED";
+      isDeptHeadRequest = true;
+    } else if (requester_role === "HR_OFFICER" || requester_role === "SUPER_ADMIN") {
+      initialStatus = "PENDING_HR";
+      isDeptHeadRequest = true;
+    } else if (requester_role === "DEPT_HEAD" || requester_role === "DEPARTMENT_HEAD") {
+      initialStatus = "PENDING_HR";
+      isDeptHeadRequest = true;
+    } else {
+      initialStatus = "PENDING_DEPARTMENT";
       const pool = require("../config/db").db.promise();
       const [empRows] = await pool.execute(
         "SELECT department_uuid FROM Employees WHERE uuid = ?",
         [employee_uuid]
       );
-      
       const employeeDeptUuid = empRows[0]?.department_uuid;
-      
-      if (isDeptHead) {
-        // Department Head's own request → skip dept approval, go directly to HR
-        // Department heads decide at department level, so their requests bypass dept approval
-        initialStatus = "PENDING_HR";
-        isDeptHeadRequest = true;
-      } else if (isHRStaff && employeeDeptUuid) {
-        // HR staff → Check if they are also the department head of their department
-        const [hrHeadRows] = await pool.execute(
-          `SELECT u.uuid, r.code as role, e.department_uuid as hr_dept_uuid
+      if (employeeDeptUuid) {
+        const [deptHeadRows] = await pool.execute(
+          `SELECT u.uuid
            FROM Users u
            JOIN Employees e ON e.uuid = u.employee_uuid
            JOIN Roles r ON r.uuid = u.role_uuid
-           WHERE r.code = 'DEPT_HEAD'
-           LIMIT 100`
+           WHERE e.department_uuid = ? AND r.code IN ('DEPT_HEAD', 'DEPARTMENT_HEAD')
+           LIMIT 1`,
+          [employeeDeptUuid]
         );
-        
-        // Check if the HR Admin is also the head of HR department
-        const isHRDeptHead = hrHeadRows.some(h => 
-          h.uuid === req.user.uuid && h.hr_dept_uuid === employeeDeptUuid
-        );
-        
-        if (isHRDeptHead || requester_role === "HR_ADMIN" || requester_role === "SUPER_ADMIN") {
-          // HR Admin who is also dept head of HR, or any HR_ADMIN/SUPER_ADMIN → skip dept approval, go to HR directly
-          initialStatus = "PENDING_HR";
-          isDeptHeadRequest = true;
-        } else {
-          // HR Officer (not dept head of HR) → normal flow through dept head
-          initialStatus = "PENDING_DEPARTMENT";
-          const [deptHeadRows] = await pool.execute(
-            `SELECT u.uuid
-             FROM Users u
-             JOIN Employees e ON e.uuid = u.employee_uuid
-             JOIN Roles r ON r.uuid = u.role_uuid
-             WHERE e.department_uuid = ? AND r.code = 'DEPT_HEAD'
-             LIMIT 1`,
-            [employeeDeptUuid]
-          );
-          departmentHeadId = deptHeadRows[0]?.uuid || null;
-        }
+        departmentHeadId = deptHeadRows[0]?.uuid || null;
       }
     }
 
     const newRequest = await RequestService.createLeaveRequest({
       employee_uuid,
-      leaveType,
+      leaveType: resolvedLeaveType,
       startDate,
       endDate,
       total_days: actualWorkingDays,
@@ -456,11 +445,11 @@ const createRequest = async (req, res) => {
       entityType: "LEAVE_REQUEST",
       entityUuid: newRequest.uuid,
       diff: {
-        leaveType,
+        leaveType: resolvedLeaveType,
         startDate: newRequest.startDate,
         endDate: newRequest.endDate,
         total_days: actualWorkingDays,
-        specialFlow: isDeptHeadRequest ? "DEPT_HEAD_AUTO_APPROVE" : isHRStaff ? "HR_TO_DEPT_HEAD" : "STANDARD",
+        specialFlow: isDeptHeadRequest ? "DIRECT_HR_OR_AUTO_APPROVED" : "STANDARD",
       },
       ipAddress: req.ip,
     });
@@ -470,31 +459,26 @@ const createRequest = async (req, res) => {
       const pool2 = require("../config/db").db.promise();
       const [empRows] = await pool2.execute(
         `SELECT CONCAT(e.first_name,' ',COALESCE(e.middle_name,''),' ',e.last_name) AS full_name,
-                d.name AS department_name, e.department_uuid,
-                lr.department_head_id
+                d.name AS department_name
          FROM Employees e
            LEFT JOIN Positions p ON p.uuid = e.position_uuid
          LEFT JOIN Departments d ON d.uuid = e.department_uuid
-         LEFT JOIN leaveRequests lr ON lr.uuid = ?
          WHERE e.uuid = ?`,
-        [newRequest.uuid, employee_uuid]
+        [employee_uuid]
       );
       const empInfo = empRows[0] || {};
-      let deptHeadUserUuid = null;
-      if (empInfo.department_head_id) {
-        deptHeadUserUuid = empInfo.department_head_id;
-      }
+      
       await notifyLeaveSubmitted({
         senderUserUuid:      req.user.uuid,
         senderRole:          requester_role,
         employeeFullName:    (empInfo.full_name || "").trim(),
         departmentName:      empInfo.department_name || "",
-        leaveType,
+        leaveType:           resolvedLeaveType,
         startDate:           newRequest.startDate,
         endDate:             newRequest.endDate,
         totalDays:           actualWorkingDays,
         requestUuid:         newRequest.uuid,
-        departmentHeadUserUuid: deptHeadUserUuid,
+        departmentHeadUserUuid: departmentHeadId,
       });
     } catch (notifErr) {
       console.error("[Notification] createRequest notify failed (non-fatal):", notifErr.message);
@@ -871,17 +855,37 @@ const shortenApprovedRequest = async (req, res) => {
 
 const getPendingRequests = async (req, res) => {
   try {
-    const userRole = req.user?.role;
+    // Extract role code - handle both string and object formats
+    const userRole = typeof req.user?.role === 'string' 
+      ? req.user.role 
+      : (req.user?.role?.code || req.user?.raw_role || 'EMPLOYEE');
+    
+    // DEBUG: Log user info
+    console.log('[getPendingRequests] User info:', {
+      uuid: req.user?.uuid,
+      role: userRole,
+      raw_role: req.user?.raw_role,
+      department_uuid: req.user?.department_uuid,
+      employee_uuid: req.user?.employee_uuid
+    });
     
     // Department heads only see PENDING_DEPARTMENT requests for their own department
-    // HR roles only see PENDING_HR requests (not PENDING_DEPARTMENT)
-    const departmentUuid =
-      userRole === "DEPT_HEAD" ? req.user?.department_uuid : null;
+    // HR roles (HR_ADMIN, HR_OFFICER, SUPER_ADMIN) only see PENDING_HR requests
+    const isDeptHead = userRole === "DEPT_HEAD" || userRole === "DEPARTMENT_HEAD";
+    const departmentUuid = isDeptHead ? req.user?.department_uuid : null;
+
+    console.log('[getPendingRequests] Calling service with:', {
+      departmentUuid,
+      role: userRole,
+      isDeptHead
+    });
 
     const pendingRequests = await RequestService.getPendingRequests({ 
       departmentUuid,
       role: userRole
     });
+
+    console.log('[getPendingRequests] Found', pendingRequests?.length || 0, 'requests');
 
     return sendSuccess(res, {
       status: 200,

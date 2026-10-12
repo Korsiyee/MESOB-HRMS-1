@@ -23,7 +23,7 @@
  * Value: Array of module codes accessible to that role
  */
 const ROLE_MODULE_MAPPING = {
-  // EMPLOYEE: Only personal modules
+  // EMPLOYEE: Only personal space modules
   EMPLOYEE: [
     'MY_ATTENDANCE',
     'MY_LETTERS',
@@ -31,13 +31,19 @@ const ROLE_MODULE_MAPPING = {
     'MY_ACCOUNTS'
   ],
   
-  // DEPT_HEAD: Department management + personal modules
+  // DEPT_HEAD: Department attendance + leave requests approval/rejection + personal space ONLY
+  // NO access to employee lists, departments, positions, levels, or organization modules
   DEPT_HEAD: [
-    'EMPLOYEE_LIST',
-    'EMPLOYEE_PROFILE',
-    'DEPARTMENTS',
-    'POSITIONS',
-    'LEVELS',
+    'ATTENDANCE_RECORDS',
+    'LEAVE_REQUESTS',
+    'MY_ATTENDANCE',
+    'MY_LETTERS',
+    'MY_LEAVES',
+    'MY_ACCOUNTS'
+  ],
+
+  // DEPARTMENT_HEAD: Alias for DEPT_HEAD
+  DEPARTMENT_HEAD: [
     'ATTENDANCE_RECORDS',
     'LEAVE_REQUESTS',
     'MY_ATTENDANCE',
@@ -46,13 +52,8 @@ const ROLE_MODULE_MAPPING = {
     'MY_ACCOUNTS'
   ],
   
-  // MANAGER: Department management + personal modules (alias for DEPT_HEAD)
+  // MANAGER: Alias for DEPT_HEAD
   MANAGER: [
-    'EMPLOYEE_LIST',
-    'EMPLOYEE_PROFILE',
-    'DEPARTMENTS',
-    'POSITIONS',
-    'LEVELS',
     'ATTENDANCE_RECORDS',
     'LEAVE_REQUESTS',
     'MY_ATTENDANCE',
@@ -61,10 +62,11 @@ const ROLE_MODULE_MAPPING = {
     'MY_ACCOUNTS'
   ],
   
-  // HR_OFFICER: HR operations (most HR functions except critical admin tasks)
+  // HR_OFFICER: Inherits all HR Admin permissions, except: Accounts, Leave Policy, Day Off
   HR_OFFICER: [
     'EMPLOYEE_LIST',
     'EMPLOYEE_PROFILE',
+    'REGISTER_EMPLOYEE',
     'DEPARTMENTS',
     'POSITIONS',
     'LEVELS',
@@ -78,7 +80,7 @@ const ROLE_MODULE_MAPPING = {
     'MY_ACCOUNTS'
   ],
   
-  // HR_ADMIN: Full HR management including critical functions
+  // HR_ADMIN: Full access to all modules, except: Audit Logs, Network Settings
   HR_ADMIN: [
     'EMPLOYEE_LIST',
     'EMPLOYEE_PROFILE',
@@ -87,20 +89,18 @@ const ROLE_MODULE_MAPPING = {
     'POSITIONS',
     'LEVELS',
     'ATTENDANCE_RECORDS',
-    'NETWORK_SETTINGS',
     'SHIFTS',
     'LETTERS',
     'LEAVE_REQUESTS',
     'LEAVE_SETTINGS',
     'ACCOUNTS',
-    'AUDIT_LOGS',
     'MY_ATTENDANCE',
     'MY_LETTERS',
     'MY_LEAVES',
     'MY_ACCOUNTS'
   ],
   
-  // SUPER_ADMIN: Complete system access (all modules)
+  // SUPER_ADMIN: Full system access (all modules)
   SUPER_ADMIN: [
     'EMPLOYEE_LIST',
     'EMPLOYEE_PROFILE',
@@ -128,8 +128,9 @@ const ROLE_MODULE_MAPPING = {
  */
 const ROLE_DASHBOARD_MAPPING = {
   EMPLOYEE: 'employee',
-  DEPT_HEAD: 'admin',
-  MANAGER: 'admin',
+  DEPT_HEAD: 'department',
+  DEPARTMENT_HEAD: 'department',
+  MANAGER: 'department',
   HR_OFFICER: 'admin',
   HR_ADMIN: 'admin',
   SUPER_ADMIN: 'admin'
@@ -141,6 +142,7 @@ const ROLE_DASHBOARD_MAPPING = {
 const ROLE_HIERARCHY = {
   EMPLOYEE: 10,
   DEPT_HEAD: 20,
+  DEPARTMENT_HEAD: 20,
   MANAGER: 20,
   HR_OFFICER: 30,
   HR_ADMIN: 40,

@@ -68,24 +68,24 @@ const MyAccountPage = () => {
     if (passwords.newPwd !== passwords.confirm) { showMsg('error','New passwords do not match.'); return; }
     
     // Validate password complexity
-    if (passwords.newPwd.length < 8) { 
-      showMsg('error','Password must be at least 8 characters.'); 
+    if (!passwords.newPwd || passwords.newPwd.length < 8) { 
+      showMsg('error', 'Password must be at least 8 characters long.'); 
       return; 
     }
     if (!/[A-Z]/.test(passwords.newPwd)) {
-      showMsg('error','Password must contain at least one uppercase letter.');
+      showMsg('error', 'Password must contain at least one uppercase letter (A-Z).');
       return;
     }
     if (!/[a-z]/.test(passwords.newPwd)) {
-      showMsg('error','Password must contain at least one lowercase letter.');
+      showMsg('error', 'Password must contain at least one lowercase letter (a-z).');
       return;
     }
     if (!/[0-9]/.test(passwords.newPwd)) {
-      showMsg('error','Password must contain at least one number.');
+      showMsg('error', 'Password must contain at least one number (0-9).');
       return;
     }
-    if (!/[^A-Za-z0-9]/.test(passwords.newPwd)) {
-      showMsg('error','Password must contain at least one symbol.');
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(passwords.newPwd) && !/[^A-Za-z0-9]/.test(passwords.newPwd)) {
+      showMsg('error', 'Password must contain at least one special character (e.g., !, @, #, or $).');
       return;
     }
     
@@ -214,10 +214,10 @@ const MyAccountPage = () => {
                     <p style={{ margin:'0 0 8px', fontSize:'0.72rem', fontWeight:700, color:C.textSub, textTransform:'uppercase', letterSpacing:'0.05em' }}>Password Requirements:</p>
                     {[
                       { label: 'At least 8 characters', met: passwords.newPwd.length >= 8 },
-                      { label: 'One uppercase letter', met: /[A-Z]/.test(passwords.newPwd) },
-                      { label: 'One lowercase letter', met: /[a-z]/.test(passwords.newPwd) },
-                      { label: 'One number', met: /[0-9]/.test(passwords.newPwd) },
-                      { label: 'One symbol (!@#$...)', met: /[^A-Za-z0-9]/.test(passwords.newPwd) },
+                      { label: 'One uppercase letter (A-Z)', met: /[A-Z]/.test(passwords.newPwd) },
+                      { label: 'One lowercase letter (a-z)', met: /[a-z]/.test(passwords.newPwd) },
+                      { label: 'One number (0-9)', met: /[0-9]/.test(passwords.newPwd) },
+                      { label: 'One special character (!@#$...)', met: (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(passwords.newPwd) || /[^A-Za-z0-9]/.test(passwords.newPwd)) },
                     ].map(rule => (
                       <div key={rule.label} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
                         <span style={{ fontSize:'0.8rem', fontWeight:700, color: rule.met ? '#059669' : '#DC2626', flexShrink:0 }}>

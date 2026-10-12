@@ -437,7 +437,9 @@ CREATE TABLE AttendanceSummary (
 DROP TABLE IF EXISTS NetworkSettings;
 CREATE TABLE NetworkSettings (
   uuid VARCHAR(36) NOT NULL,
-  ip_address VARCHAR(45) NOT NULL,
+  label VARCHAR(200) NOT NULL,
+  ip_range VARCHAR(100) NOT NULL,
+  ip_address VARCHAR(45) DEFAULT NULL,
   subnet_mask VARCHAR(45) DEFAULT NULL,
   location_name VARCHAR(200) DEFAULT NULL,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
@@ -445,7 +447,7 @@ CREATE TABLE NetworkSettings (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (uuid),
-  UNIQUE KEY uk_netset_ip (ip_address),
+  UNIQUE KEY uk_netset_ip_range (ip_range),
   KEY idx_netset_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

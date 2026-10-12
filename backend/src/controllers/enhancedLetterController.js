@@ -50,18 +50,24 @@ exports.createEnhancedLetterTemplate = async (req, res) => {
 
     await pool.execute(
       `INSERT INTO LetterTemplates (
-        uuid, title, category, description, layout_config_id,
-        recipient_info, subject, main_body, closing_text, cc_recipients,
+        uuid, template_code, template_name, title, category, type, description, layout_config_id,
+        recipient_info, subject, subject_template, body_template, main_body, text_content, closing_text, cc_recipients,
         uses_new_format, is_active, created_by, version
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE, TRUE, ?, 1)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE, TRUE, ?, 1)`,
       [
         templateId,
+        `TPL_${Date.now().toString().slice(-6)}`,
         title.trim(),
+        title.trim(),
+        category || "GENERAL",
         category || "GENERAL",
         description || null,
         layoutId,
         recipient_info || null,
         subject || null,
+        subject || null,
+        main_body,
+        main_body,
         main_body,
         closing_text || null,
         cc_recipients || null,
@@ -143,12 +149,12 @@ exports.updateEnhancedLetterTemplate = async (req, res) => {
     const values = [];
 
     if (title !== undefined) {
-      updates.push("title = ?");
-      values.push(title.trim());
+      updates.push("title = ?", "template_name = ?");
+      values.push(title.trim(), title.trim());
     }
     if (category !== undefined) {
-      updates.push("category = ?");
-      values.push(category);
+      updates.push("category = ?", "type = ?");
+      values.push(category, category);
     }
     if (description !== undefined) {
       updates.push("description = ?");
@@ -159,12 +165,12 @@ exports.updateEnhancedLetterTemplate = async (req, res) => {
       values.push(recipient_info);
     }
     if (subject !== undefined) {
-      updates.push("subject = ?");
-      values.push(subject);
+      updates.push("subject = ?", "subject_template = ?");
+      values.push(subject, subject);
     }
     if (main_body !== undefined) {
-      updates.push("main_body = ?");
-      values.push(main_body);
+      updates.push("main_body = ?", "body_template = ?", "text_content = ?");
+      values.push(main_body, main_body, main_body);
     }
     if (closing_text !== undefined) {
       updates.push("closing_text = ?");

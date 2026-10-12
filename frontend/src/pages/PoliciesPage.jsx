@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { PolicyApi } from '../api/policyApi';
-import { Shield, Pencil, X, Plus, Trash2 } from 'lucide-react';
+import { LeaveApi } from '../api/leaveApi';
+import { Shield, Pencil, X, Plus, Trash2, RefreshCw } from 'lucide-react';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { Can } from '../components/Can';
 
@@ -117,6 +118,8 @@ const EditModal = ({policy, onClose, onSaved, showMsg}) => {
 const PoliciesPage = () => {
   const [policies, setPolicies] = useState([]);
   const [loading,  setLoading]  = useState(true);
+  const [rebuilding, setRebuilding] = useState(false);
+  const [confirmRebuild, setConfirmRebuild] = useState(false);
   const [notice,   setNotice]   = useState({type:'',message:''});
   const [editPol,  setEditPol]  = useState(null);
   const [showAdd,  setShowAdd]  = useState(false);
@@ -143,14 +146,57 @@ const PoliciesPage = () => {
     finally { setDeleting(''); setConfirmDelete(null); }
   };
 
+  const handleRebuildBalances = async () => {
+    setConfirmRebuild(false);
+    setRebuilding(true);
+    try {
+      const res = await LeaveApi.rebuildAll();
+      const count = res?.data?.succeededEmployees ?? res?.processedEmployees ?? 'all';
+      showMsg('success', `Leave balances successfully rebuilt for ${count} active employees.`);
+    } catch(e) {
+      showMsg('error', e.message || 'Failed to rebuild leave balances.');
+    } finally {
+      setRebuilding(false);
+    }
+  };
+
   return (
     <div style={{ fontFamily:'Poppins,sans-serif', display:'flex', flexDirection:'column', gap:20 }}>
       <Notice type={notice.type} message={notice.message} onClose={()=>setNotice({type:'',message:''})}/>
       <div style={{ background:C.headerBg, borderRadius:14, padding:'20px 26px', display:'flex', justifyContent:'space-between', alignItems:'center', boxShadow:'0 4px 20px rgba(0,0,0,0.18)' }}>
-        <div><h1 style={{ margin:0, fontSize:'1.2rem', fontWeight:700, color:'#E8F0EE' }}>Leave Policies</h1><p style={{ margin:'3px 0 0', fontSize:'0.75rem', color:'rgba(232,240,238,0.6)' }}>Configure entitlement rules per leave type</p></div>
-        <Can action="create" resource="policies">
-          <GreenBtn onClick={()=>setShowAdd(true)} style={{ background:'#E8F0EE', color:C.primary }}><Plus size={15}/> Add Policy</GreenBtn>
-        </Can>
+        <div>
+          <h1 style={{ margin:0, fontSize:'1.2rem', fontWeight:700, color:'#E8F0EE' }}>Leave Policies</h1>
+          <p style={{ margin:'3px 0 0', fontSize:'0.75rem', color:'rgba(232,240,238,0.6)' }}>Configure entitlement rules per leave type and rebuild employee balances</p>
+        </div>
+        <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+          <button
+            onClick={() => setConfirmRebuild(true)}
+            disabled={rebuilding}
+            style={{
+              background: 'rgba(255,255,255,0.12)',
+              color: '#E8F0EE',
+              border: '1px solid rgba(232,240,238,0.3)',
+              borderRadius: 8,
+              padding: '9px 16px',
+              fontSize: '0.78rem',
+              fontWeight: 600,
+              cursor: rebuilding ? 'not-allowed' : 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 7,
+              fontFamily: 'Poppins,sans-serif',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => { if (!rebuilding) e.currentTarget.style.background = 'rgba(255,255,255,0.2)'; }}
+            onMouseLeave={e => { if (!rebuilding) e.currentTarget.style.background = 'rgba(255,255,255,0.12)'; }}
+          >
+            <RefreshCw size={15} style={{ animation: rebuilding ? 'continuousSpin 1s linear infinite' : 'none' }} />
+            {rebuilding ? 'Rebuilding…' : 'Rebuild Balances'}
+          </button>
+          <Can action="create" resource="policies">
+            <GreenBtn onClick={()=>setShowAdd(true)} style={{ background:'#E8F0EE', color:C.primary }}><Plus size={15}/> Add Policy</GreenBtn>
+          </Can>
+        </div>
       </div>
       <div style={{ background:C.card, borderRadius:14, border:`1px solid ${C.border}`, boxShadow:C.shadow, overflow:'hidden' }}>
         <table style={{ width:'100%', borderCollapse:'collapse' }}>
@@ -180,6 +226,17 @@ const PoliciesPage = () => {
       {showAdd && <AddModal onClose={()=>setShowAdd(false)} onSaved={()=>{setShowAdd(false);load();}} showMsg={showMsg}/>}
       {editPol && <EditModal policy={editPol} onClose={()=>setEditPol(null)} onSaved={()=>{setEditPol(null);load();}} showMsg={showMsg}/>}
       
+      <ConfirmDialog
+        open={confirmRebuild}
+        onClose={() => setConfirmRebuild(false)}
+        onConfirm={handleRebuildBalances}
+        variant="info"
+        title="Rebuild All Leave Balances?"
+        description="This will recalculate and synchronize annual leave entitlements, carryovers, and remaining balances for all active employees based on current policies, years of service, and approved leave transactions."
+        confirmText="Rebuild Now"
+        cancelText="Cancel"
+      />
+
       <ConfirmDialog
         open={!!confirmDelete}
         onClose={() => setConfirmDelete(null)}

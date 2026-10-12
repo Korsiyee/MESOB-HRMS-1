@@ -8,6 +8,23 @@ const C = {
   textMuted: '#2E6058',
 };
 
+// Helper function to format decimal hours to "Xhr Ymin" format
+const formatHoursToHrMin = (decimalHours) => {
+  if (decimalHours === null || decimalHours === undefined) return '';
+  
+  const totalMinutes = Math.round(decimalHours * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  
+  if (hours > 0 && minutes > 0) {
+    return `${hours}hr ${minutes}min`;
+  } else if (hours > 0) {
+    return `${hours}hr`;
+  } else {
+    return `${minutes}min`;
+  }
+};
+
 /**
  * AttendanceStatsCards Component
  * Displays key attendance metrics in card format
@@ -18,7 +35,7 @@ const AttendanceStatsCards = ({ stats }) => {
       icon: Clock,
       label: 'Total Worked Hours',
       value: stats?.totalWorkedHours !== null && stats?.totalWorkedHours !== undefined 
-        ? `${parseFloat(stats.totalWorkedHours).toFixed(1)}h` 
+        ? formatHoursToHrMin(parseFloat(stats.totalWorkedHours))
         : '—',
       color: '#0F766E',
       bgColor: 'rgba(15,118,110,0.1)',
@@ -27,7 +44,7 @@ const AttendanceStatsCards = ({ stats }) => {
       icon: TrendingUp,
       label: 'Total Overtime',
       value: stats?.totalOvertimeHours !== null && stats?.totalOvertimeHours !== undefined 
-        ? `${parseFloat(stats.totalOvertimeHours).toFixed(1)}h` 
+        ? formatHoursToHrMin(parseFloat(stats.totalOvertimeHours))
         : '—',
       color: '#059669',
       bgColor: 'rgba(5,150,105,0.1)',
@@ -37,7 +54,7 @@ const AttendanceStatsCards = ({ stats }) => {
       icon: TrendingDown,
       label: 'Total Missing Hours',
       value: stats?.totalMissingHours !== null && stats?.totalMissingHours !== undefined 
-        ? `${parseFloat(stats.totalMissingHours).toFixed(1)}h` 
+        ? formatHoursToHrMin(parseFloat(stats.totalMissingHours))
         : '—',
       color: '#DC2626',
       bgColor: 'rgba(220,38,38,0.08)',

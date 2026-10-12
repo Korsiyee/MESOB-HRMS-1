@@ -34,7 +34,8 @@ function addDays(dateString, days) {
 async function listShifts() {
   const [rows] = await executeQuery(
     `
-      SELECT s.uuid, s.name, s.start_time, s.end_time, s.working_days_json,
+      SELECT s.uuid, s.shift_code, s.name, s.start_time, s.end_time, s.working_days_json,
+        s.grace_period_minutes, s.break_duration_minutes,
         s.created_at, s.updated_at
       FROM ShiftDefinitions s
       ORDER BY s.name ASC
@@ -50,7 +51,8 @@ async function listShifts() {
 async function getShiftByUuid(uuid) {
   const [rows] = await executeQuery(
     `
-      SELECT s.uuid, s.name, s.start_time, s.end_time, s.working_days_json,
+      SELECT s.uuid, s.shift_code, s.name, s.start_time, s.end_time, s.working_days_json,
+        s.grace_period_minutes, s.break_duration_minutes,
         s.created_at, s.updated_at
       FROM ShiftDefinitions s
       WHERE s.uuid = ?
@@ -76,18 +78,33 @@ async function createShift(payload) {
   }
 
   const uuid = randomUUID();
+  const shiftCode = String(
+    payload.shift_code ||
+      payload.code ||
+      `SHIFT-${name.replace(/[^A-Za-z0-9]/g, "").slice(0, 8).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`
+  ).trim();
   const workingDays = parseWorkingDays(payload.working_days_json);
+  const gracePeriodMinutes = Number.isFinite(payload.grace_period_minutes)
+    ? Number(payload.grace_period_minutes)
+    : 15;
+  const breakDurationMinutes = Number.isFinite(payload.break_duration_minutes)
+    ? Number(payload.break_duration_minutes)
+    : 0;
+
   await executeQuery(
     `
-      INSERT INTO ShiftDefinitions (uuid, name, start_time, end_time, working_days_json)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO ShiftDefinitions (uuid, shift_code, name, start_time, end_time, working_days_json, grace_period_minutes, break_duration_minutes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       uuid,
+      shiftCode,
       name,
       payload.start_time,
       payload.end_time,
       JSON.stringify(workingDays),
+      gracePeriodMinutes,
+      breakDurationMinutes,
     ],
   );
 
@@ -112,6 +129,14 @@ async function updateShift(uuid, payload) {
     params.push(name);
   }
 
+  if (payload.shift_code !== undefined || payload.code !== undefined) {
+    const code = String(payload.shift_code || payload.code).trim();
+    if (code) {
+      updates.push("shift_code = ?");
+      params.push(code);
+    }
+  }
+
   if (payload.start_time !== undefined) {
     updates.push("start_time = ?");
     params.push(payload.start_time);
@@ -120,6 +145,16 @@ async function updateShift(uuid, payload) {
   if (payload.end_time !== undefined) {
     updates.push("end_time = ?");
     params.push(payload.end_time);
+  }
+
+  if (payload.grace_period_minutes !== undefined) {
+    updates.push("grace_period_minutes = ?");
+    params.push(Number(payload.grace_period_minutes) || 15);
+  }
+
+  if (payload.break_duration_minutes !== undefined) {
+    updates.push("break_duration_minutes = ?");
+    params.push(Number(payload.break_duration_minutes) || 0);
   }
 
   if (payload.working_days_json !== undefined) {
@@ -202,7 +237,7 @@ async function assignShift(shiftUuid, payload) {
 
     const employeeUuid = String(payload.employee_uuid || "").trim();
 
-    // Check for existing assignments to detect overlaps and gaps
+    // Check for existing assignments
     const [existingAssignments] = await connection.execute(
       `SELECT uuid, shift_uuid, effective_from, effective_to 
        FROM EmployeeShifts 
@@ -211,15 +246,41 @@ async function assignShift(shiftUuid, payload) {
       [employeeUuid]
     );
 
-    // CONSTRAINT 1: Check for overlaps
-    const params = [employeeUuid, effectiveFrom];
+    // Look for active open-ended assignment to gracefully close or adjust
+    const [activeOpen] = await connection.execute(
+      `SELECT uuid, shift_uuid, effective_from 
+       FROM EmployeeShifts 
+       WHERE employee_uuid = ? AND effective_to IS NULL
+       ORDER BY effective_from DESC LIMIT 1`,
+      [employeeUuid]
+    );
+
+    if (activeOpen.length > 0) {
+      const openAssignment = activeOpen[0];
+      if (openAssignment.effective_from < effectiveFrom) {
+        // Auto-close prior assignment to day before effectiveFrom
+        const closeDate = addDays(effectiveFrom, -1);
+        await connection.execute(
+          "UPDATE EmployeeShifts SET effective_to = ? WHERE uuid = ?",
+          [closeDate, openAssignment.uuid],
+        );
+      } else if (openAssignment.effective_from === effectiveFrom) {
+        // Re-assigning starting on the exact same date: replace previous open assignment
+        await connection.execute(
+          "DELETE FROM EmployeeShifts WHERE uuid = ?",
+          [openAssignment.uuid],
+        );
+      }
+    }
+
+    // Check if any overlapping assignments remain
     let overlapQuery = `
       SELECT uuid, effective_from, effective_to
       FROM EmployeeShifts
       WHERE employee_uuid = ?
         AND (effective_to IS NULL OR effective_to >= ?)
     `;
-
+    const params = [employeeUuid, effectiveFrom];
     if (effectiveTo) {
       overlapQuery += " AND effective_from <= ?";
       params.push(effectiveTo);
@@ -227,67 +288,44 @@ async function assignShift(shiftUuid, payload) {
 
     const [overlaps] = await connection.execute(overlapQuery, params);
 
-    // CONSTRAINT 2: Prevent multiple active (NULL effective_to) assignments
-    if (!effectiveTo) {
-      const [activeShifts] = await connection.execute(
-        `SELECT uuid, effective_from FROM EmployeeShifts 
-         WHERE employee_uuid = ? AND effective_to IS NULL`,
-        [employeeUuid]
-      );
-      
-      if (activeShifts.length > 0) {
-        // Only allow if we're auto-closing the existing one
-        if (activeShifts.length > 1 || overlaps.length === 0) {
-          throw new ApiError(
-            "Employee already has an active shift assignment. Close the existing assignment before creating a new one.",
-            409,
-            "ACTIVE_SHIFT_EXISTS",
-          );
-        }
-      }
-    }
-
     if (overlaps.length) {
       const openAssignment = overlaps.find((row) => !row.effective_to);
-      if (overlaps.length === 1 && openAssignment) {
-        if (openAssignment.effective_from >= effectiveFrom) {
-          throw new ApiError(
-            "Shift assignment overlaps existing schedule.",
-            409,
-            "SHIFT_OVERLAP",
-          );
-        }
-        // Auto-close the existing open assignment
+      if (overlaps.length === 1 && openAssignment && openAssignment.effective_from < effectiveFrom) {
         const closeDate = addDays(effectiveFrom, -1);
         await connection.execute(
           "UPDATE EmployeeShifts SET effective_to = ? WHERE uuid = ?",
           [closeDate, openAssignment.uuid],
         );
-      } else {
-        throw new ApiError(
-          "Shift assignment overlaps existing schedule.",
-          409,
-          "SHIFT_OVERLAP",
-        );
+      } else if (effectiveTo) {
+        // If assigning a fixed duration, check if we need to close or fail
+        const fixedOverlap = overlaps.filter(o => o.effective_to);
+        if (fixedOverlap.length > 0) {
+          throw new ApiError(
+            "Shift assignment overlaps an existing scheduled shift period.",
+            409,
+            "SHIFT_OVERLAP",
+          );
+        }
       }
     }
 
-    // WARNING: Check for gaps in coverage
+    // Warning: Check for gaps in coverage
     let gapWarning = null;
     if (existingAssignments.length > 0) {
       const lastAssignment = existingAssignments[existingAssignments.length - 1];
-      
       if (lastAssignment.effective_to && effectiveFrom > lastAssignment.effective_to) {
-        const gapDays = Math.floor(
-          (new Date(effectiveFrom) - new Date(lastAssignment.effective_to)) / (1000 * 60 * 60 * 24)
-        ) - 1;
-        
+        const gapDays =
+          Math.floor(
+            (new Date(effectiveFrom) - new Date(lastAssignment.effective_to)) /
+              (1000 * 60 * 60 * 24),
+          ) - 1;
+
         if (gapDays > 0) {
           gapWarning = {
             message: `Warning: ${gapDays} day gap detected between ${lastAssignment.effective_to} and ${effectiveFrom}`,
             gap_start: lastAssignment.effective_to,
             gap_end: effectiveFrom,
-            gap_days: gapDays
+            gap_days: gapDays,
           };
         }
       }
@@ -319,7 +357,7 @@ async function assignShift(shiftUuid, payload) {
       uuid: assignmentUuid,
       employee_uuid: employeeUuid,
       shift_uuid: String(shiftUuid || "").trim(),
-      assignment_type: 'DIRECT',
+      assignment_type: "DIRECT",
       effective_from: effectiveFrom,
       effective_to: effectiveTo,
     };
@@ -341,11 +379,15 @@ async function getShiftEmployees(shiftUuid) {
         e.first_name,
         e.middle_name,
         e.last_name,
-        p.department_uuid,
+        COALESCE(e.department_uuid, p.department_uuid) AS department_uuid,
+        d.name AS department_name,
+        p.title AS position_title,
         es.effective_from,
         es.effective_to
       FROM EmployeeShifts es
       INNER JOIN Employees e ON e.uuid = es.employee_uuid
+      LEFT JOIN Positions p ON p.uuid = e.position_uuid
+      LEFT JOIN Departments d ON d.uuid = COALESCE(e.department_uuid, p.department_uuid)
       WHERE es.shift_uuid = ?
         AND es.effective_from <= CURRENT_DATE()
         AND (es.effective_to IS NULL OR es.effective_to >= CURRENT_DATE())

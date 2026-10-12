@@ -38,7 +38,12 @@ const NAV_CONFIG = [
   {
     group: "HOME",
     items: [
-      { label: "Home", icon: LayoutDashboard, to: "/", alwaysShow: true },
+      { 
+        label: "Home", 
+        icon: LayoutDashboard, 
+        to: "/", 
+        alwaysShow: true  // Changed to alwaysShow so all roles can see it
+      },
     ],
   },
   {
@@ -113,6 +118,7 @@ const NAV_CONFIG = [
   {
     group: "PERSONAL SPACE",
     items: [
+      { label: "My Dashboard", icon: LayoutDashboard, to: "/my-dashboard", alwaysShow: true },
       { label: "My Attendance", icon: Clock, to: "/attendance/my", alwaysShow: true },
       { label: "My Letters", icon: FileText, to: "/letters/my", alwaysShow: true },
       { label: "My Leaves", icon: CalendarDays, to: "/leave/my-requests", alwaysShow: true },
@@ -154,15 +160,18 @@ const Sidebar = ({ collapsed, onToggle, pendingCount = 0, mobileOpen = false, is
   const { hasModule, hasAnyModule } = useModulePermissions();
   const { hasPermission } = usePermissions();
 
+  const userRoleCode = user?.role?.code || user?.role?.name || (typeof user?.role === 'string' ? user?.role : null);
+
   const filteredNav = NAV_CONFIG.map(group => ({
     ...group,
     items: group.items
       .filter(item => {
+        if (item.roles && !item.roles.includes(userRoleCode)) return false;
         if (item.alwaysShow) return true;
         if (item.permission) return hasPermission(item.permission);
         if (item.modules) return hasAnyModule(item.modules);
         if (item.module) return hasModule(item.module);
-        return true;
+        return false;
       })
       .map(item => {
         if (!item.children) return item;
@@ -172,6 +181,11 @@ const Sidebar = ({ collapsed, onToggle, pendingCount = 0, mobileOpen = false, is
           return true;
         });
         return { ...item, children: filteredChildren };
+      })
+      .filter(item => {
+        // If an item had children configured, but all children were filtered out, hide it
+        if (item.children && item.children.length === 0) return false;
+        return true;
       })
   })).filter(group => group.items.length > 0);
 

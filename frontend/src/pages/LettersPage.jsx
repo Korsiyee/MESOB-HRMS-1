@@ -512,24 +512,26 @@ const LettersPage = () => {
   };
 
   const handleRejectRequest = async (uuid) => {
-    dialog.showPrompt(
-      'Enter rejection reason (optional):',
-      async (reason) => {
-        try {
-          await LetterApi.rejectLetterRequest(uuid, reason || '');
-          showToast('Letter request rejected.');
-          loadData();
-        } catch (err) {
-          showToast(err.message || 'Failed to reject request.', 'error');
-        }
-      },
-      {
-        title: 'Reject Letter Request',
-        placeholder: 'Enter reason for rejection...',
-        defaultValue: '',
-        confirmText: 'Reject',
-      }
-    );
+    const reason = await dialog.prompt({
+      title: 'Reject Letter Request',
+      message: 'Enter rejection reason (optional):',
+      placeholder: 'Enter reason for rejection...',
+      defaultValue: '',
+      confirmText: 'Reject',
+    });
+
+    // If user canceled (reason is null), don't proceed
+    if (reason === null) {
+      return;
+    }
+
+    try {
+      await LetterApi.rejectLetterRequest(uuid, reason || '');
+      showToast('Letter request rejected.');
+      loadData();
+    } catch (err) {
+      showToast(err.message || 'Failed to reject request.', 'error');
+    }
   };
 
   const handleGenerateApprovedLetter = async (req) => {

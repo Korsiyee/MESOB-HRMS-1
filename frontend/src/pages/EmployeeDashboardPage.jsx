@@ -68,31 +68,44 @@ const Sk = ({ h=14, w="100%", r=4 }) => (
 
 /* ─── section card ─── */
 const Card = ({ title, icon: Icon, children, style={} }) => (
-  <div style={{ background:CARD_BG, borderRadius:12, border:`1px solid ${BORDER}`, overflow:"hidden", ...style }}>
+  <div style={{ background:"linear-gradient(145deg, #FFFFFF 0%, #F5F8F7 100%)", borderRadius:16, border:`1px solid ${BORDER}`, boxShadow:"0 4px 20px -2px rgba(0,50,40,0.06), 0 2px 6px -1px rgba(0,0,0,0.03)", overflow:"hidden", ...style }}>
     {title && (
-      <div style={{ background:DARK, padding:"10px 16px", display:"flex", alignItems:"center", gap:8 }}>
-        {Icon && <Icon size={15} color="rgba(255,255,255,0.8)"/>}
+      <div style={{ background:DARK, padding:"12px 18px", display:"flex", alignItems:"center", gap:8 }}>
+        {Icon && <Icon size={16} color="rgba(255,255,255,0.85)"/>}
         <span style={{ fontSize:13, fontWeight:700, color:"#fff", fontFamily:"Poppins,sans-serif" }}>{title}</span>
       </div>
     )}
-    <div style={{ padding:16 }}>{children}</div>
+    <div style={{ padding:18 }}>{children}</div>
   </div>
 );
 
 /* ─── info row ─── */
 const InfoRow = ({ label, value, loading }) => (
-  <div style={{ display:"flex", gap:12, padding:"7px 0", borderBottom:`1px solid ${BORDER}` }}>
+  <div style={{ display:"flex", gap:12, padding:"8px 0", borderBottom:`1px solid ${BORDER}` }}>
     <span style={{ fontSize:12, color:MUTED, fontWeight:500, minWidth:130, flexShrink:0 }}>{label}</span>
-    {loading ? <Sk h={12} w={120}/> : <span style={{ fontSize:13, color:TEXT, fontWeight:500 }}>{value||"—"}</span>}
+    {loading ? <Sk h={12} w={120}/> : <span style={{ fontSize:13, color:TEXT, fontWeight:600 }}>{value||"—"}</span>}
   </div>
 );
 
 /* ─── stat box ─── */
 const StatBox = ({ label, value, sub, color="#0F766E", loading }) => (
-  <div style={{ flex:1, background:"#fff", borderRadius:10, border:`1px solid ${BORDER}`, padding:"12px 14px", textAlign:"center" }}>
-    {loading ? <Sk h={24} w={40} r={6}/> : <div style={{ fontSize:22, fontWeight:800, color, fontFamily:"Poppins,sans-serif" }}>{value??0}</div>}
-    <div style={{ fontSize:10, fontWeight:700, color:MUTED, textTransform:"uppercase", marginTop:3 }}>{label}</div>
-    {sub && <div style={{ fontSize:10, color:"#6b7280", marginTop:1 }}>{sub}</div>}
+  <div
+    style={{
+      flex:1,
+      background:"linear-gradient(145deg, #FFFFFF 0%, #F5F8F7 100%)",
+      borderRadius:14,
+      border:`1px solid ${BORDER}`,
+      padding:"14px 16px",
+      textAlign:"center",
+      boxShadow:"0 2px 10px rgba(0,50,40,0.04)",
+      transition:"transform 0.18s ease, box-shadow 0.18s ease",
+    }}
+    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px -2px rgba(0,50,40,0.1)'; }}
+    onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 2px 10px rgba(0,50,40,0.04)'; }}
+  >
+    {loading ? <Sk h={24} w={40} r={6}/> : <div style={{ fontSize:24, fontWeight:800, color, fontFamily:"Poppins,sans-serif" }}>{value??0}</div>}
+    <div style={{ fontSize:10, fontWeight:700, color:MUTED, textTransform:"uppercase", marginTop:3, letterSpacing:"0.04em" }}>{label}</div>
+    {sub && <div style={{ fontSize:10, color:"#6b7280", marginTop:2 }}>{sub}</div>}
   </div>
 );
 
@@ -408,7 +421,10 @@ const EmployeeDashboardPage = () => {
         <div>
           <h1 style={{ margin:0, fontSize:22, fontWeight:700, color:"#fff" }}>My Dashboard</h1>
           <p style={{ margin:"3px 0 0", fontSize:12, color:"rgba(255,255,255,0.65)" }}>
-            Welcome back, {emp?.first_name || user?.username || "—"}
+            Welcome back, {(() => {
+              const name = emp?.first_name || user?.username?.split(/[\s.]+/)[0] || "—";
+              return name === "—" ? name : name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+            })()}
           </p>
         </div>
         <button onClick={load} style={{ background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.25)", color:"#fff", padding:"8px 16px", borderRadius:8, fontSize:12, fontWeight:600, cursor:"pointer" }}>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Camera, Check, X, AlertCircle, Trash2 } from 'lucide-react';
 import FaceCaptureModal from './FaceCaptureModal';
 import { FaceRecognitionApi } from '../api/faceRecognitionApi';
+import ConfirmDialog from './ui/ConfirmDialog';
 
 const C = {
   card: '#EEF1F0',
@@ -22,6 +23,7 @@ const C = {
 const EmployeeFaceRegistration = ({ employeeUuid, employeeName, isHR = false, onUpdate }) => {
   const [status, setStatus] = useState({ registered: false, loading: true });
   const [showModal, setShowModal] = useState(false);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -64,11 +66,8 @@ const EmployeeFaceRegistration = ({ employeeUuid, employeeName, isHR = false, on
     }
   };
 
-  const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete the registered face images? This action cannot be undone.')) {
-      return;
-    }
-
+  const confirmDelete = async () => {
+    setShowConfirmDelete(false);
     setDeleting(true);
     setError('');
     setSuccess('');
@@ -289,7 +288,7 @@ const EmployeeFaceRegistration = ({ employeeUuid, employeeName, isHR = false, on
 
             {isHR && (
               <button
-                onClick={handleDelete}
+                onClick={() => setShowConfirmDelete(true)}
                 disabled={deleting}
                 style={{
                   padding: '10px 16px',
@@ -316,6 +315,19 @@ const EmployeeFaceRegistration = ({ employeeUuid, employeeName, isHR = false, on
           </>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={showConfirmDelete}
+        onClose={() => setShowConfirmDelete(false)}
+        onConfirm={confirmDelete}
+        title="Delete Face Images"
+        description="Are you sure you want to delete the registered face images? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="delete"
+        loading={deleting}
+      />
 
       {/* Modal */}
       {showModal && (

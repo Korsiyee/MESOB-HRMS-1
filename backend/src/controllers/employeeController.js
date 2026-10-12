@@ -70,28 +70,85 @@ exports.createEmployee = asyncHandler(async (req, res) => {
 
   const payload = req.body || {};
   
-  // Extract role_uuid if provided (optional during registration)
-  const roleUuid = payload.role_uuid;
-  delete payload.role_uuid; // Remove from employee data
+  // Extract role and account credentials if provided
+  const roleUuid = payload.role_uuid || null;
+  const createAccount = Boolean(payload.create_account || roleUuid);
+  const customUsername = payload.username ? String(payload.username).trim() : null;
+  const customPassword = payload.password ? String(payload.password).trim() : null;
+
+  delete payload.role_uuid;
+  delete payload.create_account;
+  delete payload.username;
+  delete payload.password;
   
   const employee = await EmployeeService.createEmployee(payload);
   
-  // If role_uuid provided, assign role to the new user
-  if (roleUuid && employee.user_uuid) {
-    const rbacService = require("../services/rbacService");
+  let accountInfo = { account_created: false };
+
+  // If user account creation is requested (or role_uuid was selected)
+  if (createAccount && employee?.uuid) {
+    const { db } = require("../config/db");
+    const { generatePasswordHash, findUserByUsername } = require("../services/authService");
+    const { randomUUID } = require("crypto");
+    const pool = db.promise();
+
     try {
-      await rbacService.assignRoleToUser(employee.user_uuid, roleUuid);
+      // Determine username
+      let username = customUsername;
+      if (!username) {
+        const first = (employee.first_name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+        const last = (employee.last_name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+        const base = `${first}.${last}` || `emp.${String(employee.mesob_id || "").toLowerCase().replace(/[^a-z0-9]/g, "")}`;
+        username = base;
+        let counter = 2;
+        while (true) {
+          const [exists] = await pool.execute("SELECT uuid FROM Users WHERE username = ? LIMIT 1", [username]);
+          if (!exists.length) break;
+          username = `${base}${counter}`;
+          counter++;
+        }
+      }
+
+      // Determine target role UUID
+      let targetRoleUuid = roleUuid;
+      if (!targetRoleUuid) {
+        const [defaultRole] = await pool.execute(
+          "SELECT uuid FROM Roles WHERE code = 'EMPLOYEE' AND is_active = 1 LIMIT 1"
+        );
+        targetRoleUuid = defaultRole[0]?.uuid || null;
+      }
+
+      const defaultPassword = customPassword || "Mesob@2026";
+      const passwordHash = await generatePasswordHash(defaultPassword);
+      const userUuid = randomUUID();
+
+      await pool.execute(
+        `INSERT INTO Users (uuid, employee_uuid, username, password_hash, role_uuid, is_active, must_change_password)
+         VALUES (?, ?, ?, ?, ?, 1, 1)`,
+        [userUuid, employee.uuid, username, passwordHash, targetRoleUuid]
+      );
+
+      accountInfo = {
+        account_created: true,
+        user_uuid: userUuid,
+        username,
+        role_uuid: targetRoleUuid,
+      };
+
       await safeLogEvent({
         actorUuid: req.user?.uuid || null,
         action: AUDIT_ACTIONS.USER_ROLE_ASSIGN,
         entityType: AUDIT_ENTITY_TYPES.USER,
-        entityUuid: employee.user_uuid,
-        diff: { role_uuid: roleUuid, employee_uuid: employee.uuid },
+        entityUuid: userUuid,
+        diff: { role_uuid: targetRoleUuid, employee_uuid: employee.uuid },
         ipAddress: getClientIp(req),
       });
-    } catch (roleError) {
-      console.error("Failed to assign role during employee creation:", roleError);
-      // Don't fail the employee creation if role assignment fails
+    } catch (accErr) {
+      console.error("Failed to create user account during employee creation:", accErr);
+      accountInfo = {
+        account_created: false,
+        account_error: accErr.message,
+      };
     }
   }
   
@@ -100,11 +157,12 @@ exports.createEmployee = asyncHandler(async (req, res) => {
     action: AUDIT_ACTIONS.EMPLOYEE_CREATE,
     entityType: AUDIT_ENTITY_TYPES.EMPLOYEE,
     entityUuid: employee.uuid,
-    diff: { mesob_id: employee.mesob_id, role_uuid: roleUuid },
+    diff: { mesob_id: employee.mesob_id, role_uuid: roleUuid, account_created: accountInfo.account_created },
     ipAddress: getClientIp(req),
   });
 
-  return sendSuccess(res, { status: 201, data: employee });
+  const refreshed = await EmployeeService.getEmployeeByUuid(employee.uuid, { includeDocuments: true });
+  return sendSuccess(res, { status: 201, data: { ...(refreshed || employee), ...accountInfo } });
 });
 
 exports.listEmployees = asyncHandler(async (req, res) => {
@@ -188,16 +246,96 @@ exports.updateEmployee = asyncHandler(async (req, res) => {
   const roleUuid = payload.role_uuid;
   delete payload.role_uuid; // Remove from employee data
   
+  // If role_uuid provided, validate Super Admin privilege and department head constraint
+  if (roleUuid) {
+    const isSuperAdmin = req.user?.role === 'SUPER_ADMIN' || req.user?.raw_role === 'SUPER_ADMIN';
+    if (!isSuperAdmin) {
+      throw new ApiError(
+        "Only Super Admin can change an employee's role directly within their profile.",
+        403,
+        "FORBIDDEN"
+      );
+    }
+
+    const { db } = require("../config/db");
+    const pool = db.promise();
+    const [roleRows] = await pool.execute(
+      "SELECT code, name FROM Roles WHERE uuid = ? LIMIT 1",
+      [roleUuid]
+    );
+    if (roleRows.length > 0) {
+      const code = roleRows[0].code;
+      if (code === 'DEPT_HEAD' || code === 'DEPARTMENT_HEAD') {
+        const { isEmployeeDesignatedDeptHead } = require("../services/departmentService");
+        const isHead = await isEmployeeDesignatedDeptHead(uuid, payload.department_uuid);
+        if (!isHead) {
+          throw new ApiError(
+            "An employee can only be assigned the Department Head role if they are currently designated as the head of their department.",
+            400,
+            "NOT_DESIGNATED_DEPT_HEAD"
+          );
+        }
+      }
+    }
+  }
+
   const employee = await EmployeeService.updateEmployee(uuid, payload);
   
-  // If role_uuid provided, update role assignment
-  if (roleUuid && employee.user_uuid) {
-    const rbacService = require("../services/rbacService");
+  // If role_uuid provided, update role assignment or create account
+  if (roleUuid) {
+    const { db } = require("../config/db");
+    const pool = db.promise();
     try {
-      await rbacService.assignRoleToUser(employee.user_uuid, roleUuid);
+      const [existingUsers] = await pool.execute(
+        "SELECT uuid, role_uuid FROM Users WHERE employee_uuid = ? LIMIT 1",
+        [uuid]
+      );
+
+      if (existingUsers.length > 0) {
+        const userUuid = existingUsers[0].uuid;
+        await pool.execute("UPDATE Users SET role_uuid = ? WHERE uuid = ?", [roleUuid, userUuid]);
+        await safeLogEvent({
+          actorUuid: req.user?.uuid || null,
+          action: AUDIT_ACTIONS.USER_ROLE_ASSIGN,
+          entityType: AUDIT_ENTITY_TYPES.USER,
+          entityUuid: userUuid,
+          diff: { old_role_uuid: existingUsers[0].role_uuid, new_role_uuid: roleUuid, employee_uuid: uuid },
+          ipAddress: getClientIp(req),
+        });
+      } else {
+        // Auto-create user account if employee has no user yet
+        const { generatePasswordHash } = require("../services/authService");
+        const { randomUUID } = require("crypto");
+        const first = (employee.first_name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+        const last = (employee.last_name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+        const base = `${first}.${last}` || `emp.${String(employee.mesob_id || "").toLowerCase().replace(/[^a-z0-9]/g, "")}`;
+        let username = base;
+        let counter = 2;
+        while (true) {
+          const [exists] = await pool.execute("SELECT uuid FROM Users WHERE username = ? LIMIT 1", [username]);
+          if (!exists.length) break;
+          username = `${base}${counter}`;
+          counter++;
+        }
+
+        const passwordHash = await generatePasswordHash("Mesob@2026");
+        const newUserUuid = randomUUID();
+        await pool.execute(
+          `INSERT INTO Users (uuid, employee_uuid, username, password_hash, role_uuid, is_active, must_change_password)
+           VALUES (?, ?, ?, ?, ?, 1, 1)`,
+          [newUserUuid, uuid, username, passwordHash, roleUuid]
+        );
+        await safeLogEvent({
+          actorUuid: req.user?.uuid || null,
+          action: AUDIT_ACTIONS.USER_ROLE_ASSIGN,
+          entityType: AUDIT_ENTITY_TYPES.USER,
+          entityUuid: newUserUuid,
+          diff: { role_uuid: roleUuid, employee_uuid: uuid },
+          ipAddress: getClientIp(req),
+        });
+      }
     } catch (roleError) {
       console.error("Role assignment failed during update:", roleError);
-      // Continue - employee update succeeded even if role assignment failed
     }
   }
 
@@ -210,7 +348,8 @@ exports.updateEmployee = asyncHandler(async (req, res) => {
     ipAddress: getClientIp(req),
   });
 
-  return sendSuccess(res, { status: 200, data: employee });
+  const refreshed = await EmployeeService.getEmployeeByUuid(uuid, { includeDocuments: true });
+  return sendSuccess(res, { status: 200, data: refreshed || employee });
 });
 
 exports.updateEmployeeStatus = asyncHandler(async (req, res) => {
@@ -420,12 +559,21 @@ exports.getDeptHeadStats = asyncHandler(async (req, res) => {
 
   // Only DEPT_HEAD (or HR admins for testing) may call this
   const deptUuid =
-    user?.role === "DEPT_HEAD"
+    (user?.role === "DEPT_HEAD" || user?.role === "DEPARTMENT_HEAD")
       ? user.department_uuid
-      : req.query.department_uuid;
+      : (req.query.department_uuid || user?.department_uuid);
 
   if (!deptUuid) {
-    throw new ApiError("Department context is missing.", 400, "VALIDATION_ERROR");
+    return sendSuccess(res, {
+      status: 200,
+      data: {
+        totalEmployees: 0,
+        presentToday: 0,
+        onLeaveToday: 0,
+        absentToday: 0,
+        pendingRequests: 0,
+      },
+    });
   }
 
   // Total employees in department
@@ -495,12 +643,13 @@ exports.getDeptHeadStats = asyncHandler(async (req, res) => {
 ───────────────────────────────────────────────────────── */
 exports.getDeptEmployees = asyncHandler(async (req, res) => {
   const user = req.user;
-  const deptUuid = user?.role === "DEPT_HEAD"
-    ? user.department_uuid
-    : req.query.department_uuid;
+  const deptUuid =
+    (user?.role === "DEPT_HEAD" || user?.role === "DEPARTMENT_HEAD")
+      ? user.department_uuid
+      : (req.query.department_uuid || user?.department_uuid);
 
   if (!deptUuid) {
-    throw new ApiError("Department context is missing.", 400, "VALIDATION_ERROR");
+    return sendSuccess(res, { status: 200, data: [] });
   }
 
   const [rows] = await executeQuery(
@@ -547,7 +696,6 @@ exports.searchEmployeesForAttendance = asyncHandler(async (req, res) => {
      LEFT JOIN Positions p ON p.uuid = e.position_uuid
      LEFT JOIN Departments d ON d.uuid = p.department_uuid
      WHERE e.status = 'ACTIVE'
-       AND e.attendance_exempt = FALSE
        AND (
          e.mesob_id LIKE ?
          OR e.first_name LIKE ?
@@ -600,6 +748,39 @@ exports.updateEmployeeRole = asyncHandler(async (req, res) => {
 
   if (!role_uuid) {
     throw new ApiError("Role UUID is required.", 400, "VALIDATION_ERROR");
+  }
+
+  // Super Admin check
+  const isSuperAdmin = req.user?.role === 'SUPER_ADMIN' || req.user?.raw_role === 'SUPER_ADMIN';
+  if (!isSuperAdmin) {
+    throw new ApiError(
+      "Only Super Admin can change an employee's role directly within their profile.",
+      403,
+      "FORBIDDEN"
+    );
+  }
+
+  // Validate department head constraint
+  const { db } = require("../config/db");
+  const pool = db.promise();
+  const [roleRows] = await pool.execute(
+    "SELECT code, name FROM Roles WHERE uuid = ? LIMIT 1",
+    [role_uuid]
+  );
+  if (!roleRows.length) {
+    throw new ApiError("Role not found.", 404, "NOT_FOUND");
+  }
+  const roleCode = roleRows[0].code;
+  if (roleCode === 'DEPT_HEAD' || roleCode === 'DEPARTMENT_HEAD') {
+    const { isEmployeeDesignatedDeptHead } = require("../services/departmentService");
+    const isHead = await isEmployeeDesignatedDeptHead(uuid);
+    if (!isHead) {
+      throw new ApiError(
+        "An employee can only be assigned the Department Head role if they are currently designated as the head of their department.",
+        400,
+        "NOT_DESIGNATED_DEPT_HEAD"
+      );
+    }
   }
 
   // First, get the employee to find their user_uuid

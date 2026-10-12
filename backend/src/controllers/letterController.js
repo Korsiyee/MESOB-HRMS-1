@@ -61,14 +61,25 @@ exports.listLetterTemplates = async (req, res) => {
     const [rows] = await pool.execute(`
       SELECT
         uuid,
-        template_name AS name,
-        type,
-        body_template AS content,
+        COALESCE(template_name, title) AS name,
+        COALESCE(title, template_name) AS title,
+        COALESCE(type, category, 'GENERAL') AS type,
+        COALESCE(category, type, 'GENERAL') AS category,
+        description,
+        COALESCE(body_template, main_body, text_content, '') AS content,
+        COALESCE(main_body, body_template, text_content, '') AS main_body,
         text_content,
+        subject,
+        subject_template,
+        recipient_info,
+        closing_text,
+        cc_recipients,
+        uses_new_format,
         pdf_template_key,
         original_filename,
         file_size,
         mime_type,
+        is_active,
         created_at,
         updated_at
       FROM LetterTemplates

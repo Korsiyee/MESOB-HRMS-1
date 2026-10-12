@@ -12,12 +12,14 @@ const {
 const DEFAULT_GRACE_PERIOD_MINUTES = 15;
 const HALF_DAY_THRESHOLD = 0.5;
 
-// Attendance lifecycle states
+// Attendance lifecycle states matching AttendanceLogs.state enum('PENDING','COMPLETED','CORRECTED')
 const ATTENDANCE_STATES = {
   PENDING: 'PENDING',
-  CHECKED_IN: 'CHECKED_IN',
-  CHECKED_OUT: 'CHECKED_OUT',
-  CALCULATED: 'CALCULATED'
+  CHECKED_IN: 'PENDING',
+  CHECKED_OUT: 'COMPLETED',
+  CALCULATED: 'COMPLETED',
+  COMPLETED: 'COMPLETED',
+  CORRECTED: 'CORRECTED',
 };
 
 /**
@@ -49,14 +51,6 @@ async function logAttendance(payload, actorUuid) {
     );
   }
 
-  if (employee.attendance_exempt) {
-    throw new ApiError(
-      "Employee is exempt from attendance tracking.",
-      422,
-      "ATTENDANCE_EXEMPT",
-    );
-  }
-
   // Validate type
   if (!["CHECK_IN", "CHECK_OUT"].includes(type)) {
     throw new ApiError(
@@ -80,9 +74,17 @@ async function logAttendance(payload, actorUuid) {
     throw new ApiError("Failed to parse attendance date.", 400, "VALIDATION_ERROR");
   }
 
-  // Validate source
-  const validSources = ['MANUAL', 'DEVICE', 'SYSTEM', 'FACE_RECOGNITION'];
-  const logSource = validSources.includes(source) ? source : 'MANUAL';
+  // Validate source matching AttendanceLogs.source enum('SELF','FACE','ADMIN','SYSTEM')
+  let logSource = 'SELF';
+  if (source === 'FACE_RECOGNITION' || source === 'FACE') {
+    logSource = 'FACE';
+  } else if (source === 'ADMIN' || (source === 'MANUAL' && actorUuid && actorUuid !== employee_uuid)) {
+    logSource = 'ADMIN';
+  } else if (source === 'SYSTEM') {
+    logSource = 'SYSTEM';
+  } else {
+    logSource = 'SELF';
+  }
 
   // Log the validation check for debugging
   console.log(`[ATTENDANCE] Validating ${type} for employee ${employee_uuid} on date ${logDate} (timestamp: ${logTime.toISOString()}, source: ${logSource})`);
@@ -255,7 +257,7 @@ async function computeAndUpsertDailySummary(employeeUuid, date, connection = nul
   };
   
   // Get employee's active shift for this date with grace period
-  const [shifts] = await query(
+  let [shifts] = await query(
     `
       SELECT s.uuid, s.name, s.start_time, s.end_time, s.working_days_json,
              s.grace_period_minutes, s.break_duration_minutes,
@@ -270,6 +272,20 @@ async function computeAndUpsertDailySummary(employeeUuid, date, connection = nul
     `,
     [employeeUuid, date, date],
   );
+
+  if (!shifts.length) {
+    // Graceful fallback to system default shift
+    const [defaultShifts] = await query(
+      `SELECT s.uuid, s.name, s.start_time, s.end_time, s.working_days_json,
+              s.grace_period_minutes, s.break_duration_minutes
+       FROM ShiftDefinitions s
+       ORDER BY s.created_at ASC
+       LIMIT 1`
+    );
+    if (defaultShifts.length) {
+      shifts = defaultShifts;
+    }
+  }
 
   if (!shifts.length) {
     console.error(`[ATTENDANCE] No active shift found for employee ${employeeUuid} on date ${date}`);
@@ -480,12 +496,13 @@ async function upsertAttendanceSummary({
     }
   };
   
+  const dbStatus = status === 'ON_LEAVE' ? 'LEAVE' : status;
   await query(
     `
       INSERT INTO AttendanceSummary (
         uuid, employee_uuid, date, status, shift_uuid, 
         shift_name_snapshot, shift_start_time_snapshot, shift_end_time_snapshot,
-        leave_request_uuid, corrected_by
+        leave_request_uuid, corrected_by_uuid
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         status = VALUES(status),
@@ -494,10 +511,10 @@ async function upsertAttendanceSummary({
         shift_start_time_snapshot = VALUES(shift_start_time_snapshot),
         shift_end_time_snapshot = VALUES(shift_end_time_snapshot),
         leave_request_uuid = VALUES(leave_request_uuid),
-        corrected_by = VALUES(corrected_by),
+        corrected_by_uuid = VALUES(corrected_by_uuid),
         updated_at = CURRENT_TIMESTAMP
     `,
-    [uuid, employeeUuid, date, status, shiftUuid, shiftName, shiftStartTime, shiftEndTime, leaveRequestUuid, correctedBy],
+    [uuid, employeeUuid, date, dbStatus, shiftUuid, shiftName, shiftStartTime, shiftEndTime, leaveRequestUuid, correctedBy],
   );
 }
 
@@ -648,7 +665,7 @@ async function calculateAndUpsertAttendance(employeeUuid, date, connection = nul
   };
   
   // Get employee's active shift for this date with grace period and break duration
-  const [shifts] = await query(
+  let [shifts] = await query(
     `
       SELECT s.uuid, s.name, s.start_time, s.end_time, s.working_days_json,
              s.grace_period_minutes, s.break_duration_minutes,
@@ -663,6 +680,20 @@ async function calculateAndUpsertAttendance(employeeUuid, date, connection = nul
     `,
     [employeeUuid, date, date],
   );
+
+  if (!shifts.length) {
+    // Graceful fallback to system default shift
+    const [defaultShifts] = await query(
+      `SELECT s.uuid, s.name, s.start_time, s.end_time, s.working_days_json,
+              s.grace_period_minutes, s.break_duration_minutes
+       FROM ShiftDefinitions s
+       ORDER BY s.created_at ASC
+       LIMIT 1`
+    );
+    if (defaultShifts.length) {
+      shifts = defaultShifts;
+    }
+  }
 
   if (!shifts.length) {
     console.error(`[ATTENDANCE] No active shift found for employee ${employeeUuid} on date ${date}`);
@@ -818,13 +849,14 @@ async function upsertAttendanceSummaryWithCalculations({
     }
   };
   
+  const dbStatus = status === 'ON_LEAVE' ? 'LEAVE' : status;
   await query(
     `
       INSERT INTO AttendanceSummary (
         uuid, employee_uuid, date, status, shift_uuid, 
         shift_name_snapshot, shift_start_time_snapshot, shift_end_time_snapshot,
         leave_request_uuid, worked_hours, overtime_hours, missing_hours,
-        late_minutes, break_duration_minutes, corrected_by
+        late_minutes, break_duration_minutes, corrected_by_uuid
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         status = VALUES(status),
@@ -838,11 +870,11 @@ async function upsertAttendanceSummaryWithCalculations({
         missing_hours = VALUES(missing_hours),
         late_minutes = VALUES(late_minutes),
         break_duration_minutes = VALUES(break_duration_minutes),
-        corrected_by = VALUES(corrected_by),
+        corrected_by_uuid = VALUES(corrected_by_uuid),
         updated_at = CURRENT_TIMESTAMP
     `,
     [
-      uuid, employeeUuid, date, status, shiftUuid, 
+      uuid, employeeUuid, date, dbStatus, shiftUuid, 
       shiftName, shiftStartTime, shiftEndTime,
       leaveRequestUuid, workedHours, overtimeHours, missingHours,
       lateMinutes, breakDurationMinutes, correctedBy
@@ -923,7 +955,7 @@ async function getEmployeeAttendanceSummary(employeeUuid, filters = {}) {
     let query = `
       SELECT 
         a.uuid, a.employee_uuid, a.date, a.status, a.shift_uuid, 
-        a.leave_request_uuid, a.corrected_by, a.created_at, a.updated_at,
+        a.leave_request_uuid, a.corrected_by_uuid AS corrected_by, a.created_at, a.updated_at,
         a.worked_hours, a.overtime_hours, a.missing_hours, a.late_minutes,
         s.name AS shift_name,
         l.check_in, l.check_out
@@ -1015,7 +1047,7 @@ async function getEmployeeAttendanceSummary(employeeUuid, filters = {}) {
 async function getAllAttendance(filters = {}) {
   const params = [];
   let query = `
-    SELECT a.uuid, a.employee_uuid, a.date, a.status, a.shift_uuid, a.leave_request_uuid, a.corrected_by,
+    SELECT a.uuid, a.employee_uuid, a.date, a.status, a.shift_uuid, a.leave_request_uuid, a.corrected_by_uuid AS corrected_by,
       e.mesob_id, e.first_name, e.middle_name, e.last_name, p.department_uuid,
       d.name AS department_name
     FROM AttendanceSummary a
@@ -1085,8 +1117,8 @@ async function correctAttendance(summaryUuid, status, correctedByEmployeeUuid) {
   }
 
   await executeQuery(
-    "UPDATE AttendanceSummary SET status = ?, corrected_by = ?, updated_at = CURRENT_TIMESTAMP WHERE uuid = ?",
-    [status, correctedByEmployeeUuid, summaryUuid],
+    "UPDATE AttendanceSummary SET status = ?, corrected_by_uuid = ?, updated_at = CURRENT_TIMESTAMP WHERE uuid = ?",
+    [status === 'ON_LEAVE' ? 'LEAVE' : status, correctedByEmployeeUuid, summaryUuid],
   );
 
   const [updated] = await executeQuery(
@@ -1225,7 +1257,7 @@ async function createAttendanceSummary({ employee_uuid, date, status, shift_uuid
   const [rows] = await executeQuery(
     `SELECT a.uuid, a.employee_uuid, a.date, a.status, a.shift_uuid, 
             a.shift_name_snapshot, a.shift_start_time_snapshot, a.shift_end_time_snapshot,
-            a.corrected_by, a.created_at, a.updated_at,
+            a.corrected_by_uuid AS corrected_by, a.created_at, a.updated_at,
             e.mesob_id, CONCAT(e.first_name,' ',e.last_name) AS full_name,
             d.name AS department, s.name AS shift_name
      FROM AttendanceSummary a

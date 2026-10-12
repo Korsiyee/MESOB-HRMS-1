@@ -169,12 +169,21 @@ async function assignRoleToUser(userUuid, roleUuid, performedBy) {
   
   // Verify target user exists
   const [users] = await executeQuery(
-    `SELECT uuid FROM Users WHERE uuid = ?`,
+    `SELECT uuid, employee_uuid FROM Users WHERE uuid = ?`,
     [userUuid]
   );
   
   if (users.length === 0) {
     throw new Error('User not found');
+  }
+
+  // Constraint check for Department Head
+  if (role.code === 'DEPT_HEAD' || role.code === 'DEPARTMENT_HEAD') {
+    const { isEmployeeDesignatedDeptHead } = require('./departmentService');
+    const isHead = users[0].employee_uuid && (await isEmployeeDesignatedDeptHead(users[0].employee_uuid));
+    if (!isHead) {
+      throw new Error('An employee can only be assigned the Department Head role if they are currently designated as the head of their department.');
+    }
   }
   
   return await rbacService.assignRoleToUser(userUuid, roleUuid);

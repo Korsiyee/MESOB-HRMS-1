@@ -3,22 +3,23 @@ const { executeQuery, withTransaction } = require("../utils/dbQuery");
 const { ApiError } = require("../utils/errors");
 
 /**
- * List all levels with optional filters
+ * List all levels with optional filters and statistics
  */
 async function listLevels({ includeInactive = false, includeCurrentVersion = false } = {}) {
   const params = [];
   let query = `
     SELECT
       l.uuid,
+      l.level_code,
       l.name,
       l.description,
       l.sort_order,
       l.is_active,
       l.created_at,
       l.updated_at,
-      0 AS employee_count,
-      0 AS male_count,
-      0 AS female_count
+      COUNT(DISTINCT elh.employee_uuid) AS employee_count,
+      COUNT(DISTINCT CASE WHEN e.gender = 'MALE' THEN elh.employee_uuid END) AS male_count,
+      COUNT(DISTINCT CASE WHEN e.gender = 'FEMALE' THEN elh.employee_uuid END) AS female_count
   `;
 
   if (includeCurrentVersion) {
@@ -32,6 +33,8 @@ async function listLevels({ includeInactive = false, includeCurrentVersion = fal
 
   query += `
     FROM Levels l
+    LEFT JOIN EmployeeLevelHistory elh ON elh.level_uuid = l.uuid AND (elh.effective_to IS NULL OR elh.effective_to >= CURDATE())
+    LEFT JOIN Employees e ON e.uuid = elh.employee_uuid AND e.status = 'ACTIVE'
   `;
 
   if (includeCurrentVersion) {
@@ -47,7 +50,7 @@ async function listLevels({ includeInactive = false, includeCurrentVersion = fal
   }
 
   query += `
-    GROUP BY l.uuid, l.name, l.description, l.sort_order, l.is_active, 
+    GROUP BY l.uuid, l.level_code, l.name, l.description, l.sort_order, l.is_active, 
              l.created_at, l.updated_at
   `;
 
@@ -76,16 +79,21 @@ async function getLevelByUuid(uuid, { includeVersions = true, includeEmployees =
     `
       SELECT
         l.uuid,
+        l.level_code,
         l.name,
         l.description,
         l.sort_order,
         l.is_active,
         l.created_at,
         l.updated_at,
-        COUNT(DISTINCT e.uuid) AS employee_count
+        COUNT(DISTINCT elh.employee_uuid) AS employee_count,
+        COUNT(DISTINCT CASE WHEN e.gender = 'MALE' THEN elh.employee_uuid END) AS male_count,
+        COUNT(DISTINCT CASE WHEN e.gender = 'FEMALE' THEN elh.employee_uuid END) AS female_count
       FROM Levels l
+      LEFT JOIN EmployeeLevelHistory elh ON elh.level_uuid = l.uuid AND (elh.effective_to IS NULL OR elh.effective_to >= CURDATE())
+      LEFT JOIN Employees e ON e.uuid = elh.employee_uuid AND e.status = 'ACTIVE'
       WHERE l.uuid = ?
-      GROUP BY l.uuid, l.name, l.description, l.sort_order, l.is_active, 
+      GROUP BY l.uuid, l.level_code, l.name, l.description, l.sort_order, l.is_active, 
                l.created_at, l.updated_at
       LIMIT 1
     `,
@@ -99,6 +107,8 @@ async function getLevelByUuid(uuid, { includeVersions = true, includeEmployees =
   const level = {
     ...rows[0],
     employee_count: Number(rows[0].employee_count || 0),
+    male_count: Number(rows[0].male_count || 0),
+    female_count: Number(rows[0].female_count || 0),
   };
 
   // Include version history if requested
@@ -109,54 +119,51 @@ async function getLevelByUuid(uuid, { includeVersions = true, includeEmployees =
           lv.uuid,
           lv.level_uuid,
           lv.base_salary,
+          lv.allowances_json,
           lv.effective_from,
           lv.effective_to,
           lv.version_number,
           lv.notes,
           lv.created_by_uuid,
           lv.created_at,
-          lv.updated_at,
-          CONCAT_WS(' ', u.first_name, u.middle_name, u.last_name) AS created_by_name
+          COALESCE(CONCAT_WS(' ', ue.first_name, ue.middle_name, ue.last_name), u.username, 'System') AS created_by_name
         FROM LevelVersions lv
         LEFT JOIN Users u ON u.uuid = lv.created_by_uuid
+        LEFT JOIN Employees ue ON ue.uuid = u.employee_uuid
         WHERE lv.level_uuid = ?
         ORDER BY lv.effective_from DESC, lv.version_number DESC
       `,
       [level.uuid]
     );
 
-    level.versions = versions.map((v) => ({
-      ...v,
-      base_salary: Number(v.base_salary || 0),
-    }));
+    level.versions = versions.map((v) => {
+      let allowances = [];
+      try {
+        const parsed = v.allowances_json
+          ? typeof v.allowances_json === "string"
+            ? JSON.parse(v.allowances_json)
+            : v.allowances_json
+          : [];
+        if (Array.isArray(parsed)) {
+          allowances = parsed.map((a) => ({
+            uuid: a.uuid || randomUUID(),
+            allowance_type: a.allowance_type || a.type || "OTHER",
+            allowance_name: a.allowance_name || a.type || "Allowance",
+            amount: Number(a.amount || 0),
+            is_taxable: Boolean(a.is_taxable ?? true),
+            description: a.description || null,
+          }));
+        }
+      } catch (_) {
+        allowances = [];
+      }
 
-    // Get allowances for each version
-    for (const version of level.versions) {
-      const [allowances] = await executeQuery(
-        `
-          SELECT
-            uuid,
-            level_version_uuid,
-            allowance_type,
-            allowance_name,
-            amount,
-            is_taxable,
-            description,
-            created_at,
-            updated_at
-          FROM LevelAllowances
-          WHERE level_version_uuid = ?
-          ORDER BY allowance_type ASC, allowance_name ASC
-        `,
-        [version.uuid]
-      );
-
-      version.allowances = allowances.map((a) => ({
-        ...a,
-        amount: Number(a.amount || 0),
-        is_taxable: Boolean(a.is_taxable),
-      }));
-    }
+      return {
+        ...v,
+        base_salary: Number(v.base_salary || 0),
+        allowances,
+      };
+    });
 
     // Mark current version
     const currentVersion = level.versions.find(
@@ -185,11 +192,13 @@ async function getLevelByUuid(uuid, { includeVersions = true, includeEmployees =
           e.status,
           e.hire_date,
           d.name AS department_name,
-          p.title AS position_title
-        FROM Employees e
+          p.title AS position_title,
+          elh.effective_from AS level_assigned_date
+        FROM EmployeeLevelHistory elh
+        JOIN Employees e ON e.uuid = elh.employee_uuid
         LEFT JOIN Positions p ON p.uuid = e.position_uuid
-        LEFT JOIN Departments d ON d.uuid = p.department_uuid
-        WHERE e.level_uuid = ? AND e.status = 'ACTIVE'
+        LEFT JOIN Departments d ON d.uuid = COALESCE(e.department_uuid, p.department_uuid)
+        WHERE elh.level_uuid = ? AND (elh.effective_to IS NULL OR elh.effective_to >= CURDATE()) AND e.status = 'ACTIVE'
         ORDER BY e.last_name ASC, e.first_name ASC
       `,
       [level.uuid]
@@ -225,6 +234,11 @@ async function createLevel(payload, createdByUuid = null) {
   }
 
   const uuid = randomUUID();
+  const levelCode = String(
+    payload.level_code ||
+      payload.code ||
+      `LVL-${name.replace(/[^A-Za-z0-9]/g, "").slice(0, 6).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`
+  ).trim();
   const description = String(payload.description || "").trim() || null;
   const sortOrder = Number.isFinite(payload.sort_order)
     ? Math.max(0, Math.floor(payload.sort_order))
@@ -234,9 +248,9 @@ async function createLevel(payload, createdByUuid = null) {
   return withTransaction(async (connection) => {
     // Insert level
     await connection.execute(
-      `INSERT INTO Levels (uuid, name, description, sort_order, is_active)
-       VALUES (?, ?, ?, ?, ?)`,
-      [uuid, name, description, sortOrder, is_active]
+      `INSERT INTO Levels (uuid, level_code, name, description, sort_order, is_active)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [uuid, levelCode, name, description, sortOrder, is_active ? 1 : 0]
     );
 
     // Create initial version if base_salary provided
@@ -244,34 +258,26 @@ async function createLevel(payload, createdByUuid = null) {
       const baseSalary = Number(payload.base_salary || 0);
       const effectiveFrom = payload.effective_from || new Date().toISOString().split("T")[0];
       const versionUuid = randomUUID();
+      const allowancesJson =
+        Array.isArray(payload.allowances) && payload.allowances.length > 0
+          ? JSON.stringify(
+              payload.allowances.map((a) => ({
+                type: a.allowance_type || a.type || a.allowance_name,
+                allowance_name: a.allowance_name || a.type || "Allowance",
+                allowance_type: a.allowance_type || a.type || "OTHER",
+                amount: Number(a.amount || 0),
+                is_taxable: a.is_taxable !== false,
+                description: a.description || null,
+              }))
+            )
+          : null;
 
       await connection.execute(
         `INSERT INTO LevelVersions 
-         (uuid, level_uuid, base_salary, effective_from, version_number, notes, created_by_uuid)
-         VALUES (?, ?, ?, ?, 1, ?, ?)`,
-        [versionUuid, uuid, baseSalary, effectiveFrom, payload.notes || null, createdByUuid]
+         (uuid, level_uuid, base_salary, allowances_json, effective_from, version_number, notes, created_by_uuid)
+         VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+        [versionUuid, uuid, baseSalary, allowancesJson, effectiveFrom, payload.notes || null, createdByUuid]
       );
-
-      // Add allowances if provided
-      if (Array.isArray(payload.allowances) && payload.allowances.length > 0) {
-        for (const allowance of payload.allowances) {
-          const allowanceUuid = randomUUID();
-          await connection.execute(
-            `INSERT INTO LevelAllowances
-             (uuid, level_version_uuid, allowance_type, allowance_name, amount, is_taxable, description)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [
-              allowanceUuid,
-              versionUuid,
-              allowance.allowance_type || "OTHER",
-              String(allowance.allowance_name || "").trim(),
-              Number(allowance.amount || 0),
-              allowance.is_taxable !== false,
-              String(allowance.description || "").trim() || null,
-            ]
-          );
-        }
-      }
     }
 
     return getLevelByUuid(uuid);
@@ -314,6 +320,14 @@ async function updateLevel(uuid, payload) {
     params.push(name);
   }
 
+  if (payload.level_code !== undefined || payload.code !== undefined) {
+    const code = String(payload.level_code || payload.code).trim();
+    if (code) {
+      updates.push("level_code = ?");
+      params.push(code);
+    }
+  }
+
   if (payload.description !== undefined) {
     updates.push("description = ?");
     params.push(String(payload.description || "").trim() || null);
@@ -330,7 +344,7 @@ async function updateLevel(uuid, payload) {
 
   if (payload.is_active !== undefined) {
     updates.push("is_active = ?");
-    params.push(Boolean(payload.is_active));
+    params.push(payload.is_active ? 1 : 0);
   }
 
   if (updates.length === 0) {
@@ -357,7 +371,7 @@ async function deleteLevel(uuid) {
 
   // Check if any employees are assigned to this level
   const [employees] = await executeQuery(
-    "SELECT COUNT(*) AS count FROM Employees WHERE level_uuid = ?",
+    "SELECT COUNT(*) AS count FROM EmployeeLevelHistory WHERE level_uuid = ? AND (effective_to IS NULL OR effective_to >= CURDATE())",
     [uuid]
   );
 
@@ -369,6 +383,7 @@ async function deleteLevel(uuid) {
     );
   }
 
+  await executeQuery("DELETE FROM LevelVersions WHERE level_uuid = ?", [uuid]);
   await executeQuery("DELETE FROM Levels WHERE uuid = ?", [uuid]);
 }
 
@@ -416,41 +431,35 @@ async function createLevelVersion(levelUuid, payload, createdByUuid = null) {
 
     // Insert new version
     const versionUuid = randomUUID();
+    const allowancesJson =
+      Array.isArray(payload.allowances) && payload.allowances.length > 0
+        ? JSON.stringify(
+            payload.allowances.map((a) => ({
+              type: a.allowance_type || a.type || a.allowance_name,
+              allowance_name: a.allowance_name || a.type || "Allowance",
+              allowance_type: a.allowance_type || a.type || "OTHER",
+              amount: Number(a.amount || 0),
+              is_taxable: a.is_taxable !== false,
+              description: a.description || null,
+            }))
+          )
+        : null;
+
     await connection.execute(
       `INSERT INTO LevelVersions
-       (uuid, level_uuid, base_salary, effective_from, version_number, notes, created_by_uuid)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       (uuid, level_uuid, base_salary, allowances_json, effective_from, version_number, notes, created_by_uuid)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         versionUuid,
         levelUuid,
         baseSalary,
+        allowancesJson,
         effectiveFrom,
         versionNumber,
         String(payload.notes || "").trim() || null,
         createdByUuid,
       ]
     );
-
-    // Add allowances if provided
-    if (Array.isArray(payload.allowances) && payload.allowances.length > 0) {
-      for (const allowance of payload.allowances) {
-        const allowanceUuid = randomUUID();
-        await connection.execute(
-          `INSERT INTO LevelAllowances
-           (uuid, level_version_uuid, allowance_type, allowance_name, amount, is_taxable, description)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [
-            allowanceUuid,
-            versionUuid,
-            allowance.allowance_type || "OTHER",
-            String(allowance.allowance_name || "").trim(),
-            Number(allowance.amount || 0),
-            allowance.is_taxable !== false,
-            String(allowance.description || "").trim() || null,
-          ]
-        );
-      }
-    }
 
     return getLevelByUuid(levelUuid);
   });
@@ -468,6 +477,7 @@ async function getLevelVersionAtDate(levelUuid, date = null) {
         lv.uuid,
         lv.level_uuid,
         lv.base_salary,
+        lv.allowances_json,
         lv.effective_from,
         lv.effective_to,
         lv.version_number,
@@ -487,36 +497,32 @@ async function getLevelVersionAtDate(levelUuid, date = null) {
     return null;
   }
 
-  const version = {
+  let allowances = [];
+  try {
+    const parsed = rows[0].allowances_json
+      ? typeof rows[0].allowances_json === "string"
+        ? JSON.parse(rows[0].allowances_json)
+        : rows[0].allowances_json
+      : [];
+    if (Array.isArray(parsed)) {
+      allowances = parsed.map((a) => ({
+        uuid: a.uuid || randomUUID(),
+        allowance_type: a.allowance_type || a.type || "OTHER",
+        allowance_name: a.allowance_name || a.type || "Allowance",
+        amount: Number(a.amount || 0),
+        is_taxable: Boolean(a.is_taxable ?? true),
+        description: a.description || null,
+      }));
+    }
+  } catch (_) {
+    allowances = [];
+  }
+
+  return {
     ...rows[0],
     base_salary: Number(rows[0].base_salary || 0),
+    allowances,
   };
-
-  // Get allowances
-  const [allowances] = await executeQuery(
-    `
-      SELECT
-        uuid,
-        level_version_uuid,
-        allowance_type,
-        allowance_name,
-        amount,
-        is_taxable,
-        description
-      FROM LevelAllowances
-      WHERE level_version_uuid = ?
-      ORDER BY allowance_type ASC, allowance_name ASC
-    `,
-    [version.uuid]
-  );
-
-  version.allowances = allowances.map((a) => ({
-    ...a,
-    amount: Number(a.amount || 0),
-    is_taxable: Boolean(a.is_taxable),
-  }));
-
-  return version;
 }
 
 /**

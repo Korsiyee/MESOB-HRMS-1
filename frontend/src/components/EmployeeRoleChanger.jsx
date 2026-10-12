@@ -12,8 +12,8 @@ const EmployeeRoleChanger = ({ employeeUuid, currentRole, onRoleChanged }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Check if current user can change roles (HR_ADMIN or SUPER_ADMIN)
-  const canChangeRoles = user?.role?.name === 'HR_ADMIN' || user?.role?.name === 'SUPER_ADMIN';
+  // Check if current user can change roles (SUPER_ADMIN only)
+  const canChangeRoles = user?.role?.name === 'SUPER_ADMIN' || user?.role?.code === 'SUPER_ADMIN';
 
   useEffect(() => {
     if (canChangeRoles) {
@@ -41,9 +41,23 @@ const EmployeeRoleChanger = ({ employeeUuid, currentRole, onRoleChanged }) => {
     setSuccess('');
 
     try {
-      await apiRequest(`/employees/${employeeUuid}/role`, {
-        method: 'PATCH',
-        body: JSON.stringify({ role_uuid: selectedRoleUuid })
+      // First get the user UUID for this employee
+      const employeeResponse = await apiRequest(`/employees/${employeeUuid}`, {
+        method: 'GET'
+      });
+      
+      const userUuid = employeeResponse.data?.user_uuid;
+      
+      if (!userUuid) {
+        setError('This employee does not have a user account. Create an account first.');
+        setLoading(false);
+        return;
+      }
+
+      // Use the correct role management endpoint
+      await apiRequest(`/role-management/users/${userUuid}/role`, {
+        method: 'PUT',
+        body: JSON.stringify({ roleUuid: selectedRoleUuid })
       });
 
       const newRole = roles.find(r => r.uuid === selectedRoleUuid);
@@ -54,6 +68,7 @@ const EmployeeRoleChanger = ({ employeeUuid, currentRole, onRoleChanged }) => {
         onRoleChanged(newRole);
       }
     } catch (err) {
+      console.error('Role change error:', err);
       setError(err.message || 'Failed to update role');
     } finally {
       setLoading(false);

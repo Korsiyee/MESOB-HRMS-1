@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Users, Search, Edit, Eye, UserCheck, UserX, Mail, Phone,
+  Users, Search, Eye, UserCheck, UserX, Mail, Phone,
   Briefcase, Building2, Shield, Loader,
 } from "lucide-react";
 import { EmployeeApi } from "../api/employeeApi";
@@ -190,11 +190,6 @@ export default function EmployeeProfilePage() {
   const handleView = (employee) => {
     // Navigate to existing EmployeeDetailPage (same as Employee List)
     navigate(`/employees/${employee.uuid}`);
-  };
-
-  const handleEdit = (employee) => {
-    // Navigate to existing EmployeeDetailPage in edit mode (same as Employee List)
-    navigate(`/employees/${employee.uuid}?mode=edit`);
   };
 
   const handleStatusChange = (employee) => {
@@ -494,39 +489,8 @@ export default function EmployeeProfilePage() {
                     }}
                   >
                     <Eye size={14} />
-                    View
+                    View Details
                   </button>
-
-                  <Can action="update" resource="employees">
-                    <button
-                      onClick={() => handleEdit(employee)}
-                      style={{
-                        width: "100%",
-                        padding: "10px",
-                        borderRadius: 8,
-                        border: "none",
-                        background: C.primary,
-                        color: "#fff",
-                        fontSize: "0.82rem",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 6,
-                        transition: "all 0.15s",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = C.primaryHov;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = C.primary;
-                      }}
-                    >
-                      <Edit size={14} />
-                      Edit
-                    </button>
-                  </Can>
 
                   <Can action="update" resource="employees">
                     <button

@@ -6,6 +6,23 @@ const C = {
   primary: '#0F766E', primaryHov: '#14B8A6', textMain: '#1A2E2B', textSub: '#1E4A42', textMuted: '#2E6058',
 };
 
+// Helper function to format decimal hours to "Xhr Ymin" format
+const formatHoursToHrMin = (decimalHours) => {
+  if (decimalHours === null || decimalHours === undefined) return '';
+  
+  const totalMinutes = Math.round(decimalHours * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  
+  if (hours > 0 && minutes > 0) {
+    return `${hours}hr ${minutes}min`;
+  } else if (hours > 0) {
+    return `${hours}hr`;
+  } else {
+    return `${minutes}min`;
+  }
+};
+
 const AttendanceSummaryReport = ({ records = [] }) => {
   const [periodType, setPeriodType] = useState('weekly');
   const [customStart, setCustomStart] = useState('');
@@ -62,9 +79,9 @@ const AttendanceSummaryReport = ({ records = [] }) => {
       .map(([week, data]) => ({ week: new Date(week).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), ...data }));
 
     return { 
-      totalWorkedHours: (typeof totalWorkedHours === 'number' ? totalWorkedHours : 0).toFixed(1), 
-      totalOvertimeHours: (typeof totalOvertimeHours === 'number' ? totalOvertimeHours : 0).toFixed(1),
-      totalMissingHours: (typeof totalMissingHours === 'number' ? totalMissingHours : 0).toFixed(1), 
+      totalWorkedHours: (typeof totalWorkedHours === 'number' ? totalWorkedHours : 0), 
+      totalOvertimeHours: (typeof totalOvertimeHours === 'number' ? totalOvertimeHours : 0),
+      totalMissingHours: (typeof totalMissingHours === 'number' ? totalMissingHours : 0), 
       totalLateDays, 
       totalLateMinutes, 
       statusCounts,
@@ -117,9 +134,9 @@ const AttendanceSummaryReport = ({ records = [] }) => {
     <div class="meta"><strong>Period:</strong> ${dateRange} &nbsp;|&nbsp; <strong>Total Days:</strong> ${summary.totalDays} &nbsp;|&nbsp; 
     <strong>Generated:</strong> ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
     <div class="grid"><div class="card b"><div class="val">${summary.attendanceRate}%</div><div class="lbl">Attendance Rate</div></div>
-    <div class="card g"><div class="val">${summary.totalWorkedHours}h</div><div class="lbl">Total Worked</div></div>
-    <div class="card g"><div class="val">+${summary.totalOvertimeHours}h</div><div class="lbl">Overtime</div></div>
-    <div class="card r"><div class="val">-${summary.totalMissingHours}h</div><div class="lbl">Missing Hours</div></div></div>
+    <div class="card g"><div class="val">${formatHoursToHrMin(summary.totalWorkedHours)}</div><div class="lbl">Total Worked</div></div>
+    <div class="card g"><div class="val">+${formatHoursToHrMin(summary.totalOvertimeHours)}</div><div class="lbl">Overtime</div></div>
+    <div class="card r"><div class="val">-${formatHoursToHrMin(summary.totalMissingHours)}</div><div class="lbl">Missing Hours</div></div></div>
     <div class="sec"><div class="tit">Weekly Hours Trend</div><div class="chart">
     <svg width="500" height="190" xmlns="http://www.w3.org/2000/svg">${bars}
     <g transform="translate(20,185)"><rect width="10" height="10" fill="#0F766E"/><text x="15" y="9" font-size="11" fill="#2E6058">Worked</text>
@@ -180,13 +197,13 @@ const AttendanceSummaryReport = ({ records = [] }) => {
           <div style={{fontSize:'1.2rem',fontWeight:700,color:C.primary}}>{summary.attendanceRate}%</div>
           <div style={{fontSize:'0.68rem',color:C.textMuted}}>Rate</div></div>
         <div style={{textAlign:'center',padding:'10px',background:'rgba(5,150,105,0.05)',borderRadius:8}}>
-          <div style={{fontSize:'1.2rem',fontWeight:700,color:'#059669'}}>{summary.totalWorkedHours}h</div>
+          <div style={{fontSize:'1.2rem',fontWeight:700,color:'#059669'}}>{formatHoursToHrMin(summary.totalWorkedHours)}</div>
           <div style={{fontSize:'0.68rem',color:C.textMuted}}>Worked</div></div>
         <div style={{textAlign:'center',padding:'10px',background:'rgba(5,150,105,0.05)',borderRadius:8}}>
-          <div style={{fontSize:'1.2rem',fontWeight:700,color:'#059669'}}>+{summary.totalOvertimeHours}h</div>
+          <div style={{fontSize:'1.2rem',fontWeight:700,color:'#059669'}}>+{formatHoursToHrMin(summary.totalOvertimeHours)}</div>
           <div style={{fontSize:'0.68rem',color:C.textMuted}}>Overtime</div></div>
         <div style={{textAlign:'center',padding:'10px',background:'rgba(220,38,38,0.05)',borderRadius:8}}>
-          <div style={{fontSize:'1.2rem',fontWeight:700,color:'#DC2626'}}>-{summary.totalMissingHours}h</div>
+          <div style={{fontSize:'1.2rem',fontWeight:700,color:'#DC2626'}}>-{formatHoursToHrMin(summary.totalMissingHours)}</div>
           <div style={{fontSize:'0.68rem',color:C.textMuted}}>Missing</div></div>
       </div>
     </div>

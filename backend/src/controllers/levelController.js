@@ -47,7 +47,8 @@ function validateLevelCreate(payload) {
 
   if (Array.isArray(payload.allowances)) {
     payload.allowances.forEach((allowance, index) => {
-      if (!allowance.allowance_name || !String(allowance.allowance_name).trim()) {
+      const name = allowance.allowance_name || allowance.type;
+      if (!name || !String(name).trim()) {
         missing.push(`allowances[${index}].allowance_name`);
       }
       const amount = Number(allowance.amount);
@@ -108,7 +109,8 @@ function validateLevelVersion(payload) {
 
   if (Array.isArray(payload.allowances)) {
     payload.allowances.forEach((allowance, index) => {
-      if (!allowance.allowance_name || !String(allowance.allowance_name).trim()) {
+      const name = allowance.allowance_name || allowance.type;
+      if (!name || !String(name).trim()) {
         missing.push(`allowances[${index}].allowance_name`);
       }
       const amount = Number(allowance.amount);
@@ -129,9 +131,10 @@ function validateLevelVersion(payload) {
  * GET /api/levels
  */
 exports.listLevels = asyncHandler(async (req, res) => {
-  const includeInactive = String(req.query?.include_inactive || "").toLowerCase() === "true";
+  const includeInactive =
+    String(req.query?.include_inactive ?? req.query?.includeInactive ?? "").toLowerCase() === "true";
   const includeCurrentVersion =
-    String(req.query?.include_current_version || "").toLowerCase() === "true";
+    String(req.query?.include_current_version ?? req.query?.includeCurrentVersion ?? "").toLowerCase() === "true";
 
   const levels = await LevelService.listLevels({
     includeInactive,
@@ -167,9 +170,10 @@ exports.createLevel = asyncHandler(async (req, res) => {
  * GET /api/levels/:uuid
  */
 exports.getLevel = asyncHandler(async (req, res) => {
-  const includeVersions = String(req.query?.include_versions || "true").toLowerCase() === "true";
+  const includeVersions =
+    String(req.query?.include_versions ?? req.query?.includeVersions ?? "true").toLowerCase() === "true";
   const includeEmployees =
-    String(req.query?.include_employees || "").toLowerCase() === "true";
+    String(req.query?.include_employees ?? req.query?.includeEmployees ?? "").toLowerCase() === "true";
 
   const level = await LevelService.getLevelByUuid(req.params.uuid, {
     includeVersions,

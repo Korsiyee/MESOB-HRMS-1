@@ -47,24 +47,24 @@ const ResetPasswordModal = ({ account, onClose, showMsg }) => {
     if (!newPwd.trim()) { showMsg('error','New password is required.'); return; }
     
     // Validate password complexity (8 chars minimum)
-    if (newPwd.length < 8) { 
-      showMsg('error','Password must be at least 8 characters.'); 
+    if (!newPwd || newPwd.length < 8) { 
+      showMsg('error', 'Password must be at least 8 characters long.'); 
       return; 
     }
     if (!/[A-Z]/.test(newPwd)) {
-      showMsg('error','Password must contain at least one uppercase letter.');
+      showMsg('error', 'Password must contain at least one uppercase letter (A-Z).');
       return;
     }
     if (!/[a-z]/.test(newPwd)) {
-      showMsg('error','Password must contain at least one lowercase letter.');
+      showMsg('error', 'Password must contain at least one lowercase letter (a-z).');
       return;
     }
     if (!/[0-9]/.test(newPwd)) {
-      showMsg('error','Password must contain at least one number.');
+      showMsg('error', 'Password must contain at least one number (0-9).');
       return;
     }
-    if (!/[^A-Za-z0-9]/.test(newPwd)) {
-      showMsg('error','Password must contain at least one symbol.');
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(newPwd) && !/[^A-Za-z0-9]/.test(newPwd)) {
+      showMsg('error', 'Password must contain at least one special character (e.g., !, @, #, or $).');
       return;
     }
     
@@ -339,6 +339,11 @@ const CreateAccountModal = ({ onClose, onCreated, showMsg, existingAccounts = []
             <select value={role} onChange={e => setRole(e.target.value)} style={{ ...inputStyle, cursor:'pointer' }}>
               {roles.map(r => <option key={r.code} value={r.code}>{r.label}</option>)}
             </select>
+            {role === 'DEPT_HEAD' && (
+              <p style={{ margin:'6px 0 0', fontSize:'0.72rem', color:'#B45309' }}>
+                ⚠️ An employee can only be assigned the Department Head role if they are currently designated as the head of their department.
+              </p>
+            )}
           </div>
 
           <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
@@ -400,8 +405,9 @@ const AccountsPage = () => {
   };
 
   const roleColor = (role) => {
+    const roleCode = typeof role === 'object' ? (role?.code || role?.name) : role;
     const m = { SUPER_ADMIN:['rgba(124,58,237,0.1)','#7C3AED'], HR_ADMIN:['rgba(245,158,11,0.1)','#B45309'], HR_OFFICER:['rgba(37,99,235,0.1)','#1D4ED8'], DEPT_HEAD:['rgba(15,118,110,0.1)',C.primary], EMPLOYEE:['rgba(0,80,60,0.07)',C.textMuted] };
-    return m[role] || m.EMPLOYEE;
+    return m[roleCode] || m.EMPLOYEE;
   };
 
   return (
@@ -456,7 +462,7 @@ const AccountsPage = () => {
                   </td>
                   <td style={TD}>
                     <span style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'3px 10px', borderRadius:99, background:rbg, color:rc, fontSize:'0.68rem', fontWeight:700 }}>
-                      <Shield size={11}/> {acc.role}
+                      <Shield size={11}/> {typeof acc.role === 'object' ? (acc.role?.name || acc.role?.code) : (acc.role_name || acc.role || '')}
                     </span>
                   </td>
                   <td style={TD}>

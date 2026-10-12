@@ -841,15 +841,10 @@ const AddDepartmentView = ({ activeTab, onTabChange }) => {
   const [form, setForm] = useState({
     name: '',
     parent_uuid: '',
-    head_employee_uuid: '',
   });
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState({ type: '', message: '' });
-  const [employees, setEmployees] = useState([]);
   const [depts, setAllDepts] = useState([]);
-  const [empSearch, setEmpSearch] = useState('');
-  const [dropOpen, setDropOpen] = useState(false);
-  const searchWrapRef = React.useRef(null);
   
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
@@ -858,40 +853,14 @@ const AddDepartmentView = ({ activeTab, onTabChange }) => {
     setTimeout(() => setNotice({ type: '', message: '' }), 4500);
   };
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handler = (e) => {
-      if (searchWrapRef.current && !searchWrapRef.current.contains(e.target)) {
-        setDropOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     const h = { Authorization: `Bearer ${token}` };
-    Promise.all([
-      fetch('/api/employees?status=ACTIVE&limit=300', { headers: h }).then(r => r.json()),
-      fetch('/api/departments', { headers: h }).then(r => r.json()),
-    ]).then(([eRes, dRes]) => {
-      setEmployees(eRes?.data || []);
-      setAllDepts(dRes?.data || []);
-    }).catch(() => {});
+    fetch('/api/departments', { headers: h })
+      .then(r => r.json())
+      .then(dRes => setAllDepts(dRes?.data || []))
+      .catch(() => {});
   }, []);
-
-  const filteredEmps = empSearch
-    ? employees.filter(e => `${e.first_name} ${e.middle_name || ''} ${e.last_name} ${e.mesob_id}`.toLowerCase().includes(empSearch.toLowerCase()))
-    : employees;
-
-  const selectedEmp = employees.find(e => e.uuid === form.head_employee_uuid);
-
-  const selectEmployee = (emp) => {
-    set('head_employee_uuid', emp.uuid);
-    setEmpSearch('');
-    setDropOpen(false);
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -903,15 +872,13 @@ const AddDepartmentView = ({ activeTab, onTabChange }) => {
     setSaving(true);
     try {
       const body = {
-        name: form.name,
+        name: form.name.trim(),
         ...(form.parent_uuid ? { parent_uuid: form.parent_uuid } : { parent_uuid: null }),
-        ...(form.head_employee_uuid ? { head_employee_uuid: form.head_employee_uuid } : { head_employee_uuid: null }),
       };
       await DepartmentApi.create(body);
       showMsg('success', `Department "${form.name}" created successfully!`);
       // Reset form
-      setForm({ name: '', parent_uuid: '', head_employee_uuid: '' });
-      setEmpSearch('');
+      setForm({ name: '', parent_uuid: '' });
     } catch (err) {
       showMsg('error', err.message || 'Failed to create department.');
     } finally {
@@ -954,7 +921,7 @@ const AddDepartmentView = ({ activeTab, onTabChange }) => {
             />
           </div>
 
-          <div style={{ marginBottom: 18 }}>
+          <div style={{ marginBottom: 24 }}>
             <label style={lbl}>Parent Department <span style={{ color: C.textMuted, fontWeight: 400, fontSize: '0.68rem' }}>(optional)</span></label>
             <select value={form.parent_uuid} onChange={e => set('parent_uuid', e.target.value)} style={field}>
               <option value="">Root Department (no parent)</option>
@@ -962,61 +929,10 @@ const AddDepartmentView = ({ activeTab, onTabChange }) => {
             </select>
           </div>
 
-          <div style={{ marginBottom: 24 }}>
-            <label style={lbl}>Head Employee <span style={{ color: C.textMuted, fontWeight: 400, fontSize: '0.68rem' }}>(optional)</span></label>
-
-            {/* Selected employee chip */}
-            {selectedEmp && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '7px 12px', background: 'rgba(15,118,110,0.08)', borderRadius: 8, border: `1px solid ${C.primary}` }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: C.primary, flex: 1 }}>
-                  ✓ {selectedEmp.first_name} {selectedEmp.middle_name} {selectedEmp.last_name} — {selectedEmp.mesob_id}
-                </span>
-                <button type="button" onClick={() => { set('head_employee_uuid', ''); setEmpSearch(''); setDropOpen(false); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted, fontSize: '0.7rem', fontWeight: 600, padding: '2px 4px' }}>
-                  ✕ Clear
-                </button>
-              </div>
-            )}
-
-            {/* Search input + dropdown */}
-            <div ref={searchWrapRef} style={{ position: 'relative' }}>
-              <input
-                value={empSearch}
-                onChange={e => { setEmpSearch(e.target.value); setDropOpen(true); }}
-                onFocus={() => setDropOpen(true)}
-                placeholder={selectedEmp ? 'Search to change…' : 'Search by name or ID…'}
-                style={field}
-              />
-              {dropOpen && empSearch && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, border: `1px solid ${C.border}`, borderRadius: 8, background: '#fff', maxHeight: 200, overflowY: 'auto', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', marginTop: 2 }}>
-                  {filteredEmps.length === 0 ? (
-                    <div style={{ padding: '10px 14px', fontSize: '0.78rem', color: C.textMuted }}>No employees found.</div>
-                  ) : (
-                    filteredEmps.slice(0, 20).map(e => (
-                      <button
-                        key={e.uuid}
-                        type="button"
-                        onMouseDown={ev => { ev.preventDefault(); selectEmployee(e); }}
-                        style={{ width: '100%', padding: '9px 14px', textAlign: 'left', border: 'none', background: form.head_employee_uuid === e.uuid ? 'rgba(15,118,110,0.1)' : 'transparent', cursor: 'pointer', fontSize: '0.8rem', color: C.textMain, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                        onMouseEnter={ev => ev.currentTarget.style.background = 'rgba(15,118,110,0.07)'}
-                        onMouseLeave={ev => ev.currentTarget.style.background = form.head_employee_uuid === e.uuid ? 'rgba(15,118,110,0.1)' : 'transparent'}
-                      >
-                        <span style={{ fontWeight: form.head_employee_uuid === e.uuid ? 700 : 400 }}>
-                          {e.first_name} {e.middle_name} {e.last_name}
-                        </span>
-                        <span style={{ color: C.textMuted, fontSize: '0.72rem' }}>{e.mesob_id}</span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
             <button
               type="button"
-              onClick={() => setForm({ name: '', parent_uuid: '', head_employee_uuid: '' })}
+              onClick={() => setForm({ name: '', parent_uuid: '' })}
               style={{ padding: '9px 18px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', color: C.textSub, fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'Poppins,sans-serif' }}
             >
               Clear Form

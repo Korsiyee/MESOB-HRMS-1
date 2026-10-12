@@ -6,6 +6,8 @@ import {
 } from 'recharts';
 import AttendanceStatsCards from '../components/AttendanceStatsCards';
 import AttendanceHoursChart from '../components/AttendanceHoursChart';
+import { useAuth } from '../context/AuthContext';
+import DeptHeadAttendancePage from './DeptHeadAttendancePage';
 
 /* ── Palette ── */
 const C = {
@@ -76,6 +78,14 @@ const STATUS_COLORS = {
 };
 
 const AttendanceOverviewPage = () => {
+  const { user } = useAuth();
+  const roleCode = user?.role?.code || user?.role?.name || (typeof user?.role === 'string' ? user?.role : null);
+  const isDeptHead = roleCode === 'DEPT_HEAD' || roleCode === 'DEPARTMENT_HEAD' || roleCode === 'MANAGER';
+
+  if (isDeptHead) {
+    return <DeptHeadAttendancePage />;
+  }
+
   const [summary,     setSummary]     = useState(null);
   const [trend,       setTrend]       = useState([]);
   const [deptStats,   setDeptStats]   = useState([]);

@@ -12,8 +12,7 @@ const SUPPORTED_DECISION_REJECT = "REJECT";
 const REQUEST_STATUS_PENDING_DEPARTMENT = "PENDING_DEPARTMENT";
 const REQUEST_STATUS_PENDING_HR = "PENDING_HR";
 const REQUEST_STATUS_APPROVED = "APPROVED";
-const REQUEST_STATUS_REJECTED_DEPARTMENT = "REJECTED_DEPARTMENT";
-const REQUEST_STATUS_REJECTED_HR = "REJECTED_HR";
+const REQUEST_STATUS_REJECTED = "REJECTED";
 const REQUEST_DAY_PATTERN_FULL = "FULL_DAY";
 const REQUEST_DAY_PATTERN_HALF = "HALF_DAY";
 const REQUEST_DAY_PATTERN_MIXED = "MIXED";
@@ -106,7 +105,7 @@ class RequestService {
         // If status is PENDING_DEPARTMENT and no dept head assigned, find the employee's dept head
         if (status === 'PENDING_DEPARTMENT' && !deptHeadId) {
           const [empDeptRows] = await connection.execute(
-            `SELECT p.department_uuid 
+            `SELECT e.department_uuid 
              FROM Employees e 
              WHERE e.uuid = ?`,
             [employee_uuid]
@@ -121,7 +120,7 @@ class RequestService {
                FROM Users u
                JOIN Employees e ON e.uuid = u.employee_uuid
                JOIN Roles r ON r.uuid = u.role_uuid
-               WHERE e.department_uuid = ? AND r.code = 'DEPT_HEAD'
+               WHERE e.department_uuid = ? AND r.code IN ('DEPT_HEAD', 'DEPARTMENT_HEAD')
                LIMIT 1`,
               [deptUuid]
             );
@@ -135,9 +134,9 @@ class RequestService {
         const requestInsertQuery = `
           INSERT INTO leaveRequests (
             uuid, employee_uuid, leaveType, startDate, endDate,
-            total_days, reason, status, department_head_id, hr_supervisor_id,
-            supportingDocument, dayPattern, dailyPlanJson
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            totalDays, reason, status, department_head_id, hr_supervisor_id,
+            dayPattern, dailyPlan
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const [requestResult] = await connection.execute(requestInsertQuery, [
@@ -151,7 +150,6 @@ class RequestService {
           status,
           deptHeadId,
           hrSupervisorId,
-          supportingDocument || null,
           dayPattern || null,
           serializedDailyPlan,
         ]);
@@ -196,7 +194,33 @@ class RequestService {
           );
         }
 
+        if (status === "APPROVED") {
+          const budgetYearInfo = await getBudgetYearForDate(startDate);
+          const currentBudgetYear = budgetYearInfo.year;
+
+          await connection.execute(
+            `UPDATE employeeLeaveBalances
+             SET usedDays = usedDays + ?, remainingDays = remainingDays - ?
+             WHERE employee_uuid = ? AND budgetYear = ? AND leaveType = ?`,
+            [total_days, total_days, employee_uuid, currentBudgetYear, leaveType]
+          );
+        }
+
         await connection.commit();
+
+        if (status === "APPROVED") {
+          try {
+            const { markAttendanceAsLeave } = require("./attendanceService");
+            await markAttendanceAsLeave({
+              employee_uuid,
+              startDate,
+              endDate,
+              leaveRequestUuid: requestUuid,
+            });
+          } catch (attendanceError) {
+            console.error("Failed to mark attendance as leave on auto-approved request:", attendanceError);
+          }
+        }
       } catch (transactionError) {
         await connection.rollback();
 
@@ -226,8 +250,8 @@ class RequestService {
         SELECT uuid, employee_uuid, leaveType,
                DATE_FORMAT(startDate, '%Y-%m-%d') AS startDate,
                DATE_FORMAT(endDate, '%Y-%m-%d') AS endDate,
-               total_days, reason, status, department_head_id, hr_supervisor_id,
-           rejectionReason, supportingDocument, dayPattern, dailyPlanJson
+               totalDays, totalDays AS total_days, reason, status, department_head_id, hr_supervisor_id,
+               rejectionReason, dayPattern, dailyPlan, dailyPlan AS dailyPlanJson
         FROM leaveRequests
         WHERE uuid = ?
       `;
@@ -307,9 +331,9 @@ class RequestService {
                DATE_FORMAT(original_end_date, '%Y-%m-%d') AS original_end_date,
                DATE_FORMAT(actual_return_date, '%Y-%m-%d') AS actual_return_date,
                is_shortened, shortened_at,
-               total_days,
+               totalDays, totalDays AS total_days,
                reason, status, department_head_id, hr_supervisor_id,
-           rejectionReason, supportingDocument, dayPattern, dailyPlanJson
+               rejectionReason, dayPattern, dailyPlan, dailyPlan AS dailyPlanJson
         FROM leaveRequests
         WHERE employee_uuid = ?
       `;
@@ -363,14 +387,31 @@ class RequestService {
       let statusFilter = "";
       const params = [];
       
+      // DEBUG: Log input parameters
+      console.log('[RequestService.getPendingRequests] Input:', {
+        departmentUuid,
+        role
+      });
+      
       // Role-based filtering for status
-      if (departmentUuid) {
-        // Department Head: Only see PENDING_DEPARTMENT for their department
-        statusFilter = "AND lr.status = 'PENDING_DEPARTMENT' AND p.department_uuid = ?";
-        params.push(departmentUuid);
-      } else {
-        // HR roles: Only see PENDING_HR (not PENDING_DEPARTMENT)
+      const isHRRole = ["HR_OFFICER", "HR_ADMIN", "SUPER_ADMIN"].includes(role);
+      
+      console.log('[RequestService.getPendingRequests] isHRRole:', isHRRole);
+      
+      if (isHRRole) {
+        // HR roles (HR_ADMIN, HR_OFFICER, SUPER_ADMIN): See PENDING_HR requests
+        // These are requests that have been approved by dept head or are from dept heads themselves
         statusFilter = "AND lr.status = 'PENDING_HR'";
+        console.log('[RequestService.getPendingRequests] Using HR filter: PENDING_HR');
+      } else if (departmentUuid) {
+        // Department Head: Only see PENDING_DEPARTMENT for their department
+        statusFilter = "AND lr.status = 'PENDING_DEPARTMENT' AND e.department_uuid = ?";
+        params.push(departmentUuid);
+        console.log('[RequestService.getPendingRequests] Using DEPT filter: PENDING_DEPARTMENT for dept:', departmentUuid);
+      } else {
+        // For other roles (EMPLOYEE), return empty result
+        statusFilter = "AND 1=0"; // This will return no results
+        console.log('[RequestService.getPendingRequests] No filter match, returning empty');
       }
 
       const query = `
@@ -912,7 +953,7 @@ class RequestService {
           SELECT uuid, employee_uuid,
                  DATE_FORMAT(startDate, '%Y-%m-%d') AS startDate,
                  DATE_FORMAT(endDate, '%Y-%m-%d') AS endDate,
-                 total_days, status, leaveType, dailyPlanJson
+                 totalDays AS total_days, status, leaveType, dailyPlan AS dailyPlanJson
           FROM leaveRequests
           WHERE uuid = ?
           FOR UPDATE
@@ -1059,8 +1100,8 @@ class RequestService {
       const [updateResult] = await connection.execute(
         `
           UPDATE leaveRequests
-          SET leaveType = ?, startDate = ?, endDate = ?, total_days = ?,
-              dayPattern = ?, dailyPlanJson = ?
+          SET leaveType = ?, startDate = ?, endDate = ?, totalDays = ?,
+              dayPattern = ?, dailyPlan = ?
           WHERE uuid = ?
         `,
         [
@@ -1141,7 +1182,7 @@ class RequestService {
         `SELECT uuid, employee_uuid,
                 DATE_FORMAT(startDate, '%Y-%m-%d') AS startDate,
                 DATE_FORMAT(endDate,   '%Y-%m-%d') AS endDate,
-                total_days, status, is_shortened
+                totalDays AS total_days, status, is_shortened
          FROM leaveRequests
          WHERE uuid = ?
          FOR UPDATE`,
@@ -1261,10 +1302,10 @@ class RequestService {
       await connection.execute(
         `UPDATE leaveRequests
          SET endDate            = ?,
-             total_days         = ?,
+             totalDays         = ?,
              is_shortened       = 1,
              shortened_at       = ?,
-             shortened_by       = ?,
+             shortened_by_uuid       = ?,
              actual_return_date = ?,
              original_end_date  = COALESCE(original_end_date, ?)
          WHERE uuid = ?`,
@@ -1358,7 +1399,7 @@ class RequestService {
       const [requestRows] = await connection.execute(
         `SELECT lr.uuid, lr.employee_uuid,
                 DATE_FORMAT(lr.startDate, '%Y-%m-%d') AS startDate,
-                lr.status, lr.totalDays
+                lr.status, lr.totalDays AS total_days
          FROM leaveRequests lr
          WHERE lr.uuid = ?
          FOR UPDATE`,
@@ -1408,7 +1449,7 @@ class RequestService {
       // Update the request to CANCELLED
       await connection.execute(
         `UPDATE leaveRequests
-         SET status = 'CANCELLED', cancelled_at = ?, cancelled_by = ?
+         SET status = 'CANCELLED', cancelled_at = ?, cancelled_by_uuid = ?
          WHERE uuid = ?`,
         [cancelledAt, normalizedCancelledBy, normalizedUuid],
       );
@@ -1607,8 +1648,11 @@ const hydrateRequestDayMetadata = (row) => {
     return;
   }
 
-  const dailyPlan = parseDailyPlanJson(row.dailyPlanJson);
+  const dailyPlan = parseDailyPlanJson(row.dailyPlanJson || row.dailyPlan);
   row.dailyPlan = dailyPlan;
+  row.dailyPlanJson = row.dailyPlanJson || (typeof row.dailyPlan === 'string' ? row.dailyPlan : JSON.stringify(dailyPlan));
+  row.total_days = row.total_days ?? row.totalDays;
+  row.totalDays = row.totalDays ?? row.total_days;
 
   const normalizedPattern = parseString(row.dayPattern).toUpperCase();
   if (
@@ -1621,7 +1665,7 @@ const hydrateRequestDayMetadata = (row) => {
   }
 
   const fromPlan = deriveDayPatternFromDailyPlan(dailyPlan);
-  row.dayPattern = fromPlan || deriveDayPatternFromTotalDays(row.total_days);
+  row.dayPattern = fromPlan || deriveDayPatternFromTotalDays(row.total_days ?? row.totalDays);
 };
 
 const getDocumentsByRequestUuids = async (requestUuids) => {
@@ -1683,7 +1727,7 @@ const getRequestForUpdate = async (connection, requestUuid) => {
       SELECT uuid, employee_uuid,
              DATE_FORMAT(startDate, '%Y-%m-%d') AS startDate,
              DATE_FORMAT(endDate, '%Y-%m-%d') AS endDate,
-             total_days, status, dayPattern, dailyPlanJson
+             totalDays AS total_days, status, dayPattern, dailyPlan AS dailyPlanJson
       FROM leaveRequests
       WHERE uuid = ?
       FOR UPDATE
@@ -1881,14 +1925,11 @@ const handleDepartmentDecision = async ({
     const isHRApproval = request.status === REQUEST_STATUS_PENDING_HR;
 
     if (normalizedDecision === SUPPORTED_DECISION_REJECT) {
-      const rejectedStatus = isDepartmentApproval 
-        ? REQUEST_STATUS_REJECTED_DEPARTMENT 
-        : REQUEST_STATUS_REJECTED_HR;
-        
+      // Both department and HR rejections use the same REJECTED status
       await updateRequestStatusForDepartment(
         connection,
         requestUuid,
-        rejectedStatus,
+        REQUEST_STATUS_REJECTED,
         departmentHeadId,
         normalizedRejectionReason,
       );
@@ -1897,7 +1938,7 @@ const handleDepartmentDecision = async ({
 
       return {
         requestUuid,
-        status: rejectedStatus,
+        status: REQUEST_STATUS_REJECTED,
         decision: normalizedDecision,
         rejectionReason: normalizedRejectionReason,
         deductedDays: 0,
@@ -2001,7 +2042,7 @@ const handleDepartmentDecision = async ({
     const [requestUpdateResult] = await connection.execute(
       `
         UPDATE leaveRequests
-        SET total_days = ?, endDate = ?, dayPattern = ?, dailyPlanJson = ?
+        SET totalDays = ?, endDate = ?, dayPattern = ?, dailyPlan = ?
         WHERE uuid = ?
       `,
       [

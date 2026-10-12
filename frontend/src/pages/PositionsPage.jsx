@@ -334,7 +334,6 @@ const PositionModal = ({ position, deptList, onClose, onSaved, showMsg }) => {
   const editing = !!position?.uuid;
   const [form, setForm] = useState({
     title: position?.title || '',
-    grade: position?.grade || '',
     department_uuid: position?.department_uuid || '',
   });
   const [saving, setSaving] = useState(false);
@@ -347,7 +346,6 @@ const PositionModal = ({ position, deptList, onClose, onSaved, showMsg }) => {
     try {
       const body = {
         title: form.title.trim(),
-        grade: form.grade.trim() || null,
         department_uuid: form.department_uuid,
       };
       if (editing) {
@@ -387,13 +385,9 @@ const PositionModal = ({ position, deptList, onClose, onSaved, showMsg }) => {
               {deptList.map(d => <option key={d.uuid} value={d.uuid}>{d.name}</option>)}
             </select>
           </div>
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 22 }}>
             <label style={lbl}>Position Title *</label>
             <input value={form.title} onChange={e => set('title', e.target.value)} required style={fieldStyle} placeholder="Position Title" />
-          </div>
-          <div style={{ marginBottom: 22 }}>
-            <label style={lbl}>Grade <span style={{ color: C.textMuted, fontWeight: 400, fontSize: '0.68rem' }}>(optional)</span></label>
-            <input value={form.grade} onChange={e => set('grade', e.target.value)} style={fieldStyle} placeholder="e.g., G5, Senior, Level 3" />
           </div>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button type="button" onClick={onClose} style={{ padding: '9px 18px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', color: C.textSub, fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'Poppins,sans-serif' }}>Cancel</button>
@@ -556,7 +550,6 @@ const PositionsOverview = ({ activeTab, onTabChange }) => {
 const PositionsManagementPage = ({ activeTab, onTabChange }) => {
   const { isMobile, isTablet, r } = useResponsive();
   const dialog = useDialog();
-  const [subView, setSubView] = useState('manage');
   const [positions, setPositions] = useState([]);
   const [deptList, setDeptList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -648,153 +641,72 @@ const PositionsManagementPage = ({ activeTab, onTabChange }) => {
 
       {notice.message && <Notice type={notice.type} message={notice.message} onClose={() => setNotice({ type: '', message: '' })} />}
 
-      {/* Tab Navigation */}
-      <div style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.cardBorder}`, boxShadow: C.shadow, marginBottom: 20, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px' }}>
-          <div style={{ display: 'flex' }}>
-            {[
-              { id: 'manage', label: 'Manage Positions', icon: <Briefcase size={14} /> },
-              { id: 'create', label: 'Create Position', icon: <Plus size={14} /> },
-            ].map(tab => (
-              <button key={tab.id} onClick={() => setSubView(tab.id)}
-                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '16px 20px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, color: subView === tab.id ? C.primary : C.textMuted, borderBottom: subView === tab.id ? `3px solid ${C.primary}` : '3px solid transparent', transition: 'all 0.15s', fontFamily: 'Poppins,sans-serif' }}
-                onMouseEnter={e => { if (subView !== tab.id) e.currentTarget.style.color = C.textSub; }}
-                onMouseLeave={e => { if (subView !== tab.id) e.currentTarget.style.color = C.textMuted; }}>
-                {tab.icon} {tab.label}
-              </button>
-            ))}
-          </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Stats Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: r(14, 12, 10) }}>
+          {[
+            { label: 'Total Positions', value: totalPositions, icon: <Briefcase size={20} />, bg: 'linear-gradient(135deg, #0F766E 0%, #14B8A6 100%)' },
+            { label: 'Departments', value: deptList.length, icon: <Building2 size={20} />, bg: 'linear-gradient(135deg, #0F766E 0%, #14B8A6 100%)' },
+            { label: 'Total Employees', value: totalEmployees, icon: <Users size={20} />, bg: 'linear-gradient(135deg, #0F766E 0%, #14B8A6 100%)' },
+          ].map(({ label, value, icon, bg }) => (
+            <div key={label} style={{ background: bg, borderRadius: 12, padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 16px rgba(15,118,110,0.15)' }}>
+              <div>
+                <p style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>{loading ? '…' : value}</p>
+                <p style={{ margin: '4px 0 0', fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>{label}</p>
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.7)' }}>{icon}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Search and Filter */}
+        <div style={{ display: 'flex', gap: 12 }}>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by title, department…"
+            style={{ flex: 1, padding: '9px 14px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: '0.82rem', color: C.textMain, background: C.card, outline: 'none', fontFamily: 'Poppins,sans-serif' }} />
+          <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)}
+            style={{ minWidth: 200, padding: '9px 14px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: '0.82rem', color: C.textMain, background: C.card, outline: 'none', fontFamily: 'Poppins,sans-serif', cursor: 'pointer' }}>
+            <option value="">All Departments</option>
+            {deptList.map(d => <option key={d.uuid} value={d.uuid}>{d.name}</option>)}
+          </select>
+          <Can action="create" resource="positions">
+            <GreenBtn onClick={() => { setEditingPosition(null); setShowModal(true); }}>
+              <Plus size={14} /> Add Position
+            </GreenBtn>
+          </Can>
+        </div>
+
+        {/* Positions Table */}
+        <div style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.cardBorder}`, boxShadow: C.shadow, overflow: 'hidden' }}>
+          {loading ? (
+            <div style={{ padding: 48, textAlign: 'center', color: C.textMuted, fontSize: '0.82rem' }}>Loading positions…</div>
+          ) : filteredPositions.length === 0 ? (
+            <div style={{ padding: 48, textAlign: 'center', color: C.textMuted, fontSize: '0.82rem' }}>No positions found.</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'rgba(0,80,60,0.05)', borderBottom: `1px solid ${C.border}` }}>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.7rem', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Position</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.7rem', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Grade</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.7rem', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Employees</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.7rem', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPositions.map(pos => (
+                  <PositionRow 
+                    key={pos.uuid} 
+                    pos={pos} 
+                    expanded={expandedRow === pos.uuid}
+                    onToggle={() => handleToggleExpand(pos.uuid)}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
-
-      {/* Manage Positions Tab */}
-      {subView === 'manage' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Stats Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: r(14, 12, 10) }}>
-            {[
-              { label: 'Total Positions', value: totalPositions, icon: <Briefcase size={20} />, bg: 'linear-gradient(135deg, #0F766E 0%, #14B8A6 100%)' },
-              { label: 'Departments', value: deptList.length, icon: <Building2 size={20} />, bg: 'linear-gradient(135deg, #0F766E 0%, #14B8A6 100%)' },
-              { label: 'Total Employees', value: totalEmployees, icon: <Users size={20} />, bg: 'linear-gradient(135deg, #0F766E 0%, #14B8A6 100%)' },
-            ].map(({ label, value, icon, bg }) => (
-              <div key={label} style={{ background: bg, borderRadius: 12, padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 16px rgba(15,118,110,0.15)' }}>
-                <div>
-                  <p style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>{loading ? '…' : value}</p>
-                  <p style={{ margin: '4px 0 0', fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>{label}</p>
-                </div>
-                <div style={{ color: 'rgba(255,255,255,0.7)' }}>{icon}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Search and Filter */}
-          <div style={{ display: 'flex', gap: 12 }}>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by title, department, grade…"
-              style={{ flex: 1, padding: '9px 14px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: '0.82rem', color: C.textMain, background: C.card, outline: 'none', fontFamily: 'Poppins,sans-serif' }} />
-            <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)}
-              style={{ minWidth: 200, padding: '9px 14px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: '0.82rem', color: C.textMain, background: C.card, outline: 'none', fontFamily: 'Poppins,sans-serif', cursor: 'pointer' }}>
-              <option value="">All Departments</option>
-              {deptList.map(d => <option key={d.uuid} value={d.uuid}>{d.name}</option>)}
-            </select>
-            <Can action="create" resource="positions">
-              <GreenBtn onClick={() => { setEditingPosition(null); setShowModal(true); }}>
-                <Plus size={14} /> Add Position
-              </GreenBtn>
-            </Can>
-          </div>
-
-          {/* Positions Table */}
-          <div style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.cardBorder}`, boxShadow: C.shadow, overflow: 'hidden' }}>
-            {loading ? (
-              <div style={{ padding: 48, textAlign: 'center', color: C.textMuted, fontSize: '0.82rem' }}>Loading positions…</div>
-            ) : filteredPositions.length === 0 ? (
-              <div style={{ padding: 48, textAlign: 'center', color: C.textMuted, fontSize: '0.82rem' }}>No positions found.</div>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: 'rgba(0,80,60,0.05)', borderBottom: `1px solid ${C.border}` }}>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.7rem', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Position</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.7rem', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Grade</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.7rem', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Employees</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.7rem', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredPositions.map(pos => (
-                    <PositionRow 
-                      key={pos.uuid} 
-                      pos={pos} 
-                      expanded={expandedRow === pos.uuid}
-                      onToggle={() => handleToggleExpand(pos.uuid)}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Create Position Tab */}
-      {activeTab === 'create' && (
-        <div style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.cardBorder}`, boxShadow: C.shadow, padding: '28px 32px' }}>
-          <div style={{ marginBottom: 24 }}>
-            <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: C.textMain }}>Create New Position</h2>
-            <p style={{ margin: '6px 0 0', fontSize: '0.78rem', color: C.textMuted }}>Fill in the form below to create a new position</p>
-          </div>
-
-          <form onSubmit={async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const data = {
-              title: formData.get('title'),
-              grade: formData.get('grade') || null,
-              department_uuid: formData.get('department_uuid'),
-            };
-            try {
-              await PositionApi.create(data);
-              showMsg('success', 'Position created successfully.');
-              e.target.reset();
-              loadPositions();
-              setSubView('manage');
-            } catch (err) {
-              showMsg('error', err.message || 'Failed to create position.');
-            }
-          }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: C.textSub, marginBottom: 6 }}>Department *</label>
-                <select name="department_uuid" required
-                  style={{ width: '100%', padding: '10px 13px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, fontSize: '0.82rem', color: C.textMain, outline: 'none', fontFamily: 'Poppins,sans-serif', cursor: 'pointer' }}>
-                  <option value="">Select Department</option>
-                  {deptList.map(d => <option key={d.uuid} value={d.uuid}>{d.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: C.textSub, marginBottom: 6 }}>Position Title *</label>
-                <input name="title" required placeholder="Position Title"
-                  style={{ width: '100%', padding: '10px 13px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, fontSize: '0.82rem', color: C.textMain, outline: 'none', fontFamily: 'Poppins,sans-serif' }} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: C.textSub, marginBottom: 6 }}>
-                  Grade <span style={{ color: C.textMuted, fontWeight: 400, fontSize: '0.68rem' }}>(optional)</span>
-                </label>
-                <input name="grade" placeholder="e.g., G5, Senior, Level 3"
-                  style={{ width: '100%', padding: '10px 13px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, fontSize: '0.82rem', color: C.textMain, outline: 'none', fontFamily: 'Poppins,sans-serif' }} />
-              </div>
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
-                <button type="button" onClick={() => setSubView('manage')}
-                  style={{ padding: '9px 18px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', color: C.textSub, fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'Poppins,sans-serif' }}>
-                  Cancel
-                </button>
-                <GreenBtn type="submit">Create Position</GreenBtn>
-              </div>
-            </div>
-          </form>
-        </div>
-      )}
 
       {/* Position Modal */}
       {showModal && (
@@ -814,7 +726,7 @@ const PositionsManagementPage = ({ activeTab, onTabChange }) => {
    ADD POSITION VIEW (Quick Add Form)
 ══════════════════════════════════════════ */
 const AddPositionView = ({ activeTab, onTabChange }) => {
-  const [form, setForm] = useState({ title: '', grade: '', department_uuid: '' });
+  const [form, setForm] = useState({ title: '', department_uuid: '' });
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState({ type: '', message: '' });
   const [deptList, setDeptList] = useState([]);
@@ -841,13 +753,12 @@ const AddPositionView = ({ activeTab, onTabChange }) => {
     try {
       const body = {
         title: form.title.trim(),
-        grade: form.grade.trim() || null,
         department_uuid: form.department_uuid,
       };
       await PositionApi.create(body);
       showMsg('success', `Position "${form.title}" created successfully!`);
       // Reset form
-      setForm({ title: '', grade: '', department_uuid: '' });
+      setForm({ title: '', department_uuid: '' });
     } catch (err) {
       showMsg('error', err.message || 'Failed to create position.');
     } finally {
@@ -890,7 +801,7 @@ const AddPositionView = ({ activeTab, onTabChange }) => {
             </select>
           </div>
 
-          <div style={{ marginBottom: 18 }}>
+          <div style={{ marginBottom: 24 }}>
             <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: C.textSub, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Position Title *
             </label>
@@ -903,22 +814,10 @@ const AddPositionView = ({ activeTab, onTabChange }) => {
             />
           </div>
 
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: C.textSub, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Grade <span style={{ color: C.textMuted, fontWeight: 400, fontSize: '0.68rem' }}>(optional)</span>
-            </label>
-            <input
-              value={form.grade}
-              onChange={e => setForm(p => ({ ...p, grade: e.target.value }))}
-              placeholder="e.g., G5, Senior, Level 3"
-              style={{ width: '100%', padding: '10px 13px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, fontSize: '0.82rem', color: C.textMain, outline: 'none', fontFamily: 'Poppins,sans-serif' }}
-            />
-          </div>
-
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
             <button
               type="button"
-              onClick={() => setForm({ title: '', grade: '', department_uuid: '' })}
+              onClick={() => setForm({ title: '', department_uuid: '' })}
               style={{ padding: '9px 18px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', color: C.textSub, fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'Poppins,sans-serif' }}
             >
               Clear Form

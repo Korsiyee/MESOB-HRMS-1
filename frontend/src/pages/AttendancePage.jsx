@@ -48,6 +48,23 @@ const STATUS_STYLES = {
   ON_LEAVE: { bg:'rgba(124,58,237,0.1)', color:'#7C3AED' },
 };
 
+// Helper function to format decimal hours to "Xhr Ymin" format
+const formatHoursToHrMin = (decimalHours) => {
+  if (decimalHours === null || decimalHours === undefined) return '';
+  
+  const totalMinutes = Math.round(decimalHours * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  
+  if (hours > 0 && minutes > 0) {
+    return `${hours}hr ${minutes}min`;
+  } else if (hours > 0) {
+    return `${hours}hr`;
+  } else {
+    return `${minutes}min`;
+  }
+};
+
 const StatusBadge = ({ status }) => {
   const s = STATUS_STYLES[status] || STATUS_STYLES.ABSENT;
   return <span style={{ padding:'3px 10px', borderRadius:99, fontSize:'0.68rem', fontWeight:700, background:s.bg, color:s.color }}>{status}</span>;
@@ -77,9 +94,9 @@ const exportToCSV = (records) => {
     r?.shift_name || '',
     r?.check_in ? new Date(r.check_in).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '',
     r?.check_out ? new Date(r.check_out).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '',
-    r?.worked_hours !== null && r?.worked_hours !== undefined ? `${r.worked_hours}h` : '',
-    r?.overtime_hours !== null && r?.overtime_hours !== undefined ? `${r.overtime_hours}h` : '',
-    r?.missing_hours !== null && r?.missing_hours !== undefined ? `${r.missing_hours}h` : '',
+    r?.worked_hours !== null && r?.worked_hours !== undefined ? formatHoursToHrMin(r.worked_hours) : '',
+    r?.overtime_hours !== null && r?.overtime_hours !== undefined ? formatHoursToHrMin(r.overtime_hours) : '',
+    r?.missing_hours !== null && r?.missing_hours !== undefined ? formatHoursToHrMin(r.missing_hours) : '',
     r?.late_minutes !== null && r?.late_minutes !== undefined ? `${r.late_minutes}min` : '',
   ]);
   const csv = [headers, ...rows].map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -154,9 +171,9 @@ const exportToPDF = (records, filters) => {
                 <td>${r.status || ''}</td>
                 <td>${r.check_in ? new Date(r.check_in).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : ''}</td>
                 <td>${r.check_out ? new Date(r.check_out).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : ''}</td>
-                <td>${r.worked_hours !== null && r.worked_hours !== undefined ? r.worked_hours + 'h' : '-'}</td>
-                <td>${r.overtime_hours !== null && r.overtime_hours !== undefined && r.overtime_hours > 0 ? r.overtime_hours + 'h' : '-'}</td>
-                <td>${r.missing_hours !== null && r.missing_hours !== undefined && r.missing_hours > 0 ? r.missing_hours + 'h' : '-'}</td>
+                <td>${r.worked_hours !== null && r.worked_hours !== undefined ? formatHoursToHrMin(r.worked_hours) : '-'}</td>
+                <td>${r.overtime_hours !== null && r.overtime_hours !== undefined && r.overtime_hours > 0 ? formatHoursToHrMin(r.overtime_hours) : '-'}</td>
+                <td>${r.missing_hours !== null && r.missing_hours !== undefined && r.missing_hours > 0 ? formatHoursToHrMin(r.missing_hours) : '-'}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -594,13 +611,16 @@ const CorrectModal = ({ record, onClose, onSaved, showMsg }) => {
 const AttendancePage = () => {
   const { user } = useAuth();
   const dialog = useDialog();
+  const roleCode = user?.role?.code || user?.role?.name || (typeof user?.role === 'string' ? user?.role : null);
+  const isDeptHead = roleCode === 'DEPT_HEAD' || roleCode === 'DEPARTMENT_HEAD' || roleCode === 'MANAGER';
   const { allowed: canManageAll, loading: permLoading } = usePermission('attendance', 'manage_all');
   const employeeUuid = user?.employee_uuid;
+  const deptUuid = user?.department_uuid;
 
   const [records,     setRecords]     = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [notice,      setNotice]      = useState({ type:'', message:'' });
-  const [filters,     setFilters]     = useState({ search:'', departmentUuid:'', positionUuid:'', status:'', startDate:'', endDate:'', page:1, pageSize:20 });
+  const [filters,     setFilters]     = useState({ search:'', departmentUuid: isDeptHead ? (deptUuid || '') : '', positionUuid:'', status:'', startDate:'', endDate:'', page:1, pageSize:20 });
   const [meta,        setMeta]        = useState({ total:0, totalPages:1 });
   const [showPunchMethod, setShowPunchMethod] = useState(false);
   const [showLog,     setShowLog]     = useState(false);
@@ -659,9 +679,10 @@ const AttendancePage = () => {
     if (permLoading) return;
     setLoading(true);
     try {
+      const effectiveDeptUuid = isDeptHead ? (deptUuid || '') : filters.departmentUuid;
       const params = {
         search: filters.search,
-        departmentUuid: filters.departmentUuid,
+        departmentUuid: effectiveDeptUuid,
         positionUuid: filters.positionUuid,
         status: filters.status,
         startDate: filters.startDate,
@@ -669,7 +690,7 @@ const AttendancePage = () => {
         page: filters.page,
         pageSize: filters.pageSize,
       };
-      const res = canManageAll
+      const res = (canManageAll || isDeptHead)
         ? await AttendanceApi.getAllAttendance(params)
         : await AttendanceApi.getEmployeeAttendance(employeeUuid, params);
       
@@ -689,7 +710,7 @@ const AttendancePage = () => {
       setMeta({ total: 0, totalPages: 1 });
     }
     finally { setLoading(false); }
-  }, [filters.search, filters.departmentUuid, filters.positionUuid, filters.status, filters.startDate, filters.endDate, filters.page, filters.pageSize, canManageAll, employeeUuid, permLoading]);
+  }, [filters.search, filters.departmentUuid, filters.positionUuid, filters.status, filters.startDate, filters.endDate, filters.page, filters.pageSize, canManageAll, isDeptHead, deptUuid, employeeUuid, permLoading]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -718,9 +739,10 @@ const AttendancePage = () => {
   // Fetch ALL records for export (not just current page)
   const fetchAllForExport = async () => {
     try {
+      const effectiveDeptUuid = isDeptHead ? (deptUuid || '') : filters.departmentUuid;
       const params = {
         search: filters.search,
-        departmentUuid: filters.departmentUuid,
+        departmentUuid: effectiveDeptUuid,
         positionUuid: filters.positionUuid,
         status: filters.status,
         startDate: filters.startDate,
@@ -728,7 +750,7 @@ const AttendancePage = () => {
         page: 1,
         pageSize: 10000, // Large number to get all records
       };
-      const res = canManageAll
+      const res = (canManageAll || isDeptHead)
         ? await AttendanceApi.getAllAttendance(params)
         : await AttendanceApi.getEmployeeAttendance(employeeUuid, params);
       // Defensive check - ensure we return an array
@@ -850,8 +872,13 @@ const AttendancePage = () => {
           {/* Department Filter */}
           <div>
             <label style={labelStyle}>Department</label>
-            <select value={filters.departmentUuid} onChange={e=>setFilters(p=>({...p,departmentUuid:e.target.value,page:1}))} style={{ ...fieldStyle, cursor:'pointer' }}>
-              <option value="">All Departments</option>
+            <select
+              value={isDeptHead ? (deptUuid || '') : filters.departmentUuid}
+              onChange={e => !isDeptHead && setFilters(p => ({ ...p, departmentUuid: e.target.value, page: 1 }))}
+              disabled={isDeptHead}
+              style={{ ...fieldStyle, cursor: isDeptHead ? 'not-allowed' : 'pointer', opacity: isDeptHead ? 0.8 : 1 }}
+            >
+              {!isDeptHead && <option value="">All Departments</option>}
               {departments.map(d=><option key={d.uuid} value={d.uuid}>{d.name}</option>)}
             </select>
           </div>
@@ -859,7 +886,7 @@ const AttendancePage = () => {
           {/* Position Filter */}
           <div>
             <label style={labelStyle}>Position</label>
-            <select value={filters.positionUuid} onChange={e=>setFilters(p=>({...p,positionUuid:e.target.value,page:1}))} style={{ ...fieldStyle, cursor:'pointer' }} disabled={!filters.departmentUuid && positions.length === 0}>
+            <select value={filters.positionUuid} onChange={e=>setFilters(p=>({...p,positionUuid:e.target.value,page:1}))} style={{ ...fieldStyle, cursor:'pointer' }} disabled={!filters.departmentUuid && !isDeptHead && positions.length === 0}>
               <option value="">All Positions</option>
               {positions.map(pos=><option key={pos.uuid} value={pos.uuid}>{pos.title}</option>)}
             </select>
@@ -887,7 +914,7 @@ const AttendancePage = () => {
 
         {/* Action Buttons */}
         <div style={{ display:'flex', gap:10, justifyContent:'flex-end', alignItems:'center', paddingTop:8, borderTop:`1px solid ${C.border}` }}>
-          <button onClick={()=>setFilters({search:'', departmentUuid:'', positionUuid:'', status:'', startDate:'', endDate:'', page:1, pageSize:20})} 
+          <button onClick={()=>setFilters({search:'', departmentUuid: isDeptHead ? (deptUuid || '') : '', positionUuid:'', status:'', startDate:'', endDate:'', page:1, pageSize:20})} 
             style={{ padding:'7px 14px', borderRadius:7, border:`1px solid ${C.border}`, background:'transparent', color:C.textSub, fontSize:'0.75rem', fontWeight:600, cursor:'pointer', fontFamily:'Poppins,sans-serif' }}>
             Clear Filters
           </button>
@@ -957,19 +984,19 @@ const AttendancePage = () => {
                 <td style={{ ...TD, color:C.textSub, fontSize:'0.72rem' }}>{r.check_in ? new Date(r.check_in).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '—'}</td>
                 <td style={{ ...TD, color:C.textSub, fontSize:'0.72rem' }}>{r.check_out ? new Date(r.check_out).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '—'}</td>
                 <td style={{ ...TD, fontSize:'0.72rem', fontWeight:600, color: r.worked_hours !== null && r.worked_hours !== undefined ? C.textMain : C.textMuted }}>
-                  {r.worked_hours !== null && r.worked_hours !== undefined ? `${r.worked_hours}h` : '—'}
+                  {r.worked_hours !== null && r.worked_hours !== undefined ? formatHoursToHrMin(r.worked_hours) : '—'}
                 </td>
                 <td style={{ ...TD, fontSize:'0.72rem', fontWeight:600 }}>
                   {r.overtime_hours !== null && r.overtime_hours !== undefined && r.overtime_hours > 0 ? (
                     <span style={{ color:'#059669', background:'rgba(5,150,105,0.1)', padding:'2px 8px', borderRadius:4, display:'inline-block' }}>
-                      +{r.overtime_hours}h
+                      +{formatHoursToHrMin(r.overtime_hours)}
                     </span>
                   ) : <span style={{ color:C.textMuted }}>—</span>}
                 </td>
                 <td style={{ ...TD, fontSize:'0.72rem', fontWeight:600 }}>
                   {r.missing_hours !== null && r.missing_hours !== undefined && r.missing_hours > 0 ? (
                     <span style={{ color:'#DC2626', background:'rgba(220,38,38,0.08)', padding:'2px 8px', borderRadius:4, display:'inline-block' }}>
-                      -{r.missing_hours}h
+                      -{formatHoursToHrMin(r.missing_hours)}
                     </span>
                   ) : <span style={{ color:C.textMuted }}>—</span>}
                 </td>

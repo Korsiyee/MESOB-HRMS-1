@@ -10,6 +10,7 @@ import {
 import { EmployeeApi } from "../api/employeeApi";
 import { LevelApi } from "../api/levelApi";
 import { getAllRoles } from "../api/roleManagement";
+import { useAuth } from "../context/AuthContext";
 import PrettyDatePicker from "../components/PrettyDatePicker";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import EmployeeFaceRegistration from "../components/EmployeeFaceRegistration";
@@ -477,7 +478,7 @@ const EditPersonalModal = ({ employee, onClose, onSaved }) => {
 };
 
 /* ── Edit Employment Modal ── */
-const EditEmploymentModal = ({ employee, departments, positions, levels, roles, onClose, onSaved }) => {
+const EditEmploymentModal = ({ employee, departments, positions, levels, roles, isSuperAdmin, onClose, onSaved }) => {
   const [form, setForm] = useState({
     hire_date: employee?.hire_date?.slice(0, 10) || "",
     department_uuid: employee?.department_uuid || "",
@@ -493,15 +494,35 @@ const EditEmploymentModal = ({ employee, departments, positions, levels, roles, 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const currentDeptUuid = form.department_uuid || employee?.department_uuid;
+  const dept = departments.find((d) => d.uuid === currentDeptUuid);
+  const isDesignatedHead = dept ? dept.head_employee_uuid === employee?.uuid : false;
+
   const save = async (e) => {
     e?.preventDefault();
     setSaving(true);
     setError("");
     try {
+      // Validate Department Head assignment constraint
+      const selectedRole = roles.find((r) => r.uuid === form.role_uuid);
+      if (selectedRole && (selectedRole.code === 'DEPT_HEAD' || selectedRole.code === 'DEPARTMENT_HEAD')) {
+        if (!isDesignatedHead) {
+          setError("An employee can only be assigned the Department Head role if they are currently designated as the head of their department.");
+          setSaving(false);
+          return;
+        }
+      }
+
       const payload = {
         ...form,
         prior_gov_service: form.prior_gov_service_years,
       };
+
+      // If not Super Admin, do not modify role_uuid
+      if (!isSuperAdmin) {
+        delete payload.role_uuid;
+      }
+
       await EmployeeApi.update(employee.uuid, payload);
       onSaved();
       onClose();
@@ -581,26 +602,39 @@ const EditEmploymentModal = ({ employee, departments, positions, levels, roles, 
           </div>
 
           <div style={{ marginTop: 14 }}>
-            <label style={labelStyle}>System Access Role</label>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <label style={{ ...labelStyle, marginBottom: 0 }}>System Access Role</label>
+              {!isSuperAdmin && (
+                <span style={{ fontSize: '0.68rem', color: '#B45309', fontWeight: 600, background: 'rgba(245,158,11,0.1)', padding: '2px 8px', borderRadius: 6 }}>
+                  Super Admin Only
+                </span>
+              )}
+            </div>
             <select
               value={form.role_uuid}
               onChange={(e) => setForm((p) => ({ ...p, role_uuid: e.target.value }))}
-              style={inputStyle}
+              style={{ ...inputStyle, cursor: isSuperAdmin ? 'pointer' : 'not-allowed', opacity: isSuperAdmin ? 1 : 0.75 }}
+              disabled={!isSuperAdmin}
             >
               <option value="">— No Role Assigned —</option>
               {roles && roles.length > 0 ? (
-                roles.map((r) => (
-                  <option key={r.uuid} value={r.uuid}>
-                    {r.name}
-                  </option>
-                ))
+                roles.map((r) => {
+                  const isDeptHeadRole = r.code === 'DEPT_HEAD' || r.code === 'DEPARTMENT_HEAD';
+                  const cannotAssign = isDeptHeadRole && !isDesignatedHead;
+                  return (
+                    <option key={r.uuid} value={r.uuid} disabled={cannotAssign}>
+                      {r.name}{cannotAssign ? ' (Must be designated as head of department)' : ''}
+                    </option>
+                  );
+                })
               ) : (
-                <option value="" disabled>No roles available (requires HR Admin permission)</option>
+                <option value="" disabled>No roles available</option>
               )}
             </select>
             <p style={{ fontSize: "0.7rem", color: C.textMuted, marginTop: 6, fontStyle: "italic" }}>
-              Assigns system access permissions to this employee's account
-              {(!roles || roles.length === 0) && ". Requires HR Admin or Super Admin permission to view and assign roles."}
+              {isSuperAdmin
+                ? "Super Admin can assign or change the employee's system role directly. (Department Head requires designation as head of department)"
+                : "Only Super Admin can change an employee's role directly within their profile."}
             </p>
           </div>
         </div>
@@ -1170,6 +1204,10 @@ const EmployeeDetailPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  const { user } = useAuth();
+  const currentUserRoleCode = user?.role?.code || (typeof user?.role === 'string' ? user?.role : null);
+  const isSuperAdmin = currentUserRoleCode === 'SUPER_ADMIN' || user?.role?.name === 'SUPER_ADMIN';
+
   const [employee, setEmployee] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -1209,7 +1247,7 @@ const EmployeeDetailPage = () => {
       setLevels(levelRes?.data || []);
       
       // Defensive check for roles
-      const rolesData = rolesRes?.data?.roles;
+      const rolesData = rolesRes?.data?.roles || (Array.isArray(rolesRes?.data) ? rolesRes.data : []);
       if (Array.isArray(rolesData) && rolesData.length > 0) {
         console.log('[EmployeeDetailPage] Roles loaded successfully:', rolesData.length, 'roles');
         setRoles(rolesData);
@@ -1615,6 +1653,7 @@ const EmployeeDetailPage = () => {
           positions={positions}
           levels={levels}
           roles={roles}
+          isSuperAdmin={isSuperAdmin}
           onClose={() => setEditEmployment(false)}
           onSaved={load}
         />

@@ -68,7 +68,10 @@ exports.getCurrentUser = asyncHandler(async (req, res) => {
     // Combine user data with module permissions
     const userData = {
       ...user,
-      permissions: modulePermissions  // Add module permissions to response
+      permissions: modulePermissions,
+      modules: modulePermissions?.modules || [],
+      role: modulePermissions?.role || user.role,
+      dashboard: modulePermissions?.dashboard || 'employee',
     };
 
     return sendSuccess(res, {
@@ -132,28 +135,28 @@ exports.changePassword = asyncHandler(async (req, res) => {
   }
   if (!/[A-Z]/.test(newPassword)) {
     throw new ApiError(
-      "Password must contain at least one uppercase letter.",
+      "Password must contain at least one uppercase letter (A-Z).",
       400,
       "VALIDATION_ERROR",
     );
   }
   if (!/[a-z]/.test(newPassword)) {
     throw new ApiError(
-      "Password must contain at least one lowercase letter.",
+      "Password must contain at least one lowercase letter (a-z).",
       400,
       "VALIDATION_ERROR",
     );
   }
   if (!/[0-9]/.test(newPassword)) {
     throw new ApiError(
-      "Password must contain at least one number.",
+      "Password must contain at least one number (0-9).",
       400,
       "VALIDATION_ERROR",
     );
   }
-  if (!/[^A-Za-z0-9]/.test(newPassword)) {
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(newPassword) && !/[^A-Za-z0-9]/.test(newPassword)) {
     throw new ApiError(
-      "Password must contain at least one symbol.",
+      "Password must contain at least one special character (e.g., !, @, #, or $).",
       400,
       "VALIDATION_ERROR",
     );
@@ -298,7 +301,7 @@ exports.checkPermission = asyncHandler(async (req, res) => {
   if (queryStr.includes('manage_department') || queryStr.includes('approve_department') || queryStr.includes('view_department')) {
     return sendSuccess(res, {
       status: 200,
-      data: { allowed: ['SUPER_ADMIN', 'HR_ADMIN', 'DEPT_HEAD'].includes(role) },
+      data: { allowed: ['SUPER_ADMIN', 'HR_ADMIN', 'DEPT_HEAD', 'DEPARTMENT_HEAD'].includes(role) },
     });
   }
 
@@ -324,7 +327,12 @@ exports.checkPermission = asyncHandler(async (req, res) => {
     'leave': 'LEAVE_REQUESTS',
     'requests': 'LEAVE_REQUESTS',
     'accounts': 'ACCOUNTS',
-    'logs': 'AUDIT_LOGS'
+    'logs': 'AUDIT_LOGS',
+    'network-settings': 'NETWORK_SETTINGS',
+    'networksettings': 'NETWORK_SETTINGS',
+    'network_settings': 'NETWORK_SETTINGS',
+    'policies': 'LEAVE_SETTINGS',
+    'holidays': 'LEAVE_SETTINGS',
   };
   
   const target = (resource || action || '').toLowerCase();

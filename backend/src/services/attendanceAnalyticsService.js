@@ -21,19 +21,31 @@ function pct(part, total) {
 }
 
 /* ─── 1. Summary counts ─── */
-async function getOverviewSummary({ startDate, endDate } = {}) {
+async function getOverviewSummary({ startDate, endDate, departmentUuid } = {}) {
   const { startDate: sd, endDate: ed } = {
     ...defaultDateRange(),
     ...(startDate ? { startDate } : {}),
     ...(endDate ? { endDate } : {}),
   };
 
+  const params = [sd, ed];
+  let joinClause = "";
+  let whereClause = "WHERE a.date BETWEEN ? AND ?";
+
+  if (departmentUuid) {
+    joinClause = `INNER JOIN Employees e ON e.uuid = a.employee_uuid
+                  LEFT JOIN Positions p ON p.uuid = e.position_uuid`;
+    whereClause += " AND (e.department_uuid = ? OR p.department_uuid = ?)";
+    params.push(departmentUuid, departmentUuid);
+  }
+
   const [rows] = await executeQuery(
-    `SELECT status, COUNT(*) AS cnt
-     FROM AttendanceSummary
-     WHERE date BETWEEN ? AND ?
-     GROUP BY status`,
-    [sd, ed]
+    `SELECT a.status, COUNT(*) AS cnt
+     FROM AttendanceSummary a
+     ${joinClause}
+     ${whereClause}
+     GROUP BY a.status`,
+    params
   );
 
   const counts = {
@@ -52,23 +64,35 @@ async function getOverviewSummary({ startDate, endDate } = {}) {
 }
 
 /* ─── 2. Trend data (daily present vs absent) ─── */
-async function getAttendanceTrend({ startDate, endDate, groupBy = "day" } = {}) {
+async function getAttendanceTrend({ startDate, endDate, groupBy = "day", departmentUuid } = {}) {
   const { startDate: sd, endDate: ed } = {
     ...defaultDateRange(),
     ...(startDate ? { startDate } : {}),
     ...(endDate ? { endDate } : {}),
   };
 
+  const params = [sd, ed];
+  let joinClause = "";
+  let whereClause = "WHERE a.date BETWEEN ? AND ?";
+
+  if (departmentUuid) {
+    joinClause = `INNER JOIN Employees e ON e.uuid = a.employee_uuid
+                  LEFT JOIN Positions p ON p.uuid = e.position_uuid`;
+    whereClause += " AND (e.department_uuid = ? OR p.department_uuid = ?)";
+    params.push(departmentUuid, departmentUuid);
+  }
+
   const [rows] = await executeQuery(
     `SELECT
-       DATE_FORMAT(date, '%Y-%m-%d') AS day,
-       SUM(status IN ('PRESENT','LATE','HALF_DAY')) AS present,
-       SUM(status = 'ABSENT') AS absent
-     FROM AttendanceSummary
-     WHERE date BETWEEN ? AND ?
+       DATE_FORMAT(a.date, '%Y-%m-%d') AS day,
+       SUM(a.status IN ('PRESENT','LATE','HALF_DAY')) AS present,
+       SUM(a.status = 'ABSENT') AS absent
+     FROM AttendanceSummary a
+     ${joinClause}
+     ${whereClause}
      GROUP BY day
      ORDER BY day ASC`,
-    [sd, ed]
+    params
   );
 
   return rows.map((r) => ({
@@ -79,12 +103,19 @@ async function getAttendanceTrend({ startDate, endDate, groupBy = "day" } = {}) 
 }
 
 /* ─── 3. Department-wise present % ─── */
-async function getDepartmentStats({ startDate, endDate } = {}) {
+async function getDepartmentStats({ startDate, endDate, departmentUuid } = {}) {
   const { startDate: sd, endDate: ed } = {
     ...defaultDateRange(),
     ...(startDate ? { startDate } : {}),
     ...(endDate ? { endDate } : {}),
   };
+
+  const params = [sd, ed];
+  let whereClause = "WHERE a.date BETWEEN ? AND ?";
+  if (departmentUuid) {
+    whereClause += " AND (d.uuid = ? OR e.department_uuid = ?)";
+    params.push(departmentUuid, departmentUuid);
+  }
 
   const [rows] = await executeQuery(
     `SELECT
@@ -95,11 +126,11 @@ async function getDepartmentStats({ startDate, endDate } = {}) {
      FROM AttendanceSummary a
      INNER JOIN Employees e ON e.uuid = a.employee_uuid
      INNER JOIN Departments d ON d.uuid = e.department_uuid
-     WHERE a.date BETWEEN ? AND ?
+     ${whereClause}
      GROUP BY d.uuid, d.name
      ORDER BY present_count DESC
      LIMIT 10`,
-    [sd, ed]
+    params
   );
 
   return rows.map((r) => ({
@@ -112,13 +143,20 @@ async function getDepartmentStats({ startDate, endDate } = {}) {
 }
 
 /* ─── 4. Top employees by present days ─── */
-async function getTopEmployees({ startDate, endDate, limit = 10 } = {}) {
+async function getTopEmployees({ startDate, endDate, limit = 10, departmentUuid } = {}) {
   const { startDate: sd, endDate: ed } = {
     ...defaultDateRange(),
     ...(startDate ? { startDate } : {}),
     ...(endDate ? { endDate } : {}),
   };
   const safeLimit = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
+
+  const params = [sd, ed];
+  let whereClause = "WHERE a.date BETWEEN ? AND ?";
+  if (departmentUuid) {
+    whereClause += " AND (e.department_uuid = ? OR p.department_uuid = ?)";
+    params.push(departmentUuid, departmentUuid);
+  }
 
   const [rows] = await executeQuery(
     `SELECT
@@ -129,12 +167,12 @@ async function getTopEmployees({ startDate, endDate, limit = 10 } = {}) {
      FROM AttendanceSummary a
      INNER JOIN Employees e ON e.uuid = a.employee_uuid
      LEFT JOIN Positions p ON p.uuid = e.position_uuid
-     LEFT JOIN Departments d ON d.uuid = p.department_uuid
-     WHERE a.date BETWEEN ? AND ?
+     LEFT JOIN Departments d ON d.uuid = COALESCE(e.department_uuid, p.department_uuid)
+     ${whereClause}
      GROUP BY e.uuid, e.mesob_id, full_name, d.name
      ORDER BY present_days DESC
      LIMIT ${safeLimit}`,
-    [sd, ed]
+    params
   );
 
   return rows.map((r) => ({
@@ -147,8 +185,15 @@ async function getTopEmployees({ startDate, endDate, limit = 10 } = {}) {
 }
 
 /* ─── 5. Recent corrections ─── */
-async function getRecentCorrections({ limit = 10 } = {}) {
+async function getRecentCorrections({ limit = 10, departmentUuid } = {}) {
   const safeLimit = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
+
+  const params = [];
+  let whereClause = "WHERE a.corrected_by_uuid IS NOT NULL";
+  if (departmentUuid) {
+    whereClause += " AND (e.department_uuid = ? OR p.department_uuid = ?)";
+    params.push(departmentUuid, departmentUuid);
+  }
 
   const [rows] = await executeQuery(
     `SELECT
@@ -159,11 +204,12 @@ async function getRecentCorrections({ limit = 10 } = {}) {
        a.updated_at
      FROM AttendanceSummary a
      INNER JOIN Employees e ON e.uuid = a.employee_uuid
+     LEFT JOIN Positions p ON p.uuid = e.position_uuid
      LEFT JOIN Employees c ON c.uuid = a.corrected_by_uuid
-     WHERE a.corrected_by_uuid IS NOT NULL
+     ${whereClause}
      ORDER BY a.updated_at DESC
      LIMIT ${safeLimit}`,
-    []
+    params
   );
 
   return rows.map((r) => ({
@@ -191,7 +237,7 @@ async function getAttendanceRecords({
   const params = [sd, ed];
   let where = "WHERE a.date BETWEEN ? AND ?";
 
-  if (departmentUuid) { where += " AND p.department_uuid = ?"; params.push(departmentUuid); }
+  if (departmentUuid) { where += " AND (e.department_uuid = ? OR p.department_uuid = ?)"; params.push(departmentUuid, departmentUuid); }
   if (positionUuid) { where += " AND e.position_uuid = ?"; params.push(positionUuid); }
   if (status) { where += " AND a.status = ?"; params.push(status); }
   if (search) {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { LogApi } from "../api/logApi";
+import { useAuth } from "../context/AuthContext";
 import { ScrollText, Activity, User, Calendar, Search, X, ChevronRight, ChevronLeft, RefreshCw } from "lucide-react";
 
 const C = {
@@ -71,6 +72,10 @@ const getActionMeta = (action = '') => {
 };
 
 const LogsPage = () => {
+  const { user } = useAuth();
+  const roleCode = user?.role?.code || (typeof user?.role === 'string' ? user?.role : null);
+  const isSuperAdmin = roleCode === 'SUPER_ADMIN' || user?.role?.name === 'SUPER_ADMIN';
+
   const [logs,        setLogs]        = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState('');
@@ -100,7 +105,20 @@ const LogsPage = () => {
     } finally { setLoading(false); }
   }, [applied, page]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (isSuperAdmin) {
+      load();
+    }
+  }, [load, isSuperAdmin]);
+
+  if (!isSuperAdmin) {
+    return (
+      <div style={{ padding: '40px 20px', textAlign: 'center', fontFamily: 'Poppins,sans-serif' }}>
+        <p style={{ fontSize: '1.1rem', color: '#DC2626', fontWeight: 600 }}>Access Denied</p>
+        <p style={{ fontSize: '0.9rem', color: '#64748B' }}>Only Super Admin has access to Audit Logs.</p>
+      </div>
+    );
+  }
   useEffect(() => { setPage(1); }, [applied]);
 
   const handleApply = () => { setApplied({ ...filters }); };

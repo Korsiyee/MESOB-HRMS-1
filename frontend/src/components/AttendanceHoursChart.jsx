@@ -10,6 +10,23 @@ const C = {
   textMuted: '#2E6058',
 };
 
+// Helper function to format decimal hours to "Xhr Ymin" format
+const formatHoursToHrMin = (decimalHours) => {
+  if (decimalHours === null || decimalHours === undefined) return '';
+  
+  const totalMinutes = Math.round(decimalHours * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  
+  if (hours > 0 && minutes > 0) {
+    return `${hours}hr ${minutes}min`;
+  } else if (hours > 0) {
+    return `${hours}hr`;
+  } else {
+    return `${minutes}min`;
+  }
+};
+
 /**
  * AttendanceHoursChart Component
  * Simple bar chart visualization for worked hours, overtime, and missing hours
@@ -114,7 +131,7 @@ const AttendanceHoursChart = ({ records = [] }) => {
       </div>
 
       {/* Chart */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, height: 200, paddingTop: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 180, paddingTop: 20, overflow: 'hidden' }}>
         {chartData.map((week, index) => {
           const workedPercent = (week.workedHours / (maxValue || 1)) * 100;
           const overtimePercent = (week.overtimeHours / (maxValue || 1)) * 100;
@@ -124,61 +141,76 @@ const AttendanceHoursChart = ({ records = [] }) => {
           const weekLabel = `${weekDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
           
           return (
-            <div key={index} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-              {/* Bar */}
-              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: 180, position: 'relative' }}>
-                {/* Worked Hours */}
-                {week.workedHours > 0 && (
-                  <div
-                    style={{
-                      width: '60%',
-                      margin: '0 auto',
-                      height: `${workedPercent}%`,
-                      background: '#0F766E',
-                      borderRadius: '6px 6px 0 0',
-                      position: 'relative',
-                      transition: 'all 0.3s',
-                    }}
-                    title={`Worked: ${week.workedHours.toFixed(1)}h`}
-                  >
+            <div key={index} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              {/* Bar Container */}
+              <div style={{ width: '100%', height: 160, position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 4 }}>
+                {/* Main stacked bar (Worked + Overtime) */}
+                <div style={{ width: '50%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                  {/* Worked Hours */}
+                  {week.workedHours > 0 && (
+                    <div
+                      style={{
+                        width: '100%',
+                        height: `${workedPercent}%`,
+                        background: '#0F766E',
+                        borderRadius: week.overtimeHours > 0 ? '0' : '6px 6px 0 0',
+                        minHeight: '2px',
+                      }}
+                      title={`Worked: ${formatHoursToHrMin(week.workedHours)}`}
+                    />
+                  )}
+                  
+                  {/* Overtime stacked on top */}
+                  {week.overtimeHours > 0 && (
+                    <div
+                      style={{
+                        width: '100%',
+                        height: `${overtimePercent}%`,
+                        background: '#059669',
+                        borderRadius: '6px 6px 0 0',
+                        minHeight: '2px',
+                      }}
+                      title={`Overtime: ${formatHoursToHrMin(week.overtimeHours)}`}
+                    />
+                  )}
+                  
+                  {/* Label on top of bars */}
+                  {(week.workedHours > 0 || week.overtimeHours > 0) && (
                     <div style={{ 
                       position: 'absolute', 
-                      top: -20, 
+                      top: -18, 
                       left: '50%', 
                       transform: 'translateX(-50%)', 
-                      fontSize: '0.7rem', 
+                      fontSize: '0.65rem', 
                       fontWeight: 600, 
                       color: C.textMain,
                       whiteSpace: 'nowrap',
                     }}>
-                      {week.workedHours.toFixed(1)}h
+                      {formatHoursToHrMin(week.workedHours + week.overtimeHours)}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
                 
-                {/* Overtime (stacked on top) */}
-                {week.overtimeHours > 0 && (
-                  <div
-                    style={{
-                      width: '60%',
-                      margin: '0 auto',
-                      height: `${overtimePercent}%`,
-                      background: '#059669',
-                      borderRadius: '6px 6px 0 0',
-                      marginTop: -2,
-                    }}
-                    title={`Overtime: ${week.overtimeHours.toFixed(1)}h`}
-                  />
-                )}
-                
-                {/* Missing Hours (separate bar) */}
+                {/* Missing Hours separate bar */}
                 {week.missingHours > 0 && (
-                  <div style={{ position: 'absolute', right: 0, bottom: 0, width: '35%', height: `${missingPercent}%`, background: '#DC2626', borderRadius: '6px 6px 0 0', opacity: 0.7 }} title={`Missing: ${week.missingHours.toFixed(1)}h`} />
+                  <div style={{ width: '35%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                    <div 
+                      style={{ 
+                        width: '100%', 
+                        height: `${missingPercent}%`, 
+                        background: '#DC2626', 
+                        borderRadius: '6px 6px 0 0', 
+                        opacity: 0.75,
+                        minHeight: '2px',
+                      }} 
+                      title={`Missing: ${formatHoursToHrMin(week.missingHours)}`} 
+                    />
+                  </div>
                 )}
               </div>
               
-              {/* Label */}
-              <div style={{ fontSize: '0.68rem', color: C.textMuted, fontWeight: 600, textAlign: 'center' }}>
+              {/* Week Label */}
+              <div style={{ fontSize: '0.65rem', color: C.textMuted, fontWeight: 600, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
                 {weekLabel}
               </div>
             </div>
@@ -190,19 +222,19 @@ const AttendanceHoursChart = ({ records = [] }) => {
       <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-around', fontSize: '0.75rem' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontWeight: 700, fontSize: '1rem', color: C.textMain }}>
-            {chartData.reduce((sum, w) => sum + w.workedHours, 0).toFixed(1)}h
+            {formatHoursToHrMin(chartData.reduce((sum, w) => sum + w.workedHours, 0))}
           </div>
           <div style={{ color: C.textMuted }}>Total Worked</div>
         </div>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontWeight: 700, fontSize: '1rem', color: '#059669' }}>
-            {chartData.reduce((sum, w) => sum + w.overtimeHours, 0).toFixed(1)}h
+            {formatHoursToHrMin(chartData.reduce((sum, w) => sum + w.overtimeHours, 0))}
           </div>
           <div style={{ color: C.textMuted }}>Total Overtime</div>
         </div>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontWeight: 700, fontSize: '1rem', color: '#DC2626' }}>
-            {chartData.reduce((sum, w) => sum + w.missingHours, 0).toFixed(1)}h
+            {formatHoursToHrMin(chartData.reduce((sum, w) => sum + w.missingHours, 0))}
           </div>
           <div style={{ color: C.textMuted }}>Total Missing</div>
         </div>

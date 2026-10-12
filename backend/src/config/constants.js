@@ -10,7 +10,11 @@ const ATTENDANCE_STATUS = Object.freeze({
   PRESENT: "PRESENT",
   ABSENT: "ABSENT",
   LATE: "LATE",
-  ON_LEAVE: "ON_LEAVE",
+  LEAVE: "LEAVE",
+  ON_LEAVE: "LEAVE",
+  HOLIDAY: "HOLIDAY",
+  WEEKEND: "WEEKEND",
+  EXEMPT: "EXEMPT",
 });
 
 const AUDIT_ACTIONS = Object.freeze({

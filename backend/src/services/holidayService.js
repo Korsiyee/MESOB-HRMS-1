@@ -49,10 +49,13 @@ function mapHolidayRow(row) {
     uuid: row.uuid,
     name: row.holiday_name,
     gregorianDate: formatDate(row.holiday_date),
-    type: String(row.calendar_type || "PUBLIC").toUpperCase(),
+    type: String(row.source || row.calendar_type || "PUBLIC").toUpperCase(),
+    calendarType: row.calendar_type,
     ethiopian_date: row.calendar_year ? `${row.calendar_year}-01-01` : null,
     calendar_year: row.calendar_year,
+    calendarYear: row.calendar_year,
     is_active: asBoolean(row.is_active, true),
+    isActive: asBoolean(row.is_active, true),
     source: row.source || "MANUAL",
     description: row.description || "",
   };
@@ -167,21 +170,20 @@ class HolidayService {
     await this.ensureHolidaySchema();
     const date = normalizeDate(payload.date);
     const name = String(payload.name || "").trim();
-    const type = String(payload.type || "MANUAL")
-      .trim()
-      .toUpperCase();
+    const rawType = String(payload.type || payload.calendar_type || payload.calendarType || "PUBLIC").trim().toUpperCase();
+    const calendarType = (rawType === "GREGORIAN" || payload.calendar_type === "GREGORIAN" || payload.calendarType === "GREGORIAN")
+      ? "GREGORIAN"
+      : "ETHIOPIAN";
+    const source = payload.source ? String(payload.source).trim().toUpperCase() : (rawType || "MANUAL");
     const description = String(payload.description || "").trim() || null;
-    const is_active = asBoolean(payload.is_active, true);
-    const source = String(payload.source || "MANUAL")
-      .trim()
-      .toUpperCase();
+    const is_active = asBoolean(payload.is_active ?? payload.isActive, true);
 
     if (!name) {
       throw new Error("Holiday name is required.");
     }
 
-    const calendar_year = payload.calendar_year
-      ? String(payload.calendar_year).trim()
+    const calendar_year = payload.calendar_year || payload.calendarYear
+      ? String(payload.calendar_year || payload.calendarYear).trim()
       : await convertToEthiopianYear(date);
 
     const pool = db.promise();
@@ -202,7 +204,7 @@ class HolidayService {
         date,
         name,
         calendar_year,
-        type,
+        calendarType,
         is_active ? 1 : 0,
         source,
         description,
@@ -228,9 +230,13 @@ class HolidayService {
       ? normalizeDate(payload.date)
       : existing.gregorianDate;
     const name = payload.name ? String(payload.name).trim() : existing.name;
-    const type = payload.type
-      ? String(payload.type).trim().toUpperCase()
-      : existing.type;
+    const rawType = payload.type ? String(payload.type).trim().toUpperCase() : (existing.type || "PUBLIC");
+    const calendarType = (rawType === "GREGORIAN" || payload.calendar_type === "GREGORIAN" || payload.calendarType === "GREGORIAN")
+      ? "GREGORIAN"
+      : (existing.calendarType || "ETHIOPIAN");
+    const source = payload.source
+      ? String(payload.source).trim().toUpperCase()
+      : (rawType || existing.source || "MANUAL");
     const description = Object.prototype.hasOwnProperty.call(
       payload,
       "description",
@@ -239,14 +245,11 @@ class HolidayService {
       : existing.description || null;
     const is_active = Object.prototype.hasOwnProperty.call(payload, "is_active")
       ? asBoolean(payload.is_active, true)
-      : asBoolean(existing.is_active, true);
-    const source = payload.source
-      ? String(payload.source).trim().toUpperCase()
-      : String(existing.source || "MANUAL")
-          .trim()
-          .toUpperCase();
-    const calendar_year = payload.calendar_year
-      ? String(payload.calendar_year).trim()
+      : (Object.prototype.hasOwnProperty.call(payload, "isActive")
+          ? asBoolean(payload.isActive, true)
+          : asBoolean(existing.is_active, true));
+    const calendar_year = payload.calendar_year || payload.calendarYear
+      ? String(payload.calendar_year || payload.calendarYear).trim()
       : existing.calendar_year || (await convertToEthiopianYear(date));
 
     if (!name) {
@@ -270,7 +273,7 @@ class HolidayService {
         date,
         name,
         calendar_year,
-        type,
+        calendarType,
         is_active ? 1 : 0,
         source,
         description,
@@ -357,19 +360,20 @@ class HolidayService {
 
         const holiday_date = rawDate;
         const holiday_name = String(holiday.name || "Unnamed Holiday").trim();
-        const calendar_type = String(holiday.type || "PUBLIC").toUpperCase();
+        const calendar_type = "ETHIOPIAN";
+        const holiday_source = String(holiday.type || "LIBRARY").toUpperCase();
         const calendar_year = await convertToEthiopianYear(holiday_date);
 
         const [result] = await pool.execute(
           `
           INSERT INTO Holidays (uuid, holiday_date, holiday_name, calendar_year, calendar_type, is_active, source, description)
-          VALUES (?, ?, ?, ?, ?, 1, 'LIBRARY', NULL)
+          VALUES (?, ?, ?, ?, ?, 1, ?, NULL)
           ON DUPLICATE KEY UPDATE
             holiday_name = IF(source = 'MANUAL' AND ? = 0, holiday_name, VALUES(holiday_name)),
             calendar_year = IF(source = 'MANUAL' AND ? = 0, calendar_year, VALUES(calendar_year)),
             calendar_type = IF(source = 'MANUAL' AND ? = 0, calendar_type, VALUES(calendar_type)),
             is_active = IF(source = 'MANUAL' AND ? = 0, is_active, 1),
-            source = IF(source = 'MANUAL' AND ? = 0, source, 'LIBRARY')
+            source = IF(source = 'MANUAL' AND ? = 0, source, VALUES(source))
           `,
           [
             uuidv4(),
@@ -377,6 +381,7 @@ class HolidayService {
             holiday_name,
             calendar_year,
             calendar_type,
+            holiday_source,
             overwriteManual ? 1 : 0,
             overwriteManual ? 1 : 0,
             overwriteManual ? 1 : 0,
