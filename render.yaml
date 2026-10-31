@@ -1,0 +1,90 @@
+services:
+  # Backend API Service
+  - type: web
+    name: mesob-hrms-backend
+    runtime: node
+    env: node
+    region: oregon  # Change to your preferred region
+    plan: starter  # Free tier - upgrade to standard for production
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: DB_HOST
+        fromDatabase:
+          name: mesob-hrms-db
+          property: host
+      - key: DB_USER
+        fromDatabase:
+          name: mesob-hrms-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: mesob-hrms-db
+          property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: mesob-hrms-db
+          property: database
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 1d
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: MINIO_ENDPOINT
+        sync: false  # Will be set manually to MinIO service URL
+      - key: MINIO_PORT
+        value: 443
+      - key: MINIO_USE_SSL
+        value: true
+      - key: MINIO_ACCESS_KEY
+        sync: false  # Will be set manually
+      - key: MINIO_SECRET_KEY
+        sync: false  # Will be set manually
+      - key: MINIO_BUCKET
+        value: mesob-hrms
+      - key: MINIO_BUCKET_AUTO_CREATE
+        value: true
+      - key: FRONTEND_URL
+        value: https://mesob-hrms.onrender.com  # Update with your frontend URL
+
+  # Frontend Static Site
+  - type: web
+    name: mesob-hrms-frontend
+    runtime: static
+    env: static
+    region: oregon  # Change to your preferred region
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-XSS-Protection
+        value: 1; mode=block
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        value: https://mesob-hrms-backend.onrender.com  # Update with your backend URL
+
+# Database (MariaDB/MySQL)
+databases:
+  - name: mesob-hrms-db
+    plan: starter  # Free tier - 256MB, upgrade for production
+    databaseName: mesob_hrms
+    user: mesob
+    region: oregon  # Must match service region

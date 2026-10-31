@@ -35,16 +35,25 @@ const app = express();
 // In production, adjust this to match your proxy configuration
 app.set('trust proxy', 1);
 
-const corsOrigin = getEnv("CORS_ORIGIN", "*");
+// CORS configuration - allows frontend URL from environment
+const frontendUrl = getEnv("FRONTEND_URL", "http://localhost:5173");
+const corsOrigin = getEnv("CORS_ORIGIN", frontendUrl);
 const corsOptions =
   corsOrigin === "*"
-    ? { origin: "*" }
+    ? { 
+        origin: "*",
+        credentials: true 
+      }
     : {
         origin: corsOrigin
           .split(",")
           .map((origin) => origin.trim())
           .filter(Boolean),
+        credentials: true,
+        optionsSuccessStatus: 200
       };
+
+console.log('CORS configured for origins:', corsOrigin);
 
 app.use(helmet());
 app.use(cors(corsOptions));

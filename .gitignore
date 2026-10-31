@@ -1,6 +1,24 @@
 node_modules/
 .env
+.env.local
+.env.production.local
 dist/
 build/
 coverage/
 .DS_Store
+*.log
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# MinIO data
+minio_data/
+
+# Database backups
+*.sql.backup
+database/backups/
+
+# Test files
+test-*.html

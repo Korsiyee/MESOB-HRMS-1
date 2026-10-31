@@ -44,34 +44,35 @@ exports.createEnhancedLetterTemplate = async (req, res) => {
 
     // Get active layout
     const [layouts] = await pool.execute(
-      "SELECT id FROM LetterLayoutConfig WHERE is_active = TRUE LIMIT 1"
+      "SELECT uuid FROM LetterLayoutConfig WHERE is_active = TRUE LIMIT 1"
     );
-    const layoutId = layouts.length ? layouts[0].id : null;
+    const layoutUuid = layouts.length ? layouts[0].uuid : null;
+
+    // Build metadata JSON for fields that don't have dedicated columns
+    const metadata = {
+      description: description || null,
+      recipient_info: recipient_info || null,
+      closing_text: closing_text || null,
+      cc_recipients: cc_recipients || null,
+      category: category || "GENERAL",
+    };
 
     await pool.execute(
       `INSERT INTO LetterTemplates (
-        uuid, template_code, template_name, title, category, type, description, layout_config_id,
-        recipient_info, subject, subject_template, body_template, main_body, text_content, closing_text, cc_recipients,
-        uses_new_format, is_active, created_by, version
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE, TRUE, ?, 1)`,
+        uuid, template_code, template_name, letter_type, 
+        subject_template, body_template, footer_template,
+        layout_config_uuid, is_active, required_fields_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE, ?)`,
       [
         templateId,
         `TPL_${Date.now().toString().slice(-6)}`,
         title.trim(),
-        title.trim(),
         category || "GENERAL",
-        category || "GENERAL",
-        description || null,
-        layoutId,
-        recipient_info || null,
-        subject || null,
-        subject || null,
-        main_body,
-        main_body,
+        subject || title.trim(),
         main_body,
         closing_text || null,
-        cc_recipients || null,
-        req.user?.employee_uuid || null,
+        layoutUuid,
+        JSON.stringify(metadata),
       ]
     );
 
@@ -87,17 +88,34 @@ exports.createEnhancedLetterTemplate = async (req, res) => {
 
     const [created] = await pool.execute(
       `SELECT 
-        uuid, title, category, description,
-        recipient_info, subject, main_body, closing_text, cc_recipients,
-        uses_new_format, is_active, version, created_at
+        uuid, template_code, template_name, letter_type,
+        subject_template, body_template, footer_template,
+        layout_config_uuid, is_active, required_fields_json, created_at
       FROM LetterTemplates WHERE uuid = ?`,
       [templateId]
     );
 
+    // Parse metadata back for response
+    const template = created[0];
+    const meta = template.required_fields_json ? JSON.parse(template.required_fields_json) : {};
+
     return sendSuccess(res, {
       status: 201,
       message: "Letter template created successfully.",
-      data: created[0],
+      data: {
+        uuid: template.uuid,
+        template_code: template.template_code,
+        title: template.template_name,
+        category: meta.category || template.letter_type,
+        description: meta.description,
+        subject: template.subject_template,
+        main_body: template.body_template,
+        closing_text: template.footer_template,
+        recipient_info: meta.recipient_info,
+        cc_recipients: meta.cc_recipients,
+        is_active: template.is_active,
+        created_at: template.created_at,
+      },
     });
   } catch (err) {
     console.error("createEnhancedLetterTemplate error:", err);
@@ -131,7 +149,7 @@ exports.updateEnhancedLetterTemplate = async (req, res) => {
 
     // Check if template exists
     const [existing] = await pool.execute(
-      "SELECT uuid, version FROM LetterTemplates WHERE uuid = ?",
+      "SELECT uuid, required_fields_json FROM LetterTemplates WHERE uuid = ?",
       [uuid]
     );
 
@@ -142,56 +160,56 @@ exports.updateEnhancedLetterTemplate = async (req, res) => {
       });
     }
 
-    const currentVersion = existing[0].version || 1;
+    // Get existing metadata
+    const existingMeta = existing[0].required_fields_json 
+      ? JSON.parse(existing[0].required_fields_json) 
+      : {};
 
     // Build update query dynamically
     const updates = [];
     const values = [];
+    
+    // Update metadata fields
+    const newMeta = { ...existingMeta };
+    if (description !== undefined) newMeta.description = description;
+    if (recipient_info !== undefined) newMeta.recipient_info = recipient_info;
+    if (cc_recipients !== undefined) newMeta.cc_recipients = cc_recipients;
+    if (category !== undefined) newMeta.category = category;
 
     if (title !== undefined) {
-      updates.push("title = ?", "template_name = ?");
-      values.push(title.trim(), title.trim());
+      updates.push("template_name = ?");
+      values.push(title.trim());
     }
     if (category !== undefined) {
-      updates.push("category = ?", "type = ?");
-      values.push(category, category);
-    }
-    if (description !== undefined) {
-      updates.push("description = ?");
-      values.push(description);
-    }
-    if (recipient_info !== undefined) {
-      updates.push("recipient_info = ?");
-      values.push(recipient_info);
+      updates.push("letter_type = ?");
+      values.push(category);
     }
     if (subject !== undefined) {
-      updates.push("subject = ?", "subject_template = ?");
-      values.push(subject, subject);
+      updates.push("subject_template = ?");
+      values.push(subject);
     }
     if (main_body !== undefined) {
-      updates.push("main_body = ?", "body_template = ?", "text_content = ?");
-      values.push(main_body, main_body, main_body);
+      updates.push("body_template = ?");
+      values.push(main_body);
     }
     if (closing_text !== undefined) {
-      updates.push("closing_text = ?");
+      updates.push("footer_template = ?");
       values.push(closing_text);
-    }
-    if (cc_recipients !== undefined) {
-      updates.push("cc_recipients = ?");
-      values.push(cc_recipients);
     }
     if (is_active !== undefined) {
       updates.push("is_active = ?");
       values.push(is_active ? 1 : 0);
     }
 
-    // Increment version
-    updates.push("version = ?");
-    values.push(currentVersion + 1);
+    // Always update metadata if any meta fields changed
+    if (Object.keys(newMeta).length > 0) {
+      updates.push("required_fields_json = ?");
+      values.push(JSON.stringify(newMeta));
+    }
 
     values.push(uuid);
 
-    if (updates.length > 1) {
+    if (updates.length > 0) {
       await pool.execute(
         `UPDATE LetterTemplates SET ${updates.join(", ")} WHERE uuid = ?`,
         values
@@ -201,17 +219,33 @@ exports.updateEnhancedLetterTemplate = async (req, res) => {
     // Return updated template
     const [updated] = await pool.execute(
       `SELECT 
-        uuid, title, category, description,
-        recipient_info, subject, main_body, closing_text, cc_recipients,
-        uses_new_format, is_active, version, updated_at
+        uuid, template_code, template_name, letter_type,
+        subject_template, body_template, footer_template,
+        layout_config_uuid, is_active, required_fields_json, updated_at
       FROM LetterTemplates WHERE uuid = ?`,
       [uuid]
     );
 
+    const template = updated[0];
+    const meta = template.required_fields_json ? JSON.parse(template.required_fields_json) : {};
+
     return sendSuccess(res, {
       status: 200,
       message: "Template updated successfully.",
-      data: updated[0],
+      data: {
+        uuid: template.uuid,
+        template_code: template.template_code,
+        title: template.template_name,
+        category: meta.category || template.letter_type,
+        description: meta.description,
+        subject: template.subject_template,
+        main_body: template.body_template,
+        closing_text: template.footer_template,
+        recipient_info: meta.recipient_info,
+        cc_recipients: meta.cc_recipients,
+        is_active: template.is_active,
+        updated_at: template.updated_at,
+      },
     });
   } catch (err) {
     console.error("updateEnhancedLetterTemplate error:", err);
@@ -306,9 +340,9 @@ exports.previewEnhancedLetter = async (req, res) => {
     
     const [templates] = await pool.execute(
       `SELECT 
-        lt.uuid, lt.title, lt.type, lt.category,
-        lt.recipient_info, lt.subject, lt.main_body,
-        lt.closing_text, lt.cc_recipients
+        lt.uuid, lt.template_name, lt.letter_type,
+        lt.subject_template, lt.body_template,
+        lt.footer_template, lt.required_fields_json
       FROM LetterTemplates lt
       WHERE lt.uuid = ? AND lt.is_active = TRUE`,
       [template_uuid]
@@ -323,7 +357,22 @@ exports.previewEnhancedLetter = async (req, res) => {
       });
     }
 
-    const template = templates[0];
+    const templateRow = templates[0];
+    const metadata = templateRow.required_fields_json ? JSON.parse(templateRow.required_fields_json) : {};
+    
+    // Map to expected format
+    const template = {
+      uuid: templateRow.uuid,
+      title: templateRow.template_name,
+      type: templateRow.letter_type,
+      category: metadata.category || templateRow.letter_type,
+      recipient_info: metadata.recipient_info || '',
+      subject: templateRow.subject_template || '',
+      main_body: templateRow.body_template || '',
+      closing_text: templateRow.footer_template || '',
+      cc_recipients: metadata.cc_recipients || '',
+    };
+    
     console.log('[Preview] Template loaded:', template.title);
 
     // ALWAYS show placeholders for template preview (no employee needed)
@@ -457,13 +506,40 @@ exports.getTemplatesByCategory = async (req, res) => {
     const pool = db.promise();
 
     const [templates] = await pool.execute(
-      `SELECT * FROM v_active_letter_templates WHERE category = ?`,
+      `SELECT 
+        uuid, template_code, template_name as title, letter_type as category,
+        subject_template as subject, body_template as main_body, 
+        footer_template as closing_text, layout_config_uuid,
+        is_active, required_fields_json, created_at, updated_at
+      FROM LetterTemplates 
+      WHERE letter_type = ? AND is_active = 1
+      ORDER BY created_at DESC`,
       [category]
     );
 
+    // Parse metadata for each template
+    const data = templates.map(t => {
+      const meta = t.required_fields_json ? JSON.parse(t.required_fields_json) : {};
+      return {
+        uuid: t.uuid,
+        template_code: t.template_code,
+        title: t.title,
+        category: t.category,
+        description: meta.description,
+        subject: t.subject,
+        main_body: t.main_body,
+        closing_text: t.closing_text,
+        recipient_info: meta.recipient_info,
+        cc_recipients: meta.cc_recipients,
+        is_active: t.is_active,
+        created_at: t.created_at,
+        updated_at: t.updated_at,
+      };
+    });
+
     return sendSuccess(res, {
       status: 200,
-      data: templates,
+      data,
     });
   } catch (err) {
     console.error("getTemplatesByCategory error:", err);
@@ -483,16 +559,30 @@ exports.getTemplateVersionHistory = async (req, res) => {
     const { uuid } = req.params;
     const pool = db.promise();
 
-    const [versions] = await pool.execute(
-      `SELECT 
-        v.id, v.version, v.title, v.change_description,
-        v.created_at, e.first_name, e.last_name
-      FROM LetterTemplateVersions v
-      LEFT JOIN Employees e ON e.uuid = v.changed_by
-      WHERE v.template_uuid = ?
-      ORDER BY v.version DESC`,
+    // Check if template exists
+    const [templates] = await pool.execute(
+      "SELECT uuid, template_name, created_at, updated_at FROM LetterTemplates WHERE uuid = ?",
       [uuid]
     );
+
+    if (!templates.length) {
+      return sendError(res, {
+        status: 404,
+        message: "Template not found.",
+      });
+    }
+
+    // For now, return a single version entry (the current version)
+    // In the future, you can implement a LetterTemplateVersions table
+    const template = templates[0];
+    const versions = [{
+      id: 1,
+      version: 1,
+      title: template.template_name,
+      change_description: "Template created",
+      created_at: template.created_at,
+      updated_at: template.updated_at,
+    }];
 
     return sendSuccess(res, {
       status: 200,

@@ -2,14 +2,17 @@ import { updateGlobalActivity } from '../context/AuthContext';
 
 const LOCAL_API_BASE = "http://localhost:5000/api";
 
+// Support multiple environment variable formats for different build tools
 const API_BASE =
   (typeof import.meta !== "undefined" &&
     import.meta.env &&
-    import.meta.env.VITE_API_BASE) ||
+    (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE)) ||
   (typeof process !== "undefined" &&
     process.env &&
-    process.env.REACT_APP_API_BASE) ||
+    (process.env.REACT_APP_API_URL || process.env.REACT_APP_API_BASE)) ||
   LOCAL_API_BASE;
+
+console.log('[API Client] Using API base URL:', API_BASE);
 
 let isRefreshing = false;
 let refreshSubscribers = [];

@@ -61,39 +61,42 @@ exports.listLetterTemplates = async (req, res) => {
     const [rows] = await pool.execute(`
       SELECT
         uuid,
-        COALESCE(template_name, title) AS name,
-        COALESCE(title, template_name) AS title,
-        COALESCE(type, category, 'GENERAL') AS type,
-        COALESCE(category, type, 'GENERAL') AS category,
-        description,
-        COALESCE(body_template, main_body, text_content, '') AS content,
-        COALESCE(main_body, body_template, text_content, '') AS main_body,
-        text_content,
-        subject,
-        subject_template,
-        recipient_info,
-        closing_text,
-        cc_recipients,
-        uses_new_format,
-        pdf_template_key,
-        original_filename,
-        file_size,
-        mime_type,
+        template_code,
+        template_name as name,
+        template_name as title,
+        letter_type as type,
+        letter_type as category,
+        body_template as content,
+        body_template as main_body,
+        subject_template as subject,
+        footer_template,
+        required_fields_json,
+        available_variables_json,
+        requires_approval,
+        approval_levels,
         is_active,
+        layout_config_uuid,
         created_at,
         updated_at
       FROM LetterTemplates
+      WHERE is_active = 1
       ORDER BY created_at DESC
     `);
 
-    // Add template_type field to indicate if it's text or PDF
+    // Add template_type field to indicate text templates
     const data = rows.map((row) => ({
       ...row,
-      template_type: row.pdf_template_key ? "pdf" : "text",
-      pdf_template_key: row.pdf_template_key || null,
-      original_filename: row.original_filename || null,
-      file_size: row.file_size || null,
-      mime_type: row.mime_type || null,
+      template_type: "text",
+      description: null,
+      pdf_template_key: null,
+      original_filename: null,
+      file_size: null,
+      mime_type: null,
+      uses_new_format: false,
+      text_content: row.content,
+      recipient_info: null,
+      closing_text: null,
+      cc_recipients: null
     }));
 
     return sendSuccess(res, { status: 200, data });
@@ -283,7 +286,7 @@ exports.deleteLetterTemplate = async (req, res) => {
     
     // Get template info before deleting
     const [existing] = await pool.execute(
-      "SELECT uuid, title, pdf_template_key FROM LetterTemplates WHERE uuid = ?",
+      "SELECT uuid, template_name, pdf_template_key FROM LetterTemplates WHERE uuid = ?",
       [uuid]
     );
     
@@ -317,7 +320,7 @@ exports.deleteLetterTemplate = async (req, res) => {
       action: "DELETE_LETTER_TEMPLATE",
       entityType: "LETTER_TEMPLATE",
       entityUuid: uuid,
-      diff: { title: template.title },
+      diff: { title: template.template_name },
       ipAddress: req.ip,
     });
     
@@ -365,7 +368,7 @@ exports.generateLetter = async (req, res) => {
 
     // Load template
     const [templates] = await pool.execute(
-      "SELECT uuid, title, type, body_template FROM LetterTemplates WHERE uuid = ?",
+      "SELECT uuid, template_name, letter_type, body_template FROM LetterTemplates WHERE uuid = ?",
       [template_uuid]
     );
     if (!templates.length) {
@@ -402,8 +405,8 @@ exports.generateLetter = async (req, res) => {
         template_uuid,
         req.user?.employee_uuid || null,
         req.user?.employee_uuid || null,
-        template.title || "Letter",
-        template.type || "—",
+        template.template_name || "Letter",
+        template.letter_type || "—",
         generatedContent,
         generatedContent,
         letterNumber,
@@ -415,8 +418,8 @@ exports.generateLetter = async (req, res) => {
       message: "Letter generated.",
       data: {
         uuid: issuedId,
-        name: template.title,
-        type: template.type,
+        name: template.template_name,
+        type: template.letter_type,
         generated_content: generatedContent,
         issued_at: new Date().toISOString(),
       },
@@ -505,7 +508,7 @@ exports.getTemplatePDFPreview = async (req, res) => {
     const pool = db.promise();
     
     const [templates] = await pool.execute(
-      "SELECT uuid, title, pdf_template_key, original_filename FROM LetterTemplates WHERE uuid = ?",
+      "SELECT uuid, template_name, pdf_template_key, original_filename FROM LetterTemplates WHERE uuid = ?",
       [uuid]
     );
     
@@ -533,7 +536,7 @@ exports.getTemplatePDFPreview = async (req, res) => {
       status: 200,
       data: {
         uuid: template.uuid,
-        title: template.title,
+        title: template.template_name,
         filename: template.original_filename,
         preview_url: previewUrl,
         expires_in: 3600,
@@ -558,7 +561,7 @@ exports.downloadTemplatePDF = async (req, res) => {
     const pool = db.promise();
     
     const [templates] = await pool.execute(
-      "SELECT uuid, title, pdf_template_key, original_filename, mime_type FROM LetterTemplates WHERE uuid = ?",
+      "SELECT uuid, template_name, pdf_template_key, original_filename, mime_type FROM LetterTemplates WHERE uuid = ?",
       [uuid]
     );
     
@@ -623,7 +626,7 @@ exports.requestLetter = async (req, res) => {
 
     // Load template with PDF info
     const [templates] = await pool.execute(
-      "SELECT uuid, title, type, body_template, text_content, pdf_template_key FROM LetterTemplates WHERE uuid = ?",
+      "SELECT uuid, template_name, letter_type, body_template, text_content, pdf_template_key FROM LetterTemplates WHERE uuid = ?",
       [template_uuid]
     );
     if (!templates.length) {
@@ -697,9 +700,9 @@ exports.requestLetter = async (req, res) => {
 
     await pool.execute(
       `INSERT INTO LetterRequests
-         (uuid, employee_uuid, template_uuid, generated_content, body_content, generated_pdf_key, status, letter_type, subject, requested_by_uuid)
-       VALUES (?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?)`,
-      [requestId, employee_uuid, template_uuid, generatedContent, generatedContent, pdfKey, template.type || template.title || 'GENERAL', template.title || 'Letter Request', req.user?.uuid || null]
+         (uuid, employee_uuid, template_uuid, body_content, status, letter_type, subject, requested_by_uuid)
+       VALUES (?, ?, ?, ?, 'PENDING', ?, ?, ?)`,
+      [requestId, employee_uuid, template_uuid, generatedContent, template.letter_type || template.template_name || 'GENERAL', template.template_name || 'Letter Request', req.user?.uuid || null]
     );
 
     await safeLogEvent({
@@ -707,7 +710,7 @@ exports.requestLetter = async (req, res) => {
       action: "REQUEST_LETTER",
       entityType: "LETTER_REQUEST",
       entityUuid: requestId,
-      diff: { template: template.title },
+      diff: { template: template.template_name },
       ipAddress: req.ip,
     });
 
@@ -718,7 +721,7 @@ exports.requestLetter = async (req, res) => {
         senderRole:     req.user?.role,
         employeeFullName: [employee.first_name, employee.middle_name, employee.last_name].filter(Boolean).join(" "),
         departmentName:   employee.department_name || "",
-        letterType:       template.type || template.title || "Letter",
+        letterType:       template.letter_type || template.template_name || "Letter",
         requestUuid:      requestId,
       });
     } catch (notifErr) {
@@ -736,8 +739,8 @@ exports.requestLetter = async (req, res) => {
       message: "Letter request submitted.",
       data: {
         uuid: requestId,
-        template_name: template.title,
-        template_type: template.type,
+        template_name: template.template_name,
+        template_type: template.letter_type,
         generated_content: generatedContent,
         preview_url: previewUrl,
         has_pdf: !!pdfKey,
@@ -768,13 +771,15 @@ exports.getMyLetterRequests = async (req, res) => {
     const pool = db.promise();
     const [rows] = await pool.execute(
       `SELECT lr.uuid, lr.template_uuid, lr.employee_uuid,
-              lr.body_content, lr.status, lr.requested_at,
-              lr.reviewed_at, lr.rejection_reason,
-              lt.template_name, lt.type AS template_type,
-              CONCAT(u.username) AS reviewed_by_name
+              lr.letter_type, lr.subject, lr.body_content, lr.status, 
+              lr.requested_at, lr.final_approved_at, lr.rejected_at, 
+              lr.rejection_reason,
+              lt.template_name, lt.letter_type AS template_type,
+              COALESCE(u1.username, u2.username) AS reviewed_by_name
        FROM LetterRequests lr
        LEFT JOIN LetterTemplates lt ON lt.uuid = lr.template_uuid
-       LEFT JOIN Users u ON u.employee_uuid = lr.reviewed_by
+       LEFT JOIN Users u1 ON u1.employee_uuid = lr.final_approved_by_uuid
+       LEFT JOIN Users u2 ON u2.employee_uuid = lr.rejected_by_uuid
        WHERE lr.employee_uuid = ?
        ORDER BY lr.requested_at DESC`,
       [employee_uuid]
@@ -798,9 +803,10 @@ exports.getPendingLetterRequests = async (req, res) => {
   try {
     const pool = db.promise();
     const [rows] = await pool.execute(
-      `SELECT lr.uuid, lr.template_uuid, lr.employee_uuid, lr.ref_no,
-              lr.body_content, lr.status, lr.requested_at,
-              lt.template_name, lt.type AS template_type,
+      `SELECT lr.uuid, lr.template_uuid, lr.employee_uuid,
+              lr.letter_type, lr.subject, lr.body_content, lr.status, 
+              lr.requested_at,
+              lt.template_name, lt.letter_type AS template_type,
               e.mesob_id, e.first_name, e.middle_name, e.last_name,
               CONCAT(e.first_name, ' ', COALESCE(e.middle_name, ''), ' ', e.last_name) AS employee_name
        FROM LetterRequests lr
@@ -829,16 +835,18 @@ exports.getAllLetterRequests = async (req, res) => {
     const pool = db.promise();
     const [rows] = await pool.execute(
       `SELECT lr.uuid, lr.template_uuid, lr.employee_uuid,
-              lr.body_content, lr.status, lr.requested_at,
-              lr.reviewed_at, lr.rejection_reason,
-              lt.template_name, lt.type AS template_type,
+              lr.letter_type, lr.subject, lr.body_content, lr.status, 
+              lr.requested_at, lr.final_approved_at, lr.rejected_at, 
+              lr.rejection_reason,
+              lt.template_name, lt.letter_type AS template_type,
               e.mesob_id, e.first_name, e.middle_name, e.last_name,
               CONCAT(e.first_name, ' ', COALESCE(e.middle_name, ''), ' ', e.last_name) AS employee_name,
-              CONCAT(u.username) AS reviewed_by_name
+              COALESCE(u1.username, u2.username) AS reviewed_by_name
        FROM LetterRequests lr
        LEFT JOIN LetterTemplates lt ON lt.uuid = lr.template_uuid
        LEFT JOIN Employees e ON e.uuid = lr.employee_uuid
-       LEFT JOIN Users u ON u.employee_uuid = lr.reviewed_by
+       LEFT JOIN Users u1 ON u1.employee_uuid = lr.final_approved_by_uuid
+       LEFT JOIN Users u2 ON u2.employee_uuid = lr.rejected_by_uuid
        ORDER BY lr.requested_at DESC`
     );
 
@@ -889,37 +897,36 @@ exports.approveLetterRequest = async (req, res) => {
     // Create the issued letter
     const issuedId = uuidv4();
     const [templates] = await pool.execute(
-      "SELECT title, type FROM LetterTemplates WHERE uuid = ?",
+      "SELECT template_name, letter_type FROM LetterTemplates WHERE uuid = ?",
       [request.template_uuid]
     );
 
-    const contentVal = request.generated_content || request.body_content || "";
+    const contentVal = request.body_content || "";
     const letterNumber = `LTR-${Date.now().toString().slice(-6)}`;
     await pool.execute(
       `INSERT INTO IssuedLetters
          (uuid, employee_uuid, template_uuid, issued_by, issued_by_uuid, name, type, generated_content, content_html, letter_number, issued_date, file_key, file_size)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), ?, 0)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), 'generated', 0)`,
       [
         issuedId,
         request.employee_uuid,
         request.template_uuid,
         reviewer_uuid,
         reviewer_uuid,
-        templates[0]?.title || "Letter",
-        templates[0]?.type || "—",
+        templates[0]?.template_name || "Letter",
+        templates[0]?.letter_type || "—",
         contentVal,
         contentVal,
         letterNumber,
-        request.generated_pdf_key || "generated",
       ]
     );
 
     // Update request status
     await pool.execute(
       `UPDATE LetterRequests
-       SET status = 'APPROVED', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP
+       SET status = 'APPROVED', final_approved_by_uuid = ?, final_approved_at = CURRENT_TIMESTAMP, issued_letter_uuid = ?
        WHERE uuid = ?`,
-      [reviewer_uuid, uuid]
+      [reviewer_uuid, issuedId, uuid]
     );
 
     await safeLogEvent({
@@ -938,7 +945,7 @@ exports.approveLetterRequest = async (req, res) => {
         senderUserUuid:     req.user?.uuid,
         senderRole:         req.user?.role,
         recipientUserUuid:  requesterUserUuid,
-        letterType:         templates[0]?.type || templates[0]?.title || "Letter",
+        letterType:         templates[0]?.letter_type || templates[0]?.template_name || "Letter",
         requestUuid:        uuid,
       });
     } catch (notifErr) {
@@ -990,7 +997,7 @@ exports.rejectLetterRequest = async (req, res) => {
 
     await pool.execute(
       `UPDATE LetterRequests
-       SET status = 'REJECTED', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP,
+       SET status = 'REJECTED', rejected_by_uuid = ?, rejected_at = CURRENT_TIMESTAMP,
            rejection_reason = ?
        WHERE uuid = ?`,
       [reviewer_uuid, reason || null, uuid]
@@ -1008,7 +1015,7 @@ exports.rejectLetterRequest = async (req, res) => {
     // Notify the requester — non-blocking, never breaks the main response
     try {
       const [tmplRows] = await pool.execute(
-        "SELECT type, title FROM LetterTemplates WHERE uuid = ?",
+        "SELECT letter_type, template_name FROM LetterTemplates WHERE uuid = ?",
         [requests[0].template_uuid]
       );
       const requesterUserUuid = await getUserByEmployeeUuid(requests[0].employee_uuid);
@@ -1016,7 +1023,7 @@ exports.rejectLetterRequest = async (req, res) => {
         senderUserUuid:    req.user?.uuid,
         senderRole:        req.user?.role,
         recipientUserUuid: requesterUserUuid,
-        letterType:        tmplRows[0]?.type || tmplRows[0]?.title || "Letter",
+        letterType:        tmplRows[0]?.letter_type || tmplRows[0]?.template_name || "Letter",
         rejectionReason:   reason || null,
         requestUuid:       uuid,
       });
