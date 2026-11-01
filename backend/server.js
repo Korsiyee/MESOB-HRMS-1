@@ -5,6 +5,7 @@ const { checkDatabaseConnection } = require("./src/config/db");
 const {
   startInternalRebuildScheduler,
 } = require("./src/services/internalSchedulerService");
+const { autoInitDatabase } = require("./scripts/autoInitDb");
 
 const PORT = process.env.PORT || 5000;
 
@@ -17,6 +18,12 @@ async function startServer() {
     const dbConnected = await checkDatabaseConnection();
     if (dbConnected) {
       console.log("Database connection verified.");
+      
+      // Auto-initialize database if empty (for Render deployment)
+      if (process.env.NODE_ENV === 'production') {
+        console.log("🔍 Checking database initialization...");
+        await autoInitDatabase();
+      }
     } else {
       console.error("Database connection check failed: returned false");
       // if the connection couldn't be verified we may want to abort
