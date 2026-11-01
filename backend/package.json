@@ -14,7 +14,7 @@
     "dev": "nodemon server.js",
     "postinstall": "echo 'Backend dependencies installed successfully'",
     "db:setup-wizard": "node scripts/setup-wizard.js",
-    "db:init": "node scripts/dbInit.js",
+    "db:init": "node scripts/initPostgresDb.js",
     "db:clean": "node scripts/dbClean.js",
     "db:migrate": "node scripts/migrate.js",
     "db:migrate:users": "node scripts/migrateUsers.js",
