@@ -23,6 +23,9 @@ async function initializeDatabaseViaHTTP(req, res) {
       });
     }
     
+    // Check if force parameter is provided to force reinitialization
+    const force = req.query.force === 'true';
+    
     console.log('🚀 HTTP Database Initialization Request Received');
     
     const DATABASE_URL = process.env.DATABASE_URL;
@@ -43,28 +46,27 @@ async function initializeDatabaseViaHTTP(req, res) {
     
     const client = await pool.connect();
     
-    // Check if already initialized
-    const checkResult = await client.query(`
-      SELECT table_name 
-      FROM information_schema.tables 
-      WHERE table_schema = 'public' AND table_name = 'users'
-    `);
-    
-    if (checkResult.rows.length > 0) {
-      client.release();
-      await pool.end();
-      return res.status(200).json({
-        success: true,
-        message: 'Database already initialized',
-        alreadyInitialized: true
-      });
+    // Check if already initialized (unless force=true)
+    if (!force) {
+      const checkResult = await client.query(`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'users'
+      `);
+      
+      if (checkResult.rows.length > 0) {
+        client.release();
+        await pool.end();
+        return res.status(200).json({
+          success: true,
+          message: 'Database already initialized. Use ?force=true to reinitialize.',
+          alreadyInitialized: true
+        });
+      }
     }
     
     // Run initialization
-    console.log('📝 Starting database initialization...');
-    
-    // Import and run the initialization
-    const initModule = require('../../scripts/initPostgresDb');
+    console.log(force ? '📝 Force reinitializing database...' : '📝 Starting database initialization...');
     
     // Since initPostgresDb is a standalone script, we need to inline the logic here
     await runFullInitialization(client);
