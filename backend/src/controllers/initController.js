@@ -345,12 +345,13 @@ async function runFullInitialization(client) {
   await client.query(`
     CREATE TABLE AuditLogs (
       uuid VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      event_type VARCHAR(100) NOT NULL,
-      entity_type VARCHAR(100),
-      entity_uuid VARCHAR(36),
-      user_uuid VARCHAR(36),
+      actor_user_uuid VARCHAR(36),
+      action_type VARCHAR(100),
+      resource_type VARCHAR(100),
+      resource_uuid VARCHAR(36),
+      old_values_json JSONB,
+      new_values_json JSONB,
       ip_address VARCHAR(50),
-      details JSONB,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
