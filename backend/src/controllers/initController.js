@@ -103,9 +103,45 @@ async function runFullInitialization(client) {
   // Create tables (truncated for brevity - using key tables only)
   console.log('Creating tables...');
   
+  // Drop all tables first to ensure clean state
+  await client.query(`DROP TABLE IF EXISTS LetterAttachments CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS LetterRequests CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS LetterTemplates CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS LetterReferenceSequence CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS PolicyAcknowledgments CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS PolicyVersions CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS Policies CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS Notifications CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS LeaveBalances CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS LeaveApplications CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS LeaveTypes CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS PublicHolidays CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS AttendanceRecords CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS EmployeeShifts CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS FaceEncodings CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS EmployeeLevelHistory CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS EmployeeIDDocuments CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS EmployeeAddresses CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS Employees CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS Users CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS LevelVersions CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS Levels CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS DepartmentLeadership CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS Positions CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS ShiftDefinitions CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS Departments CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS RoleModules CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS Roles CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS Scopes CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS Modules CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS SystemSettings CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS NetworkSettings CASCADE`);
+  
+  console.log('Dropped existing tables...');
+  
   // System tables
   await client.query(`
-    CREATE TABLE IF NOT EXISTS SystemSettings (
+    CREATE TABLE SystemSettings (
       uuid VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
       setting_key VARCHAR(100) UNIQUE NOT NULL,
       setting_value TEXT,
@@ -117,7 +153,7 @@ async function runFullInitialization(client) {
   
   // Modules
   await client.query(`
-    CREATE TABLE IF NOT EXISTS Modules (
+    CREATE TABLE Modules (
       uuid VARCHAR(36) PRIMARY KEY,
       code VARCHAR(50) UNIQUE NOT NULL,
       name VARCHAR(100) NOT NULL,
@@ -132,7 +168,7 @@ async function runFullInitialization(client) {
   
   // Scopes
   await client.query(`
-    CREATE TABLE IF NOT EXISTS Scopes (
+    CREATE TABLE Scopes (
       uuid VARCHAR(36) PRIMARY KEY,
       code VARCHAR(50) UNIQUE NOT NULL,
       name VARCHAR(100) NOT NULL,
@@ -144,7 +180,7 @@ async function runFullInitialization(client) {
   
   // Roles
   await client.query(`
-    CREATE TABLE IF NOT EXISTS Roles (
+    CREATE TABLE Roles (
       uuid VARCHAR(36) PRIMARY KEY,
       code VARCHAR(50) UNIQUE NOT NULL,
       name VARCHAR(100) NOT NULL,
@@ -160,7 +196,7 @@ async function runFullInitialization(client) {
   
   // RoleModules
   await client.query(`
-    CREATE TABLE IF NOT EXISTS RoleModules (
+    CREATE TABLE RoleModules (
       uuid VARCHAR(36) PRIMARY KEY,
       role_uuid VARCHAR(36) NOT NULL REFERENCES Roles(uuid) ON DELETE CASCADE,
       module_uuid VARCHAR(36) NOT NULL REFERENCES Modules(uuid) ON DELETE CASCADE,
@@ -172,7 +208,7 @@ async function runFullInitialization(client) {
   
   // Departments
   await client.query(`
-    CREATE TABLE IF NOT EXISTS Departments (
+    CREATE TABLE Departments (
       uuid VARCHAR(36) PRIMARY KEY,
       dept_code VARCHAR(50) UNIQUE NOT NULL,
       name VARCHAR(200) UNIQUE NOT NULL,
@@ -186,7 +222,7 @@ async function runFullInitialization(client) {
   
   // ShiftDefinitions
   await client.query(`
-    CREATE TABLE IF NOT EXISTS ShiftDefinitions (
+    CREATE TABLE ShiftDefinitions (
       uuid VARCHAR(36) PRIMARY KEY,
       shift_code VARCHAR(50) UNIQUE NOT NULL,
       name VARCHAR(100) UNIQUE NOT NULL,
@@ -202,7 +238,7 @@ async function runFullInitialization(client) {
   
   // Positions
   await client.query(`
-    CREATE TABLE IF NOT EXISTS Positions (
+    CREATE TABLE Positions (
       uuid VARCHAR(36) PRIMARY KEY,
       position_code VARCHAR(50) UNIQUE NOT NULL,
       title VARCHAR(200) NOT NULL,
@@ -217,7 +253,7 @@ async function runFullInitialization(client) {
   
   // Levels
   await client.query(`
-    CREATE TABLE IF NOT EXISTS Levels (
+    CREATE TABLE Levels (
       uuid VARCHAR(36) PRIMARY KEY,
       level_code VARCHAR(50) UNIQUE NOT NULL,
       name VARCHAR(100) NOT NULL,
@@ -231,7 +267,7 @@ async function runFullInitialization(client) {
   
   // LevelVersions
   await client.query(`
-    CREATE TABLE IF NOT EXISTS LevelVersions (
+    CREATE TABLE LevelVersions (
       uuid VARCHAR(36) PRIMARY KEY,
       level_uuid VARCHAR(36) NOT NULL REFERENCES Levels(uuid) ON DELETE CASCADE,
       base_salary DECIMAL(15,2) NOT NULL,
@@ -247,7 +283,7 @@ async function runFullInitialization(client) {
   
   // Users
   await client.query(`
-    CREATE TABLE IF NOT EXISTS Users (
+    CREATE TABLE Users (
       uuid VARCHAR(36) PRIMARY KEY,
       employee_uuid VARCHAR(36),
       user_type VARCHAR(20) DEFAULT 'EMPLOYEE',
@@ -266,7 +302,7 @@ async function runFullInitialization(client) {
   
   // Employees
   await client.query(`
-    CREATE TABLE IF NOT EXISTS Employees (
+    CREATE TABLE Employees (
       uuid VARCHAR(36) PRIMARY KEY,
       mesob_id VARCHAR(20) UNIQUE,
       title VARCHAR(20),
@@ -294,17 +330,9 @@ async function runFullInitialization(client) {
   
   // Add employee foreign key to Users
   await client.query(`
-    DO $$ 
-    BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM information_schema.table_constraints 
-        WHERE constraint_name = 'fk_users_employee'
-      ) THEN
-        ALTER TABLE Users 
-        ADD CONSTRAINT fk_users_employee 
-        FOREIGN KEY (employee_uuid) REFERENCES Employees(uuid) ON DELETE CASCADE;
-      END IF;
-    END $$;
+    ALTER TABLE Users 
+    ADD CONSTRAINT fk_users_employee 
+    FOREIGN KEY (employee_uuid) REFERENCES Employees(uuid) ON DELETE CASCADE
   `);
   
   console.log('Inserting seed data...');
