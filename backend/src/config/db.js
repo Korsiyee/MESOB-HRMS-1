@@ -54,22 +54,46 @@ if (isMockMode) {
   db = {
     promise: () => ({
       execute: async (sql, params) => {
-        const result = await pgPool.query(sql, params);
+        // Convert MySQL ? placeholders to PostgreSQL $1, $2, etc.
+        let pgSql = sql;
+        let paramIndex = 1;
+        pgSql = pgSql.replace(/\?/g, () => `$${paramIndex++}`);
+        
+        const result = await pgPool.query(pgSql, params);
         return [result.rows, result.fields];
       },
       query: async (sql, params) => {
-        const result = await pgPool.query(sql, params);
+        // Convert MySQL ? placeholders to PostgreSQL $1, $2, etc.
+        let pgSql = sql;
+        if (params && params.length > 0) {
+          let paramIndex = 1;
+          pgSql = pgSql.replace(/\?/g, () => `$${paramIndex++}`);
+        }
+        
+        const result = await pgPool.query(pgSql, params);
         return [result.rows, result.fields];
       },
       getConnection: async () => {
         const client = await pgPool.connect();
         return {
           execute: async (sql, params) => {
-            const result = await client.query(sql, params);
+            // Convert MySQL ? placeholders to PostgreSQL $1, $2, etc.
+            let pgSql = sql;
+            let paramIndex = 1;
+            pgSql = pgSql.replace(/\?/g, () => `$${paramIndex++}`);
+            
+            const result = await client.query(pgSql, params);
             return [result.rows, result.fields];
           },
           query: async (sql, params) => {
-            const result = await client.query(sql, params);
+            // Convert MySQL ? placeholders to PostgreSQL $1, $2, etc.
+            let pgSql = sql;
+            if (params && params.length > 0) {
+              let paramIndex = 1;
+              pgSql = pgSql.replace(/\?/g, () => `$${paramIndex++}`);
+            }
+            
+            const result = await client.query(pgSql, params);
             return [result.rows, result.fields];
           },
           beginTransaction: async () => await client.query('BEGIN'),
