@@ -122,6 +122,7 @@ async function runFullInitialization(client) {
   await client.query(`DROP TABLE IF EXISTS EmployeeLevelHistory CASCADE`);
   await client.query(`DROP TABLE IF EXISTS EmployeeIDDocuments CASCADE`);
   await client.query(`DROP TABLE IF EXISTS EmployeeAddresses CASCADE`);
+  await client.query(`DROP TABLE IF EXISTS AuditLogs CASCADE`);
   await client.query(`DROP TABLE IF EXISTS Employees CASCADE`);
   await client.query(`DROP TABLE IF EXISTS Users CASCADE`);
   await client.query(`DROP TABLE IF EXISTS LevelVersions CASCADE`);
@@ -291,7 +292,10 @@ async function runFullInitialization(client) {
       password_hash VARCHAR(255) NOT NULL,
       role_uuid VARCHAR(36) REFERENCES Roles(uuid) ON DELETE SET NULL,
       is_active BOOLEAN DEFAULT TRUE,
+      refresh_token TEXT,
+      token_version INT DEFAULT 0,
       last_login TIMESTAMP,
+      last_activity TIMESTAMP,
       password_changed_at TIMESTAMP,
       failed_login_attempts INT DEFAULT 0,
       locked_until TIMESTAMP,
@@ -333,6 +337,20 @@ async function runFullInitialization(client) {
     ALTER TABLE Users 
     ADD CONSTRAINT fk_users_employee 
     FOREIGN KEY (employee_uuid) REFERENCES Employees(uuid) ON DELETE CASCADE
+  `);
+  
+  // AuditLogs table
+  await client.query(`
+    CREATE TABLE AuditLogs (
+      uuid VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      event_type VARCHAR(100) NOT NULL,
+      entity_type VARCHAR(100),
+      entity_uuid VARCHAR(36),
+      user_uuid VARCHAR(36),
+      ip_address VARCHAR(50),
+      details JSONB,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
   `);
   
   console.log('Inserting seed data...');
