@@ -23,6 +23,7 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const faceRecognitionRoutes = require("./routes/faceRecognitionRoutes");
 const networkSettingsRoutes = require("./routes/networkSettingsRoutes");
 const roleManagementRoutes = require("./routes/roleManagementRoutes");
+const initRoutes = require("./routes/initRoutes");
 const { authenticateJwt } = require("./middleware/authMiddleware");
 const notFoundHandler = require("./middleware/notFoundHandler");
 const errorHandler = require("./middleware/errorHandler");
@@ -60,6 +61,7 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 app.use("/api/health", healthRoutes);
+app.use("/api/init", initRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/sync", syncRoutes);
 app.use(authenticateJwt);
