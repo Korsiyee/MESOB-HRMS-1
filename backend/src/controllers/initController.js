@@ -441,7 +441,7 @@ async function runFullInitialization(client) {
   // Insert User - Password: mesob2024
   await client.query(`
     INSERT INTO Users (uuid, employee_uuid, username, password_hash, role_uuid, is_active) VALUES
-    ('u1000001-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000001', 'abebe.tadesse', '$2b$10$vI8aWBnW3fID.Zj7.lfIlOJ.1vLoOYsNjzQyX.NjqiIy/1F7L8YxC', (SELECT uuid FROM Roles WHERE code = 'SUPER_ADMIN'), TRUE)
+    ('u1000001-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000001', 'abebe.tadesse', '$2a$10$um.tQWQEQt7CDp5QHxLb/eVj1UXCKDm5l8qzR0qU.JX9sTIAacRcy', (SELECT uuid FROM Roles WHERE code = 'SUPER_ADMIN'), TRUE)
     ON CONFLICT (username) DO NOTHING
   `);
   
